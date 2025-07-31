@@ -1,0 +1,16 @@
+{
+    "projects": [
+        {
+            "name": "CatLottery",
+            "path": "./CatLottery.tact",
+            "output": "./build",
+            "options": {
+                "debug": true,
+                "external": true,
+                "experimental": {
+                    "inline": true
+                }
+            }
+        }
+    ]
+} 
