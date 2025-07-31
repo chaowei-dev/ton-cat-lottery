@@ -58,9 +58,9 @@ ton-cat-lottery/
 
 ```typescript
 // CatLottery.tact
-join(): 支付 TON 並加入抽獎池  
-drawWinner(): 隨機選出中獎者並發送 NFT  
-sendNFT(address): 調用 NFT 合約並發送對應貓咪 NFT  
+join(): 支付 TON 並加入抽獎池
+drawWinner(): 隨機選出中獎者並發送 NFT
+sendNFT(address): 調用 NFT 合約並發送對應貓咪 NFT
 ```
 
 ### 🧰 後端自動抽獎機器人（Go）
@@ -91,9 +91,10 @@ sendNFT(address): 調用 NFT 合約並發送對應貓咪 NFT
 ---
 
 ## 🛠️ 環境需求
+
 ```
-- Node.js >= 
-- Go >= 
+- Node.js >=
+- Go >=
 - Docker & Docker Compose
 - Tact CLI (`npm install -g tact`)
 ```
@@ -159,14 +160,14 @@ tact test CatLottery.tact
 
 ## 📚 技術棧
 
-| 類別     | 技術                         |
-| -------- | ---------------------------- |
-| 區塊鏈   | TON, Tact, TonConnect        |
-| 後端     | Go, TonCenter API, Cobra CLI |
-| 前端     | React, TonConnect UI SDK     |
-| 部署     | Docker, GitHub Actions       |
-| 監控     | Prometheus, Grafana          |
-| 基礎設施 | Terraform, GCP, Ansible（選配）   |
+| 類別     | 技術                            |
+| -------- | ------------------------------- |
+| 區塊鏈   | TON, Tact, TonConnect           |
+| 後端     | Go, TonCenter API, Cobra CLI    |
+| 前端     | React, TonConnect UI SDK        |
+| 部署     | Docker, GitHub Actions          |
+| 監控     | Prometheus, Grafana             |
+| 基礎設施 | Terraform, GCP, Ansible（選配） |
 
 ---
 
@@ -185,14 +186,14 @@ Email：liu.chaowei.dev@gmail.com
 ### 智能合約模組（Tact）
 
 > 定義好「抽獎怎麼運作」「怎麼發 NFT」「參與者怎麼加入」。
-> 
-- [ ] 初始化 `CatLottery.tact` 合約結構（定義 join/drawWinner/sendNFT）
-- [ ] 設計儲存參加者資料的 Cell 結構（儲存地址列表）
-- [ ] 實作 `join()` 方法（收款 + 儲存參與者）
-- [ ] 實作 `drawWinner()` 方法（根據 block hash 隨機選取）
-- [ ] 實作 `sendNFT(address)`：觸發 NFT 合約轉移
-- [ ] 撰寫單元測試腳本（測試參加、抽獎、轉移邏輯）
-- [ ] 使用 `tact` CLI 部署至 testnet
+
+- [x] 初始化 `CatLottery.tact` 合約結構（定義 join/drawWinner/sendNFT）
+- [x] 設計儲存參加者資料的 Cell 結構（儲存地址列表）
+- [x] 實作 `join()` 方法（收款 + 儲存參與者）
+- [x] 實作 `drawWinner()` 方法（根據 block hash 隨機選取）
+- [x] 實作 `sendNFT(address)`：觸發 NFT 合約轉移
+- [x] 撰寫單元測試腳本（測試參加、抽獎、轉移邏輯）
+- [x] 使用 `tact` CLI 部署至 testnet
 - [ ] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
 - [ ] 鑄造並部署預設的 NFT（貓咪圖像）
 
@@ -246,7 +247,6 @@ Email：liu.chaowei.dev@gmail.com
   - [ ] 抽獎次數
   - [ ] NFT 發送錯誤率
   - [ ] 節點同步狀態（延遲區塊高度）
-
 
 ### 測試與驗證
 
