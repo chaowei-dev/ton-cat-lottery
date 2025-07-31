@@ -34,7 +34,19 @@
 ```bash
 ton-cat-lottery/
 ├── contracts/             # Tact 智能合約
-│   └── CatLottery.tact
+│   ├── CatLottery.tact        # 主抽獎合約
+│   ├── CatNFT.tact            # 貓咪 NFT 合約
+│   ├── tact.config.json       # Tact 編譯配置
+│   ├── scripts/               # 部署與互動腳本
+│   │   ├── deploy.ts          # 抽獎合約部署
+│   │   ├── deploy-nft.ts      # NFT 合約部署
+│   │   ├── interact.ts        # 合約互動
+│   │   └── verify.ts          # 合約驗證
+│   ├── tests/                 # 合約測試
+│   │   └── CatLottery.test.ts # 抽獎合約測試
+│   └── build/                 # 構建產物
+│       ├── CatLottery_*       # 抽獎合約構建文件
+│       └── CatNFT_*           # NFT 合約構建文件
 ├── backend/               # Go 抽獎機器人服務
 │   └── main.go
 ├── frontend/              # React + TonConnect 前端 dApp
@@ -194,8 +206,8 @@ Email：liu.chaowei.dev@gmail.com
 - [x] 實作 `sendNFT(address)`：觸發 NFT 合約轉移
 - [x] 撰寫單元測試腳本（測試參加、抽獎、轉移邏輯）
 - [x] 使用 `tact` CLI 部署至 testnet
-- [ ] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
-- [ ] 鑄造並部署預設的 NFT（貓咪圖像）
+- [x] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
+- [x] 鑄造並部署預設的 NFT（貓咪圖像）
 
 ### 後端服務模組（Go）
 

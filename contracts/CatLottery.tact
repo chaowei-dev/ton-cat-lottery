@@ -150,23 +150,18 @@ contract CatLottery with Deployable {
         // 1. 檢查 NFT 合約地址
         require(self.nftContract != null, "NFT contract not set");
 
-        // 2. 準備 NFT 轉移訊息
-        let nftTransferMsg: NFTTransfer = NFTTransfer {
-            queryId: nftId,
-            newOwner: winner,
-            responseDestination: self.owner,
-            customPayload: emptyCell(),
-            forwardAmount: ton("0.01"),
-            forwardPayload: emptySlice(),
+        // 2. 準備 MintTo 訊息給簡化 NFT 合約
+        let mintMsg: MintTo = MintTo {
+            to: winner,
         };
 
-        // 3. 發送 NFT 轉移請求到 NFT 合約
+        // 3. 發送 MintTo 請求到 NFT 合約
         send(SendParameters {
             to: self.nftContract!!,
-            value: ton("0.05"), // 支付 NFT 轉移的 gas 費用
+            value: ton("0.05"), // 支付 NFT 鑄造的 gas 費用
             mode: SendPayGasSeparately,
             bounce: true,
-            body: nftTransferMsg.toCell(),
+            body: mintMsg.toCell(),
         });
 
         // 4. 發送 NFT 發送事件
@@ -176,6 +171,19 @@ contract CatLottery with Deployable {
             nftContract: self.nftContract!!,
             timestamp: now(),
         }.toCell());
+    }
+
+    // 根據模板 ID 獲取貓咪名稱
+    fun getCatNameByTemplate(templateId: Int): String {
+        if (templateId == 0) {
+            return "Orange Tabby";
+        } else if (templateId == 1) {
+            return "Siamese Princess";
+        } else if (templateId == 2) {
+            return "Maine Coon King";
+        } else {
+            return "Cosmic Cat";
+        }
     }
 
     // === 管理功能 ===
@@ -247,6 +255,11 @@ contract CatLottery with Deployable {
 // 設定 NFT 合約地址訊息
 message SetNFTContract {
     nftContract: Address;
+}
+
+// NFT 鑄造訊息（發送給簡化 NFT 合約）
+message MintTo {
+    to: Address;
 }
 
 // NFT 轉移訊息（符合 TON NFT 標準）
