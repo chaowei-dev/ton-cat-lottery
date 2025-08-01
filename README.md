@@ -267,7 +267,7 @@ Email：liu.chaowei.dev@gmail.com
 
 #### 基本功能
 
-- [ ] 建立 React 專案架構 (Vite + TypeScript + 基礎 CSS)
+- [x] 建立 React 專案架構 (Vite + TypeScript + 基礎 CSS)
 - [ ] 整合 TonConnect SDK - 支援 Tonkeeper 錢包連接與斷開
 - [ ] 顯示合約狀態 - 參與人數、當前輪次、抽獎是否活躍
 - [ ] 實作參加抽獎功能 - 發送 `join()` 交易並支付參與費用
