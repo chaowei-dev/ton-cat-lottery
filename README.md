@@ -223,13 +223,13 @@ Email：liu.chaowei.dev@gmail.com
 
 **智能合約互動**
 
-- [ ] 撰寫 TonCenter API 客戶端（基礎查詢功能）
-- [ ] 實作錢包管理與交易簽名
-- [ ] 核心抽獎功能：
-  - [ ] `GetContractInfo()` - 查詢抽獎狀態
-  - [ ] `SendDrawWinner()` - 執行抽獎
-  - [ ] `SendStartNewRound()` - 開始新輪次
-- [ ] 基礎交易監控（檢查交易是否成功）
+- [x] 撰寫 TonCenter API 客戶端（基礎查詢功能）
+- [x] 實作錢包管理與交易簽名
+- [x] 核心抽獎功能：
+  - [x] `GetContractInfo()` - 查詢抽獎狀態
+  - [x] `SendDrawWinner()` - 執行抽獎
+  - [x] `SendStartNewRound()` - 開始新輪次
+- [x] 基礎交易監控（檢查交易是否成功）
 
 **核心業務邏輯**
 

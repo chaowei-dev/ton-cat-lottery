@@ -25,7 +25,10 @@ func main() {
 	appLogger.Info("📋 配置載入完成")
 
 	// 初始化抽獎服務
-	lotteryService := lottery.NewService(cfg, appLogger)
+	lotteryService, err := lottery.NewService(cfg, appLogger)
+	if err != nil {
+		appLogger.Fatal("初始化抽獎服務失敗", "error", err)
+	}
 
 	// 啟動服務
 	if err := lotteryService.Start(); err != nil {

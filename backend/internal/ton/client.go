@@ -35,6 +35,31 @@ type ContractInfo struct {
 	State   string `json:"state"`
 }
 
+// LotteryContractInfo 抽獎合約狀態資訊
+type LotteryContractInfo struct {
+	Owner            string `json:"owner"`
+	EntryFee         int64  `json:"entry_fee"`
+	MaxParticipants  int    `json:"max_participants"`
+	CurrentRound     int    `json:"current_round"`
+	LotteryActive    bool   `json:"lottery_active"`
+	ParticipantCount int    `json:"participant_count"`
+	NFTContract      string `json:"nft_contract,omitempty"`
+}
+
+// Participant 參與者資訊
+type Participant struct {
+	Address   string `json:"address"`
+	Amount    int64  `json:"amount"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+// LotteryResult 抽獎結果
+type LotteryResult struct {
+	Winner    string `json:"winner"`
+	NFTId     int64  `json:"nft_id"`
+	Timestamp int64  `json:"timestamp"`
+}
+
 // NewClient 創建新的 TON 客戶端
 func NewClient(cfg *config.Config, log *logger.Logger) *Client {
 	return &Client{
@@ -53,7 +78,7 @@ func (c *Client) GetContractInfo(ctx context.Context, contractAddress string) (*
 
 	// 構建請求 URL
 	url := fmt.Sprintf("%sgetAddressInformation", c.baseURL)
-	
+
 	// 構建請求參數
 	params := map[string]interface{}{
 		"address": contractAddress,
@@ -70,7 +95,7 @@ func (c *Client) GetContractInfo(ctx context.Context, contractAddress string) (*
 		return nil, fmt.Errorf("解析合約資訊失敗: %w", err)
 	}
 
-	c.logger.Debug("合約資訊查詢成功", 
+	c.logger.Debug("合約資訊查詢成功",
 		"address", contractInfo.Address,
 		"balance", contractInfo.Balance,
 		"state", contractInfo.State,
@@ -85,7 +110,7 @@ func (c *Client) SendTransaction(ctx context.Context, transaction []byte) (strin
 
 	// 構建請求 URL
 	url := fmt.Sprintf("%ssendBoc", c.baseURL)
-	
+
 	// 構建請求參數
 	params := map[string]interface{}{
 		"boc": fmt.Sprintf("%x", transaction),
@@ -118,7 +143,7 @@ func (c *Client) GetTransactionStatus(ctx context.Context, hash string) (string,
 
 	// 構建請求 URL
 	url := fmt.Sprintf("%sgetTransactions", c.baseURL)
-	
+
 	// 構建請求參數
 	params := map[string]interface{}{
 		"hash": hash,
@@ -142,7 +167,7 @@ func (c *Client) GetTransactionStatus(ctx context.Context, hash string) (string,
 	// 假設第一個交易就是我們要查的
 	tx := transactions[0]
 	status := "unknown"
-	
+
 	if success, ok := tx["success"].(bool); ok {
 		if success {
 			status = "success"
@@ -157,7 +182,7 @@ func (c *Client) GetTransactionStatus(ctx context.Context, hash string) (string,
 
 // RunGetMethod 執行合約的 get 方法
 func (c *Client) RunGetMethod(ctx context.Context, contractAddress, method string, params []interface{}) (json.RawMessage, error) {
-	c.logger.Debug("執行合約 get 方法", 
+	c.logger.Debug("執行合約 get 方法",
 		"address", contractAddress,
 		"method", method,
 		"params", params,
@@ -165,7 +190,7 @@ func (c *Client) RunGetMethod(ctx context.Context, contractAddress, method strin
 
 	// 構建請求 URL
 	url := fmt.Sprintf("%srunGetMethod", c.baseURL)
-	
+
 	// 構建請求參數
 	requestParams := map[string]interface{}{
 		"address": contractAddress,
@@ -186,7 +211,7 @@ func (c *Client) RunGetMethod(ctx context.Context, contractAddress, method strin
 // makeRequest 發送 HTTP 請求
 func (c *Client) makeRequest(ctx context.Context, method, url string, params map[string]interface{}) (*APIResponse, error) {
 	var body io.Reader
-	
+
 	if method == "POST" {
 		jsonData, err := json.Marshal(params)
 		if err != nil {
@@ -223,4 +248,85 @@ func (c *Client) makeRequest(ctx context.Context, method, url string, params map
 	}
 
 	return &apiResp, nil
+}
+
+// === 抽獎合約專用方法 ===
+
+// GetLotteryContractInfo 獲取抽獎合約狀態
+func (c *Client) GetLotteryContractInfo(ctx context.Context, contractAddress string) (*LotteryContractInfo, error) {
+	c.logger.Debug("查詢抽獎合約狀態", "address", contractAddress)
+
+	// 調用合約的 getContractInfo get 方法
+	result, err := c.RunGetMethod(ctx, contractAddress, "getContractInfo", []interface{}{})
+	if err != nil {
+		return nil, fmt.Errorf("查詢抽獎合約狀態失敗: %w", err)
+	}
+
+	// 解析結果
+	var contractInfo LotteryContractInfo
+	if err := json.Unmarshal(result, &contractInfo); err != nil {
+		return nil, fmt.Errorf("解析抽獎合約狀態失敗: %w", err)
+	}
+
+	c.logger.Debug("抽獎合約狀態查詢成功",
+		"round", contractInfo.CurrentRound,
+		"active", contractInfo.LotteryActive,
+		"participants", contractInfo.ParticipantCount,
+	)
+
+	return &contractInfo, nil
+}
+
+// GetParticipant 獲取參與者資訊
+func (c *Client) GetParticipant(ctx context.Context, contractAddress string, index int) (*Participant, error) {
+	c.logger.Debug("查詢參與者資訊", "address", contractAddress, "index", index)
+
+	result, err := c.RunGetMethod(ctx, contractAddress, "getParticipant", []interface{}{index})
+	if err != nil {
+		return nil, fmt.Errorf("查詢參與者資訊失敗: %w", err)
+	}
+
+	var participant Participant
+	if err := json.Unmarshal(result, &participant); err != nil {
+		return nil, fmt.Errorf("解析參與者資訊失敗: %w", err)
+	}
+
+	c.logger.Debug("參與者資訊查詢成功", "address", participant.Address)
+	return &participant, nil
+}
+
+// GetWinner 獲取中獎記錄
+func (c *Client) GetWinner(ctx context.Context, contractAddress string, round int) (*LotteryResult, error) {
+	c.logger.Debug("查詢中獎記錄", "address", contractAddress, "round", round)
+
+	result, err := c.RunGetMethod(ctx, contractAddress, "getWinner", []interface{}{round})
+	if err != nil {
+		return nil, fmt.Errorf("查詢中獎記錄失敗: %w", err)
+	}
+
+	var lotteryResult LotteryResult
+	if err := json.Unmarshal(result, &lotteryResult); err != nil {
+		return nil, fmt.Errorf("解析中獎記錄失敗: %w", err)
+	}
+
+	c.logger.Debug("中獎記錄查詢成功", "winner", lotteryResult.Winner, "nft_id", lotteryResult.NFTId)
+	return &lotteryResult, nil
+}
+
+// GetContractBalance 獲取合約餘額
+func (c *Client) GetContractBalance(ctx context.Context, contractAddress string) (int64, error) {
+	c.logger.Debug("查詢合約餘額", "address", contractAddress)
+
+	result, err := c.RunGetMethod(ctx, contractAddress, "getBalance", []interface{}{})
+	if err != nil {
+		return 0, fmt.Errorf("查詢合約餘額失敗: %w", err)
+	}
+
+	var balance int64
+	if err := json.Unmarshal(result, &balance); err != nil {
+		return 0, fmt.Errorf("解析合約餘額失敗: %w", err)
+	}
+
+	c.logger.Debug("合約餘額查詢成功", "balance", balance)
+	return balance, nil
 }
