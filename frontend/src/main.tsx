@@ -4,9 +4,9 @@ import { TonConnectUIProvider } from '@tonconnect/ui-react'
 import './index.css'
 import App from './App.tsx'
 
-// 暫時使用官方 manifest 進行開發
-// TODO: 專案完成後部署自己的 manifest (使用 Cloudflare Tunnel 或類似服務)
-const manifestUrl = 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json'
+// 使用自己的 manifest (Cloudflare Pages)
+// const manifestUrl = 'https://ton-connect.github.io/demo-dapp-with-react-ui/tonconnect-manifest.json' // 官方的 manifest
+const manifestUrl = 'https://ton-cat-lottery-manifest.pages.dev/tonconnect-manifest.json'   // 自己的 manifest
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

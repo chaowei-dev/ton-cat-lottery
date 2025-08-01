@@ -269,6 +269,7 @@ Email：liu.chaowei.dev@gmail.com
 
 - [x] 建立 React 專案架構 (Vite + TypeScript + 基礎 CSS)
 - [x] 整合 TonConnect SDK - 支援 Tonkeeper 錢包連接與斷開
+- [x] 建立自己的 mainfest 用來做測試，透過 cloudflare pages 來部署
 - [ ] 顯示合約狀態 - 參與人數、當前輪次、抽獎是否活躍
 - [ ] 實作參加抽獎功能 - 發送 `join()` 交易並支付參與費用
 - [ ] 顯示用戶錢包資訊 - 地址、TON 餘額
