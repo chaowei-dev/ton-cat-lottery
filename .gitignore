@@ -86,3 +86,16 @@ Thumbs.db
 
 # Yarn integrity file
 .yarn-integrity
+
+# Go specific files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Go workspace file and vendor directory
+# vendor/
