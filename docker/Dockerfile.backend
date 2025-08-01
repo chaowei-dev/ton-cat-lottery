@@ -1,0 +1,61 @@
+# 🐳 TON Cat Lottery Backend Dockerfile
+# 基於官方 Go 鏡像構建後端服務
+
+# ================================
+# 構建階段
+# ================================
+FROM golang:1.22-alpine AS builder
+
+# 設置工作目錄
+WORKDIR /app
+
+# 安裝構建依賴
+RUN apk add --no-cache git ca-certificates
+
+# 複製後端源代碼
+COPY backend/ ./
+
+# 下載依賴
+RUN go mod tidy
+
+# 構建應用程式
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ton-cat-lottery-backend main.go
+
+# ================================
+# 運行階段
+# ================================
+FROM alpine:latest
+
+# 安裝運行時依賴
+RUN apk --no-cache add ca-certificates tzdata curl
+
+# 設置時區
+ENV TZ=Asia/Taipei
+
+# 創建非 root 用戶
+RUN adduser -D -s /bin/sh lottery
+
+# 設置工作目錄
+WORKDIR /app
+
+# 從構建階段複製二進制文件
+COPY --from=builder /app/ton-cat-lottery-backend .
+
+# 複製環境配置範例
+COPY --from=builder /app/.env.example .
+
+# 更改文件擁有者
+RUN chown -R lottery:lottery /app
+
+# 切換到非 root 用戶
+USER lottery
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康檢查 - 暫時停用，因為後端是守護進程不提供 HTTP API
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD curl -f http://localhost:8080/health || exit 1
+
+# 啟動命令
+CMD ["./ton-cat-lottery-backend"]
