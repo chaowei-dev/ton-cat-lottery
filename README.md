@@ -68,24 +68,34 @@ ton-cat-lottery/
 
 ### 🎯 智能合約（CatLottery.tact）
 
-```typescript
-// CatLottery.tact
-join(): 支付 TON 並加入抽獎池
-drawWinner(): 隨機選出中獎者並發送 NFT
-sendNFT(address): 調用 NFT 合約並發送對應貓咪 NFT
-```
+- 定義抽獎規則 (3人滿員抽獎)
+- 管理參與者資料 (地址、費用、時間)
+- 執行隨機抽獎 (基於區塊鏈隨機性)
+- 發送 NFT 給中獎者
+- 管理合約狀態 (活躍/非活躍)
+- Function:
+  ```typescript
+  // CatLottery.tact
+  join(): 支付 TON 並加入抽獎池
+  drawWinner(): 隨機選出中獎者並發送 NFT
+  sendNFT(address): 調用 NFT 合約並發送對應貓咪 NFT
+  ```
 
 ### 🧰 後端自動抽獎機器人（Go）
 
-- 定時輪詢 TON 鏈上狀態，觸發 drawWinner
-- 通過 TON API（TonCenter）查詢參與者與交易狀態
-- 自動推播通知或上傳中獎記錄（可連接 Discord / Telegram）
+- 定時檢查合約狀態 (每30分鐘)
+- 自動觸發抽獎 (當人數達到3人)
+- 發送 drawWinner 交易
+- 監控交易結果
+- 記錄抽獎歷史
 
 ### 💻 前端 dApp
 
 - 使用 TonConnect SDK 連接 Tonkeeper 錢包
-- 顯示目前抽獎狀態、參加者數量、中獎歷史
-- 使用者可一鍵參加抽獎（發送 join() 交易）
+- 顯示合約狀態 (參與人數、費用、輪次)
+- 參與抽獎功能 (發送 join 交易)
+- 交易狀態提示 (成功/失敗通知)
+- 用戶體驗優化 (響應式設計)
 
 ---
 
@@ -208,6 +218,7 @@ Email：liu.chaowei.dev@gmail.com
 - [x] 使用 `tact` CLI 部署至 testnet
 - [x] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
 - [x] 鑄造並部署預設的 NFT（貓咪圖像）
+- [x] 部署合約到 TON 測試網
 
 ### 後端服務模組（Go）
 
@@ -267,21 +278,27 @@ Email：liu.chaowei.dev@gmail.com
 
 #### 基本功能
 
-- [ ] 建立 React 專案架構 (Vite + TypeScript + 基礎 CSS)
-- [ ] 整合 TonConnect SDK - 支援 Tonkeeper 錢包連接與斷開
-- [ ] 顯示合約狀態 - 參與人數、當前輪次、抽獎是否活躍
-- [ ] 實作參加抽獎功能 - 發送 `join()` 交易並支付參與費用
-- [ ] 顯示用戶錢包資訊 - 地址、TON 餘額
-- [ ] 基礎交易狀態提示 - 發送中、成功、失敗通知
-- [ ] 基礎錯誤處理 - 網路錯誤、餘額不足、抽獎已滿等
+- [x] 建立 React 專案架構 (Vite + TypeScript + 基礎 CSS)
+- [x] 整合 TonConnect SDK - 支援 Tonkeeper 錢包連接與斷開
+- [x] 建立自己的 mainfest 用來做測試，透過 cloudflare pages 來部署
+- [x] 顯示合約狀態 - 參與人數、當前輪次、抽獎是否活躍
+  - [x] 使用模擬資料來顯示合約狀態
+  - [x] 串接真實的合約資料
+- [x] 實作參加抽獎功能 - 發送 `join()` 交易並支付參與費用
+  - [x] 合約還沒部署完成，所以先使用空 payload 來測試
+  - [x] 合約部署完成後，使用 "join" 消息
+- [x] 顯示用戶錢包資訊 - 地址、TON 餘額
+- [x] 基礎交易狀態提示 - 發送中、成功、失敗通知
+- [x] 基礎錯誤處理 - 網路錯誤、餘額不足、抽獎已滿等
+
 
 #### 進階功能
 
+- [ ] 參與者列表顯示 - 當前輪次的參與者地址
 - [ ] 顯示中獎歷史記錄 - 查詢歷史輪次的中獎者和 NFT
 - [ ] 實作即時狀態更新 - 定期刷新合約狀態（每 30 秒）
 - [ ] 顯示獎池資訊 - 當前合約餘額和預計獎金
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
-- [ ] 參與者列表顯示 - 當前輪次的參與者地址
 
 ### DevOps / 部署自動化
 

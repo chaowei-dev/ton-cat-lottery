@@ -1,5 +1,5 @@
 import { Address, toNano } from '@ton/core';
-import { CatLottery } from '../build/CatLottery/tact_CatLottery';
+import { CatLottery } from '../build/CatLottery_CatLottery';
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider, args: string[]) {
@@ -21,8 +21,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   // 獲取並顯示合約狀態
   try {
-    const contractInfo = await catLottery.getContractInfo();
-    const balance = await catLottery.getBalance();
+    const contractInfo = await catLottery.getGetContractInfo();
+    const balance = await catLottery.getGetBalance();
 
     ui.write(`\n📊 合約狀態:`);
     ui.write(`📍 地址: ${contractAddress}`);
@@ -42,7 +42,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
       ui.write(`\n👥 參與者列表:`);
       for (let i = 0; i < Number(contractInfo.participantCount); i++) {
         try {
-          const participant = await catLottery.getParticipant(BigInt(i));
+          const participant = await catLottery.getGetParticipant(BigInt(i));
           if (participant) {
             ui.write(
               `   ${i + 1}. ${participant.address} (${
@@ -64,7 +64,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
       round++
     ) {
       try {
-        const winner = await catLottery.getWinner(BigInt(round));
+        const winner = await catLottery.getGetWinner(BigInt(round));
         if (winner) {
           const date = new Date(Number(winner.timestamp) * 1000);
           ui.write(

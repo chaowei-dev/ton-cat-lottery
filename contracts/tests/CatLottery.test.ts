@@ -7,8 +7,8 @@ describe('CatLottery Basic Functionality', () => {
   let deployer: SandboxContract<TreasuryContract>;
   let catLottery: SandboxContract<CatLottery>;
 
-  const ENTRY_FEE = toNano('0.1');
-  const MAX_PARTICIPANTS = 5n;
+  const ENTRY_FEE = toNano('0.01'); // 降低測試費用
+  const MAX_PARTICIPANTS = 3n; // 降低測試門檻
 
   beforeAll(async () => {
     blockchain = await Blockchain.create();

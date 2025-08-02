@@ -1,0 +1,263 @@
+.wallet-connect {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+  margin: 20px 0;
+}
+
+.wallet-connect h3 {
+  margin: 0 0 20px 0;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  font-size: 1rem;
+}
+
+.wallet-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.wallet-name {
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.device-name {
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+
+.connecting-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+}
+
+.wallet-status {
+  margin-bottom: 20px;
+}
+
+.wallet-connected {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wallet-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.address {
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.wallet-balance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.balance {
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffb74d;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.loading-text {
+  color: #fbbf24;
+  font-style: italic;
+}
+
+.error-text {
+  color: #f87171;
+  font-style: italic;
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.2em;
+  transition: all 0.2s ease;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.show-balance-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #333;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+
+.show-balance-btn:hover:not(:disabled) {
+  background: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.show-balance-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-indicator.connected {
+  background-color: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+}
+
+.status-indicator.disconnected {
+  background-color: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.6);
+}
+
+.status-text {
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.disconnect-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.disconnect-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.wallet-disconnected {
+  text-align: center;
+}
+
+.connect-prompt {
+  margin: 12px 0 0 0;
+  opacity: 0.9;
+  font-size: 0.95em;
+}
+
+.connect-button-container {
+  display: flex;
+  justify-content: center;
+}
+
+/* TonConnect Button 自定義樣式 */
+.connect-button-container [data-tc-connect-button-loading="false"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #333 !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 12px 24px !important;
+  transition: all 0.2s ease !important;
+}
+
+.connect-button-container [data-tc-connect-button-loading="false"]:hover {
+  background: white !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .wallet-connected {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .wallet-connect {
+    padding: 20px;
+  }
+  
+  .connect-button-container [data-tc-connect-button-loading="false"] {
+    width: 100% !important;
+  }
+}

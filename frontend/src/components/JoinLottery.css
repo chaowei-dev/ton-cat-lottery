@@ -1,0 +1,425 @@
+.join-lottery {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.join-lottery h3 {
+  margin: 0 0 20px 0;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* 狀態顯示 */
+.lottery-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.status-item {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.status-item .label {
+  display: block;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+}
+
+.status-item .value {
+  display: block;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.status-item .value.active {
+  color: #4caf50;
+}
+
+.status-item .value.inactive {
+  color: #ff9800;
+}
+
+/* 錢包狀態 */
+.wallet-notice,
+.wallet-info {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.wallet-notice {
+  text-align: center;
+}
+
+.wallet-notice p {
+  color: #ffd700;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wallet-connect-address span {
+  color: #4caf50;
+  font-size: 0.9rem;
+  display: block;
+}
+
+.wallet-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loading-balance {
+  color: #ffd700;
+  font-size: 0.85rem;
+}
+
+.join-lottery-balance {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.balance.sufficient {
+  color: #4caf50;
+}
+
+.balance.insufficient {
+  color: #ff9800;
+}
+
+.insufficient-notice {
+  color: #ff5722;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.balance-error {
+  color: #f44336;
+  font-size: 0.85rem;
+}
+
+/* 參加按鈕區域 */
+.join-section {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.join-btn {
+  background: linear-gradient(45deg, #4caf50, #8bc34a);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 32px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.join-btn:hover:not(.disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.join-btn:active:not(.disabled) {
+  transform: translateY(0);
+}
+
+.join-btn.disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.join-btn.processing {
+  background: linear-gradient(45deg, #2196f3, #03a9f4);
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.3);
+}
+
+/* 載入動畫 */
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 狀態訊息 */
+.lottery-closed,
+.lottery-full,
+.lottery-disabled {
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.lottery-closed p,
+.lottery-full p,
+.lottery-disabled p {
+  color: #ff9800;
+  margin: 0;
+  font-weight: 500;
+}
+
+.lottery-full {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.lottery-full p {
+  color: #4caf50;
+}
+
+.lottery-disabled.insufficient-balance {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.lottery-disabled.insufficient-balance p {
+  color: #f44336;
+}
+
+/* 刷新餘額按鈕 */
+.refresh-balance-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+}
+
+.refresh-balance-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.refresh-balance-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 錯誤和成功訊息 */
+.error-message,
+.success-message {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.error-message {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f44336;
+}
+
+.success-message {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #4caf50;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 交易進度條 */
+.transaction-progress {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-step {
+  display: inline-block;
+  padding: 6px 12px;
+  margin: 4px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.progress-step.active {
+  background: linear-gradient(45deg, #2196f3, #03a9f4);
+  color: white;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.progress-step.completed {
+  background: linear-gradient(45deg, #4caf50, #8bc34a);
+  color: white;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.progress-step.completed.active {
+  animation: success-pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes success-pulse {
+  0% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.1);
+  }
+  100% { 
+    transform: scale(1);
+  }
+}
+
+/* 說明文字 */
+.instructions {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.instructions h4 {
+  color: white;
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+}
+
+.instructions ul {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.instructions li {
+  margin-bottom: 4px;
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+  .join-lottery {
+    padding: 16px;
+  }
+
+  .join-lottery h3 {
+    font-size: 1.3rem;
+  }
+
+  .lottery-status {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .wallet-balance {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .join-btn {
+    padding: 14px 24px;
+    font-size: 1rem;
+  }
+
+  .transaction-progress {
+    padding: 12px;
+  }
+
+  .progress-step {
+    display: block;
+    margin: 6px 0;
+    text-align: center;
+  }
+
+  .instructions {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .join-lottery {
+    padding: 12px;
+  }
+
+  .join-lottery h3 {
+    font-size: 1.2rem;
+  }
+
+  .join-btn {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+  }
+} 
