@@ -1,5 +1,6 @@
-import WalletConnect from './components/WalletConnect'
-import './styles/App.css'
+import WalletConnect from './components/WalletConnect';
+import ContractStatus from './components/ContractStatus';
+import './styles/App.css';
 
 function App() {
   return (
@@ -11,6 +12,10 @@ function App() {
       <main className="main-content">
         <div className="container">
           <WalletConnect />
+
+          {/* 合約狀態組件 */}
+          <ContractStatus contractAddress="EQC0482t814YivoEaIea43khv6jo4Mp_sXtx0eOIgtzUsl13" />
+
           <div className="card">
             <h2>錢包連接功能已完成 ✅</h2>
             <p>您現在可以連接 Tonkeeper 或其他支援的 TON 錢包！</p>
@@ -18,7 +23,7 @@ function App() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
