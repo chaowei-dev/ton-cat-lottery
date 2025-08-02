@@ -130,7 +130,7 @@ const ContractStatus: React.FC<ContractStatusProps> = ({ contractAddress }) => {
         <div className="status-item">
           <div className="status-label">合約餘額</div>
           <div className="status-value">
-            <span className="balance">
+            <span className="contract-balance">
               {balance ? `${balance} TON` : '載入中...'}
             </span>
           </div>

@@ -99,6 +99,8 @@
 .balance {
   font-family: 'Courier New', monospace;
   background: rgba(255, 255, 255, 0.2);
+  color: #ffb74d;
+  font-weight: bold;
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 0.9em;
@@ -127,7 +129,7 @@
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.8em;
+  font-size: 1.2em;
   transition: all 0.2s ease;
   font-weight: bold;
   display: inline-flex;
