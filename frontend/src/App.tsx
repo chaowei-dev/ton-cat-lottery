@@ -40,10 +40,11 @@ function App() {
       </header>
       <main className="main-content">
         <div className="container">
-          <WalletConnect />
-
           {/* 合約狀態組件 */}
           <ContractStatus contractAddress={contractAddress} />
+
+          {/* 錢包連接組件 */}
+          <WalletConnect />
 
           {/* 參加抽獎組件 */}
           {contractInfo ? (

@@ -68,8 +68,7 @@ export class ContractService {
           const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
 
           // 轉換 entryFee 從 nanoTON 到 TON
-          // 暫時返回 0.01 TON 而不是實際的 0.1 TON
-          const entryFeeTON = '0.01';
+          const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
 
           // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
           const lotteryActive = lotteryActiveRaw !== 0;
@@ -182,6 +181,46 @@ export class ContractService {
       participantCount: 0,
       nftContract: null,
     };
+  }
+}
+
+// 獲取錢包餘額服務
+export class WalletService {
+  // 獲取錢包 TON 餘額
+  static async getWalletBalance(address: string): Promise<string | null> {
+    try {
+      const url = new URL(
+        'https://testnet.toncenter.com/api/v2/getAddressBalance'
+      );
+      url.searchParams.append('address', address);
+
+      const balanceResponse = await fetch(url.toString());
+
+      if (!balanceResponse.ok) {
+        throw new Error(`HTTP error! status: ${balanceResponse.status}`);
+      }
+
+      const balanceData = await balanceResponse.json();
+
+      if (balanceData.ok && balanceData.result) {
+        // 將 nanoTON 轉換為 TON
+        const balanceInTON = (parseInt(balanceData.result) / 1e9).toFixed(4);
+        return balanceInTON;
+      } else {
+        console.error('獲取錢包餘額失敗:', balanceData);
+        return null;
+      }
+    } catch (error) {
+      console.error('獲取錢包餘額失敗:', error);
+      return null;
+    }
+  }
+
+  // 格式化 TON 金額顯示
+  static formatTON(amount: string | null): string {
+    if (!amount) return '0.0000 TON';
+    const tonAmount = parseFloat(amount);
+    return `${tonAmount.toFixed(4)} TON`;
   }
 }
 
