@@ -1,37 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useTonConnectUI, useTonAddress, useIsConnectionRestored } from '@tonconnect/ui-react';
 import {
   WalletService,
   TransactionError,
   ERROR_MESSAGES,
+  type ContractInfo,
 } from '../services/contractService';
 import type { useToast } from '../hooks/useToast';
 import './JoinLottery.css';
 
 interface JoinLotteryProps {
   contractAddress: string;
-  entryFee: string;
-  maxParticipants: number;
-  currentParticipants: number;
-  lotteryActive: boolean;
+  contractInfo: ContractInfo;
   onJoinSuccess?: () => void;
   toast: ReturnType<typeof useToast>;
 }
 
 const JoinLottery: React.FC<JoinLotteryProps> = ({
   contractAddress,
-  entryFee,
-  maxParticipants,
-  currentParticipants,
-  lotteryActive,
+  contractInfo,
   onJoinSuccess,
   toast,
 }) => {
+  // 解構合約資訊
+  const { entryFee, maxParticipants, participantCount: currentParticipants, lotteryActive } = contractInfo;
   const [tonConnectUI] = useTonConnectUI();
   const address = useTonAddress();
+  const connectionRestored = useIsConnectionRestored();
   const [isJoining, setIsJoining] = useState(false);
   const [walletBalance, setWalletBalance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [balanceRetryCount, setBalanceRetryCount] = useState(0);
+  
+  const MAX_BALANCE_RETRY = 3;
+  const BALANCE_RETRY_DELAY = 2000;
 
   // 交易狀態
   const TransactionStatus = {
@@ -53,30 +55,62 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   // 檢查用戶是否已連接錢包
   const isWalletConnected = !!address;
 
-  // 載入錢包餘額
-  const loadWalletBalance = async () => {
-    if (!address) return;
+  // 載入錢包餘額（含重試機制）
+  const loadWalletBalance = useCallback(async (isRetry = false, currentRetryCount = 0) => {
+    if (!address || !connectionRestored) return;
 
-    setIsLoadingBalance(true);
+    if (!isRetry) {
+      setIsLoadingBalance(true);
+      setBalanceRetryCount(0);
+    }
+
     try {
       const balance = await WalletService.getWalletBalance(address);
       setWalletBalance(balance);
+      setBalanceRetryCount(0);
     } catch (error) {
       console.error('載入錢包餘額失敗:', error);
-      toast.error('餘額載入失敗', '無法獲取錢包餘額，請重新整理頁面');
+      
+      const retryCountToUse = isRetry ? currentRetryCount : balanceRetryCount;
+      
+      if (retryCountToUse < MAX_BALANCE_RETRY && !isRetry) {
+        // 自動重試
+        const newRetryCount = retryCountToUse + 1;
+        setBalanceRetryCount(newRetryCount);
+        
+        toast.warning('重試中', `載入錢包餘額失敗，正在進行第 ${newRetryCount} 次重試...`);
+        
+        setTimeout(() => {
+          loadWalletBalance(true, newRetryCount);
+        }, BALANCE_RETRY_DELAY);
+      } else {
+        // 重試次數用盡
+        toast.error('餘額載入失敗', '無法獲取錢包餘額，請檢查網路連接或手動重試');
+        setWalletBalance(null);
+      }
     } finally {
-      setIsLoadingBalance(false);
+      if (!isRetry || currentRetryCount >= MAX_BALANCE_RETRY) {
+        setIsLoadingBalance(false);
+      }
     }
-  };
+  }, [address, connectionRestored, toast]); // 移除 balanceRetryCount 依賴
 
-  // 當錢包連接時載入餘額
+  // 當錢包連接且連接已恢復時載入餘額
   useEffect(() => {
-    if (address) {
-      loadWalletBalance();
-    } else {
+    if (address && connectionRestored) {
+      // 延遲載入確保連接穩定
+      const timer = setTimeout(() => {
+        loadWalletBalance(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    } else if (!address) {
       setWalletBalance(null);
+      setBalanceRetryCount(0);
     }
-  }, [address]);
+  }, [address, connectionRestored]); // 移除 loadWalletBalance 依賴
+
+  // 註：移除了備用載入機制以避免重複載入問題
 
   // 檢查是否可以參加
   const requiredAmount = 0.02; // 0.02 TON (包含參與費 + gas 費用)
@@ -86,9 +120,11 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
 
   const canJoin =
     isWalletConnected &&
+    connectionRestored &&
     lotteryActive &&
     currentParticipants < maxParticipants &&
     hasEnoughBalance &&
+    !isLoadingBalance &&
     transactionStatus === TransactionStatus.IDLE;
 
   // 參加抽獎
@@ -164,7 +200,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       if (onJoinSuccess) {
         setTimeout(() => {
           onJoinSuccess();
-          loadWalletBalance(); // 重新載入餘額
+          loadWalletBalance(false); // 重新載入餘額
         }, 5000);
       }
 
@@ -251,6 +287,59 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     return null;
   };
 
+  // 載入狀態檢查 - 參考 ContractStatus 組件的邏輯
+  if (!connectionRestored) {
+    return (
+      <div className="join-lottery">
+        <div className="loading">
+          <span>🔄 正在恢復錢包連接...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isWalletConnected) {
+    return (
+      <div className="join-lottery">
+        <h3>🎯 參加抽獎</h3>
+        <div className="wallet-notice">
+          <p>🔗 請先連接您的 TON 錢包以參加抽獎</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingBalance && walletBalance === null) {
+    return (
+      <div className="join-lottery">
+        <div className="loading">
+          <span>
+            🔄 載入錢包資訊中...
+            {balanceRetryCount > 0 && ` (第 ${balanceRetryCount} 次重試)`}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (walletBalance === null && balanceRetryCount >= MAX_BALANCE_RETRY) {
+    return (
+      <div className="join-lottery">
+        <div className="error">
+          <span>❌ 無法載入錢包資訊</span>
+          <p className="retry-info">已重試 {MAX_BALANCE_RETRY} 次，請檢查網路連接</p>
+          <button 
+            onClick={() => loadWalletBalance(false)} 
+            className="retry-btn"
+            disabled={isLoadingBalance}
+          >
+            {isLoadingBalance ? '重試中...' : '手動重試'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="join-lottery">
       <h3>🎯 參加抽獎</h3>
@@ -275,38 +364,33 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         </div>
       </div>
 
-      {/* 錢包連接狀態與餘額 */}
-      {!isWalletConnected ? (
-        <div className="wallet-notice">
-          <p>🔗 請先連接您的 TON 錢包以參加抽獎</p>
+      {/* 錢包連接狀態與餘額 - 此時已確保連接且有餘額數據 */}
+      <div className="wallet-info">
+        <div className="wallet-connect-address">
+          <span>✅ 已連接錢包: {formatAddress(address)}</span>
         </div>
-      ) : (
-        <div className="wallet-info">
-          <div className="wallet-connect-address">
-            <span>✅ 已連接錢包: {formatAddress(address)}</span>
-          </div>
-          <div className="wallet-balance">
-            {isLoadingBalance ? (
-              <span className="loading-balance">🔄 載入餘額中...</span>
-            ) : walletBalance ? (
-              <span
-                className={`join-lottery-balance ${
-                  hasEnoughBalance ? 'sufficient' : 'insufficient'
-                }`}
-              >
-                💰 餘額: {WalletService.formatTON(walletBalance)}
-                {!hasEnoughBalance && (
-                  <span className="insufficient-notice">
-                    (不足 {requiredAmount} TON)
-                  </span>
-                )}
-              </span>
-            ) : (
-              <span className="balance-error">❌ 無法載入餘額</span>
-            )}
-          </div>
+        <div className="wallet-balance">
+          {isLoadingBalance ? (
+            <span className="loading-balance">
+              🔄 刷新餘額中...
+              {balanceRetryCount > 0 && ` (第 ${balanceRetryCount} 次重試)`}
+            </span>
+          ) : (
+            <span
+              className={`join-lottery-balance ${
+                hasEnoughBalance ? 'sufficient' : 'insufficient'
+              }`}
+            >
+              💰 餘額: {WalletService.formatTON(walletBalance)}
+              {!hasEnoughBalance && (
+                <span className="insufficient-notice">
+                  (不足 {requiredAmount} TON)
+                </span>
+              )}
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
       {/* 參加按鈕 */}
       <div className="join-section">
@@ -322,7 +406,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
             {getDisabledReason()?.includes('餘額') && (
               <button
                 className="refresh-balance-btn"
-                onClick={loadWalletBalance}
+                onClick={() => loadWalletBalance(false)}
                 disabled={isLoadingBalance}
               >
                 {isLoadingBalance ? '🔄 刷新中...' : '🔄 刷新餘額'}

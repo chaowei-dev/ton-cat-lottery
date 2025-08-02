@@ -35,104 +35,134 @@ export class ContractService {
 
   // 獲取合約狀態
   async getContractInfo(): Promise<ContractInfo | null> {
-    try {
-      // 使用 TON Center API 查詢合約狀態
-      const response = await fetch(
-        `https://testnet.toncenter.com/api/v2/runGetMethod`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: this.contractAddress,
-            method: 'getContractInfo',
-            stack: [],
-          }),
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 使用 TON Center API 查詢合約狀態
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超時
+
+        const response = await fetch(
+          `https://testnet.toncenter.com/api/v2/runGetMethod`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              address: this.contractAddress,
+              method: 'getContractInfo',
+              stack: [],
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-      );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        const data = await response.json();
 
-      const data = await response.json();
+        if (data.ok && data.result) {
+          // 解析合約返回的數據
+          const stack = data.result.stack;
+          if (stack && stack.length >= 6) {
+            // 解析返回的數據
+            const entryFeeNano = parseInt(stack[1][1], 16); // 0x5f5e100 = 100000000
+            const maxParticipants = parseInt(stack[2][1], 16); // 0x3 = 3
+            const currentRound = parseInt(stack[3][1], 16); // 0x1 = 1
+            const lotteryActiveRaw = parseInt(stack[4][1], 16); // -0x1 = -1
+            const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
 
-      if (data.ok && data.result) {
-        // 解析合約返回的數據
-        const stack = data.result.stack;
-        if (stack && stack.length >= 6) {
-          // 解析返回的數據
-          const entryFeeNano = parseInt(stack[1][1], 16); // 0x5f5e100 = 100000000
-          const maxParticipants = parseInt(stack[2][1], 16); // 0x3 = 3
-          const currentRound = parseInt(stack[3][1], 16); // 0x1 = 1
-          const lotteryActiveRaw = parseInt(stack[4][1], 16); // -0x1 = -1
-          const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
+            // 轉換 entryFee 從 nanoTON 到 TON
+            const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
 
-          // 轉換 entryFee 從 nanoTON 到 TON
-          const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
+            // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
+            const lotteryActive = lotteryActiveRaw !== 0;
 
-          // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
-          const lotteryActive = lotteryActiveRaw !== 0;
-
-          return {
-            owner: this.contractAddress,
-            entryFee: entryFeeTON,
-            maxParticipants: maxParticipants,
-            currentRound: currentRound,
-            lotteryActive: lotteryActive,
-            participantCount: participantCount,
-            nftContract: null,
-          };
+            return {
+              owner: this.contractAddress,
+              entryFee: entryFeeTON,
+              maxParticipants: maxParticipants,
+              currentRound: currentRound,
+              lotteryActive: lotteryActive,
+              participantCount: participantCount,
+              nftContract: null,
+            };
+          } else {
+            throw new Error('合約返回數據格式不正確');
+          }
         } else {
-          console.error('合約返回數據格式不正確:', stack);
-          return this.getFallbackData();
+          throw new Error('合約查詢失敗: ' + (data.error || 'Unknown error'));
         }
-      } else {
-        console.error('合約查詢失敗:', data);
-        return this.getFallbackData();
+      } catch (error) {
+        console.error(`獲取合約狀態失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
+        
+        // 如果是最後一次嘗試，拋出錯誤
+        if (attempt === maxRetries - 1) {
+          break;
+        }
+        
+        // 等待一段時間後重試（指數退避）
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
-    } catch (error) {
-      console.error('獲取合約狀態失敗:', error);
-      // 錯誤時返回模擬數據
-      return {
-        owner: this.contractAddress,
-        entryFee: '0.01',
-        maxParticipants: 3,
-        currentRound: 1,
-        lotteryActive: true,
-        participantCount: 0,
-        nftContract: null,
-      };
     }
+
+    // 所有重試都失敗，返回備用數據
+    console.error('所有重試都失敗，使用備用數據');
+    return this.getFallbackData();
   }
 
   // 獲取合約餘額
   async getBalance(): Promise<string | null> {
-    try {
-      const url = new URL(
-        'https://testnet.toncenter.com/api/v2/getAddressBalance'
-      );
-      url.searchParams.append('address', this.contractAddress);
+    const maxRetries = 3;
 
-      const balanceResponse = await fetch(url.toString());
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const url = new URL(
+          'https://testnet.toncenter.com/api/v2/getAddressBalance'
+        );
+        url.searchParams.append('address', this.contractAddress);
 
-      if (!balanceResponse.ok) {
-        throw new Error(`HTTP error! status: ${balanceResponse.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超時
+
+        const balanceResponse = await fetch(url.toString(), {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!balanceResponse.ok) {
+          throw new Error(`HTTP error! status: ${balanceResponse.status}`);
+        }
+
+        const balanceData = await balanceResponse.json();
+
+        if (balanceData.ok && balanceData.result) {
+          // 將 nanoTON 轉換為 TON
+          const balanceInTON = (parseInt(balanceData.result) / 1e9).toFixed(4);
+          return balanceInTON;
+        } else {
+          throw new Error('獲取餘額失敗: ' + (balanceData.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error(`獲取合約餘額失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
+        
+        // 如果是最後一次嘗試，拋出錯誤
+        if (attempt === maxRetries - 1) {
+          break;
+        }
+        
+        // 等待一段時間後重試
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
       }
-
-      const balanceData = await balanceResponse.json();
-
-      if (balanceData.ok && balanceData.result) {
-        // 將 nanoTON 轉換為 TON
-        const balanceInTON = (parseInt(balanceData.result) / 1e9).toFixed(4);
-        return balanceInTON;
-      } else {
-        console.error('獲取餘額失敗:', balanceData);
-        return '0.0000';
-      }
-    } catch (error) {
-      console.error('獲取合約餘額失敗:', error);
-      return '0.0000';
     }
+
+    console.error('獲取餘額的所有重試都失敗，返回 0');
+    return '0.0000';
   }
 
   // 獲取參與者資訊

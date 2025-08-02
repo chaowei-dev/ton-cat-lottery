@@ -1,39 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import WalletConnect from './components/WalletConnect';
 import ContractStatus from './components/ContractStatus';
 import JoinLottery from './components/JoinLottery';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
-import { createContractService } from './services/contractService';
 import type { ContractInfo } from './services/contractService';
 import './styles/App.css';
 
 function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const contractAddress = 'EQBMegbDGejjYeIutXneUvYvWfJMpS71b11kJLaNKFnP_6Jh';
-  const contractService = createContractService(contractAddress);
   const toast = useToast();
 
-  // 載入合約狀態
-  const loadContractStatus = async () => {
-    try {
-      const info = await contractService.getContractInfo();
-      setContractInfo(info);
-    } catch (error) {
-      console.error('載入合約狀態失敗:', error);
-      toast.error('載入失敗', '無法載入合約狀態，請檢查網路連接');
-    }
-  };
-
-  // 初始載入
-  useEffect(() => {
-    loadContractStatus();
-  }, []);
-
-  // 定期刷新
-  useEffect(() => {
-    const interval = setInterval(loadContractStatus, 30000);
-    return () => clearInterval(interval);
+  // 合約狀態更新回調函數
+  const handleContractInfoUpdate = useCallback((info: ContractInfo | null) => {
+    setContractInfo(info);
   }, []);
 
   return (
@@ -45,7 +26,11 @@ function App() {
       <main className="main-content">
         <div className="container">
           {/* 合約狀態組件 */}
-          <ContractStatus contractAddress={contractAddress} />
+          <ContractStatus 
+            contractAddress={contractAddress} 
+            onContractInfoUpdate={handleContractInfoUpdate}
+            toast={toast}
+          />
 
           {/* 錢包連接組件 */}
           <WalletConnect />
@@ -54,18 +39,14 @@ function App() {
           {contractInfo ? (
             <JoinLottery
               contractAddress={contractAddress}
-              entryFee={contractInfo.entryFee}
-              maxParticipants={contractInfo.maxParticipants}
-              currentParticipants={contractInfo.participantCount}
-              lotteryActive={contractInfo.lotteryActive}
-              onJoinSuccess={loadContractStatus}
+              contractInfo={contractInfo}
+              onJoinSuccess={() => {
+                // 觸發合約狀態重新載入
+                // ContractStatus 組件會處理這個更新
+              }}
               toast={toast}
             />
-          ) : (
-            <div className="card">
-              <p>載入合約狀態中...</p>
-            </div>
-          )}
+          ) : null}
 
           <div className="card">
             <h2>智能合約模組（區塊鏈上的核心邏輯）</h2>
