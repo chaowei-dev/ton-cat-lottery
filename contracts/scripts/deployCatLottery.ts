@@ -8,7 +8,7 @@ export async function run(provider: NetworkProvider) {
   ui.write('🚀 正在部署 CatLottery 合約...');
 
   // 合約初始化參數
-  const ENTRY_FEE = toNano('0.1'); // 0.1 TON 參與費用
+  const ENTRY_FEE = toNano('0.01'); // 0.01 TON 參與費用 (降低費用)
   const MAX_PARTICIPANTS = 10; // 最大參與人數
 
   // 獲取部署者地址

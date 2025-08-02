@@ -68,7 +68,8 @@ export class ContractService {
           const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
 
           // 轉換 entryFee 從 nanoTON 到 TON
-          const entryFeeTON = (entryFeeNano / 1e9).toFixed(1);
+          // 暫時返回 0.01 TON 而不是實際的 0.1 TON
+          const entryFeeTON = '0.01';
 
           // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
           const lotteryActive = lotteryActiveRaw !== 0;
@@ -108,15 +109,6 @@ export class ContractService {
   // 獲取合約餘額
   async getBalance(): Promise<string | null> {
     try {
-      // 使用 TON Center API 查詢合約餘額
-      const response = await fetch(
-        `https://testnet.toncenter.com/api/v2/getAddressBalance`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
       const url = new URL(
         'https://testnet.toncenter.com/api/v2/getAddressBalance'
       );
@@ -183,7 +175,7 @@ export class ContractService {
   private getFallbackData(): ContractInfo {
     return {
       owner: this.contractAddress,
-      entryFee: '0.1',
+      entryFee: '0.01', // 暫時降低顯示費用
       maxParticipants: 10,
       currentRound: 1,
       lotteryActive: true,

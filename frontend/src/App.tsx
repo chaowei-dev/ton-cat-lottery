@@ -1,8 +1,37 @@
+import { useState, useEffect } from 'react';
 import WalletConnect from './components/WalletConnect';
 import ContractStatus from './components/ContractStatus';
+import JoinLottery from './components/JoinLottery';
+import { createContractService } from './services/contractService';
+import type { ContractInfo } from './services/contractService';
 import './styles/App.css';
 
 function App() {
+  const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
+  const contractAddress = 'EQDMGv1LV8e8McEK6Q2vIU4wwKcMQ7FUmNDWx3fAuoAMEYhl';
+  const contractService = createContractService(contractAddress);
+
+  // 載入合約狀態
+  const loadContractStatus = async () => {
+    try {
+      const info = await contractService.getContractInfo();
+      setContractInfo(info);
+    } catch (error) {
+      console.error('載入合約狀態失敗:', error);
+    }
+  };
+
+  // 初始載入
+  useEffect(() => {
+    loadContractStatus();
+  }, []);
+
+  // 定期刷新
+  useEffect(() => {
+    const interval = setInterval(loadContractStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="app">
       <header className="header">
@@ -14,7 +43,23 @@ function App() {
           <WalletConnect />
 
           {/* 合約狀態組件 */}
-          <ContractStatus contractAddress="EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY" />
+          <ContractStatus contractAddress={contractAddress} />
+
+          {/* 參加抽獎組件 */}
+          {contractInfo ? (
+            <JoinLottery
+              contractAddress={contractAddress}
+              entryFee={contractInfo.entryFee}
+              maxParticipants={contractInfo.maxParticipants}
+              currentParticipants={contractInfo.participantCount}
+              lotteryActive={contractInfo.lotteryActive}
+              onJoinSuccess={loadContractStatus}
+            />
+          ) : (
+            <div className="card">
+              <p>載入合約狀態中...</p>
+            </div>
+          )}
 
           <div className="card">
             <h2>錢包連接功能已完成 ✅</h2>
