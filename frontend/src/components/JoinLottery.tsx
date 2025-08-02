@@ -41,12 +41,11 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       setError(null);
       setSuccess(false);
 
-      // 準備交易消息
+      // 準備交易消息 - 使用正確的 TON Core BOC 格式
       const message = {
         address: contractAddress,
-        amount: (parseFloat(entryFee) * 1e9).toString(), // 轉換為 nanoTON
-        payload: '', // 空 payload，先測試基本交易
-        // payload: 'join', // 當合約部署完成後，使用 "join" 消息
+        amount: '10000000', // 0.05 TON (包含參與費 + gas 費)
+        payload: 'te6cckEBAQEACgAAEAAAAABqb2lukPEtIw==', // 正確的 "join" 文字消息 BOC
       };
 
       // 發送交易

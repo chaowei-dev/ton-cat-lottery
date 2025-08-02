@@ -8,7 +8,7 @@ import './styles/App.css';
 
 function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
-  const contractAddress = 'EQDMGv1LV8e8McEK6Q2vIU4wwKcMQ7FUmNDWx3fAuoAMEYhl';
+  const contractAddress = 'EQDUbgkuc2X3bbhzWXk8hn16JeG_qRsOrpv1h8DUkXf1XQO2';
   const contractService = createContractService(contractAddress);
 
   // 載入合約狀態
