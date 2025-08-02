@@ -171,7 +171,6 @@ ton-cat-lottery/
 - Tact CLI
 ```
 
-
 ---
 
 ## 🧪 測試指令
@@ -271,20 +270,14 @@ docker compose up -d
 
 | 類別     | 技術                            |
 | -------- | ------------------------------- |
+| 程式語言 | Typescript, Go, Node.js, React |
 | 區塊鏈   | TON, Tact, TonConnect           |
-| 後端     | Go, TonCenter API, Cobra CLI    |
-| 前端     | React, TonConnect UI SDK        |
-| 部署     | Docker, GitHub Actions          |
+| 後端     | Go, Node.js    |
+| 前端     | React       |
+| 部署     | Docker, GitHub Actions, k8s       |
 | 監控     | Prometheus, Grafana             |
-| 基礎設施 | Terraform, GCP, Ansible（選配） |
+| 基礎設施 | Terraform, GCP |
 
----
-
-## 🧑‍💻 開發者
-
-作者：Chao-Wei, Liu
-Email：liu.chaowei.dev@gmail.com
-版本：beta-0.0.1
 
 ---
 
@@ -305,14 +298,15 @@ Email：liu.chaowei.dev@gmail.com
 - [x] 使用 `tact` CLI 部署至 testnet
 - [x] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
 - [x] 鑄造並部署預設的 NFT（貓咪圖像）
-- [x] 部署抽獎合約到 TON 測試網
-- [ ] 部署 NFT 合約到 TON 測試網
+- [x] 部署抽獎合約到 TON testnet
+- [ ] 部署 NFT 合約到 TON testnet
 
 ### 後端服務模組（Go）
 
 > 精簡版後端，專注於核心抽獎功能，減少實作複雜度但保持專案完整性。
 
 - 基礎設施
+
   - [x] 初始化 Go 專案與模組設定（go.mod, 目錄結構）
   - [x] 基礎配置管理（環境變數、合約地址、私鑰）
   - [x] 基礎日志記錄（可用標準 log 套件）
@@ -327,7 +321,7 @@ Email：liu.chaowei.dev@gmail.com
     - [x] `SendStartNewRound()` - 開始新輪次
   - [x] 基礎交易監控（檢查交易是否成功）
 
-- 核心業務邏輯**
+- 核心業務邏輯
 
   - [x] 實作自動抽獎定時器（簡單 cron job 或 ticker）
   - [x] 基礎抽獎流程控制（檢查條件 → 執行抽獎 → 記錄結果）
@@ -370,31 +364,108 @@ Email：liu.chaowei.dev@gmail.com
 - [ ] 顯示獎池資訊 - 當前合約餘額和預計獎金
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
 
-### DevOps / 部署自動化
+### DevOps / 雲端自動化部署
 
-> 整合三個組建，透過容器化部署，並整合 CI/CD 與監控。
+> 基於 GCP + Kubernetes + Terraform，建構現代化 DevOps 流程，從基礎設施即代碼到完整 CI/CD 管線。
+
+#### 基礎容器化
 
 - [x] 撰寫 `Dockerfile`（backend）
 - [x] 撰寫 `Dockerfile`（frontend）
 - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
 - [x] 撰寫 `.env` 檔案與 secret 管理
-- [ ] 撰寫 GitHub Actions CI/CD：
-  - [ ] Push ➜ 自動建構 ➜ SSH deploy ➜ 重啟容器
-- [ ] 撰寫 Ansible Playbook 安裝 Docker 與初始化 VPS（選配）
-- [ ] 測試端到端部署流程（本地 → VPS）
 
-### 監控與可視化（Prometheus + Grafana）
+#### GCP 基礎設施即代碼（Terraform）
 
-> 讓系統具備自動部署與健康狀態監控。
+- [ ] 設計 GCP 專案架構（Project、VPC、Subnets）
+- [ ] 撰寫 Terraform 模組：
+  - [ ] `modules/gke/` - GKE Cluster 與 Node Pools
+  - [ ] `modules/vpc/` - VPC 網路與子網設定
+  - [ ] `modules/dns/` - Cloud DNS 域名管理
+  - [ ] `modules/storage/` - Cloud Storage 靜態檔案託管
+  - [ ] `modules/database/` - Cloud SQL PostgreSQL（監控資料）
+- [ ] 撰寫環境別 Terraform 配置：
+  - [ ] `environments/dev/` - 開發環境（單節點 GKE）
+  - [ ] `environments/staging/` - 測試環境（標準 GKE）
+  - [ ] `environments/prod/` - 生產環境（高可用 GKE）
+- [ ] （可選）設定 Terraform Cloud / GCS Backend（狀態管理）
+- [ ] 撰寫 `terraform/scripts/` 自動化腳本
 
-- [ ] 撰寫 `prometheus.yml` 配置（包含 backend、node_exporter）
-- [ ] 安裝 `node_exporter` 並接入主機 metrics
-- [ ] 撰寫 Go 自定義 `/metrics` endpoint（記錄抽獎次數、失敗數）
-- [ ] 安裝與設定 Grafana Dashboard（支援 TON Node、抽獎資料）
-- [ ] 儀表板顯示項目：
-  - [ ] 抽獎次數
-  - [ ] NFT 發送錯誤率
-  - [ ] 節點同步狀態（延遲區塊高度）
+#### Kubernetes 容器編排
+
+- [ ] 設計 K8s 架構與 Namespace 策略
+- [ ] 撰寫 Kubernetes manifests：
+  - [ ] `k8s/base/` - 基礎配置（ConfigMap、Secret、Service）
+  - [ ] `k8s/apps/backend/` - Go 後端服務 Deployment
+  - [ ] `k8s/apps/frontend/` - React 前端 Deployment
+  - [ ] `k8s/apps/monitoring/` - Prometheus + Grafana 部署
+- [ ] 使用 Kustomize 管理多環境配置：
+  - [ ] `k8s/overlays/dev/` - 開發環境配置
+  - [ ] `k8s/overlays/staging/` - 測試環境配置
+  - [ ] `k8s/overlays/prod/` - 生產環境配置
+- [ ] （可選）設定 Horizontal Pod Autoscaler（HPA）
+- [ ] 配置 Ingress + SSL 憑證自動化（cert-manager）
+- [ ] （可選）實作 Pod Security Standards
+
+#### GitHub Actions CI/CD 進階流程
+
+- [ ] 設計多階段 CI/CD Pipeline：
+  - [ ] **Build Stage**: Docker 映像建構與推送到 GCR
+  - [ ] **Test Stage**: 單元測試、集成測試、安全掃描
+  - [ ] **Infrastructure Stage**: Terraform plan/apply 基礎設施
+  - [ ] **Deploy Stage**: Kubernetes 滾動更新部署
+  - [ ] **Verify Stage**: 健康檢查與煙霧測試
+- [ ] 撰寫 `.github/workflows/`：
+  - [ ] `ci.yml` - 持續整合流程
+  - [ ] `cd-dev.yml` - 開發環境部署
+  - [ ] `cd-staging.yml` - 測試環境部署
+  - [ ] `cd-prod.yml` - 生產環境部署（需手動核准）
+  - [ ] `infrastructure.yml` - Terraform 基礎設施管理
+- [ ] 設定 GitHub Environments 與 Protection Rules
+- [ ] （可選）整合 GitHub Actions 與 GCP Service Account（OIDC）
+
+#### 安全性與密鑰管理
+
+- [ ] 設定 GCP Secret Manager 整合
+- [ ] 配置 Workload Identity（GKE 與 GCP 服務整合）
+- [ ] 實作 Pod Security Context 與 Network Policies
+- [ ] （可選）設定 Google Cloud Armor（DDoS 防護）
+- [ ] （可選）整合 Container Analysis API（漏洞掃描）
+- [ ] （可選）配置 Binary Authorization（映像簽名驗證）
+
+#### 監控、日誌與可觀測性
+
+- [ ] 部署 Prometheus + Grafana 到 K8s
+- [ ] （可選）整合 Google Cloud Monitoring 與 Logging
+- [ ] （可選）設定 Jaeger 分散式追蹤
+- [ ] （可選）配置 Fluentd 日誌聚合
+- [ ] 撰寫自定義監控指標（抽獎成功率、NFT 發送延遲）
+- [ ] （可選）設定 PagerDuty / Slack 告警整合
+- [ ] （可選）建立 SLI/SLO 指標與 Error Budget
+
+#### 多環境與發佈策略
+
+- [ ] （可選）實作 Blue-Green 部署策略
+- [ ] （可選）設定 Canary 發佈（使用 Flagger 或 Argo Rollouts）
+- [ ] （可選）配置 Feature Flags（使用 ConfigMap 或外部服務）
+- [ ] （可選）實作 Database Migration 自動化
+- [ ] （可選）設定跨區域災難恢復
+
+#### 成本優化與治理
+
+- [ ] （可選）設定 GCP 預算告警與成本監控
+- [ ] （可選）實作 Cluster Autoscaler（節點自動縮放）
+- [ ] （可選）配置 Vertical Pod Autoscaler（資源優化）
+- [ ] （可選）使用 Spot Instances / Preemptible VMs
+- [ ] （可選）設定資源配額與限制
+
+#### 進階 DevOps 實踐
+
+- [ ] （可選）實作 GitOps 工作流（使用 ArgoCD 或 Flux）
+- [ ] （可選）設定 Chaos Engineering 測試（使用 Chaos Monkey）
+- [ ] （可選）建立自動化備份與恢復流程
+- [ ] （可選）實作 Immutable Infrastructure 原則
+- [ ] （可選）建立 Runbook 與事故響應流程
 
 ### 測試與驗證
 
