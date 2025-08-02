@@ -269,32 +269,81 @@ export const ERROR_MESSAGES = {
 export class WalletService {
   // 獲取錢包 TON 餘額
   static async getWalletBalance(address: string): Promise<string | null> {
-    try {
-      const url = new URL(
-        'https://testnet.toncenter.com/api/v2/getAddressBalance'
-      );
-      url.searchParams.append('address', address);
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 秒
+    const timeout = 10000; // 10 秒超時
 
-      const balanceResponse = await fetch(url.toString());
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const url = new URL(
+          'https://testnet.toncenter.com/api/v2/getAddressBalance'
+        );
+        url.searchParams.append('address', address);
 
-      if (!balanceResponse.ok) {
-        throw new Error(`HTTP error! status: ${balanceResponse.status}`);
+        // 添加超時控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+        const balanceResponse = await fetch(url.toString(), {
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!balanceResponse.ok) {
+          throw new Error(`HTTP error! status: ${balanceResponse.status}, statusText: ${balanceResponse.statusText}`);
+        }
+
+        const balanceData = await balanceResponse.json();
+
+        if (balanceData.ok && balanceData.result !== undefined) {
+          // 處理可能的字符串結果
+          const resultValue = typeof balanceData.result === 'string' 
+            ? balanceData.result 
+            : balanceData.result.toString();
+          
+          // 將 nanoTON 轉換為 TON
+          const balanceInNano = parseInt(resultValue) || 0;
+          const balanceInTON = (balanceInNano / 1e9).toFixed(4);
+          
+          console.log(`錢包餘額獲取成功: ${address} = ${balanceInTON} TON`);
+          return balanceInTON;
+        } else {
+          throw new Error(`API 返回錯誤: ${JSON.stringify(balanceData)}`);
+        }
+      } catch (error: any) {
+        console.error(`獲取錢包餘額失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, {
+          address,
+          error: error.message,
+          type: error.name,
+        });
+
+        // 如果是最後一次嘗試，拋出詳細錯誤
+        if (attempt === maxRetries - 1) {
+          console.error('所有重試都失敗，詳細錯誤信息:', error);
+          return null;
+        }
+
+        // 對於某些錯誤類型，不需要重試
+        if (error.name === 'AbortError') {
+          console.warn('請求超時，將進行重試...');
+        } else if (error.message.includes('400')) {
+          console.error('地址格式錯誤，停止重試');
+          return null;
+        }
+
+        // 等待後重試（指數退避）
+        await new Promise(resolve => 
+          setTimeout(resolve, retryDelay * Math.pow(2, attempt))
+        );
       }
-
-      const balanceData = await balanceResponse.json();
-
-      if (balanceData.ok && balanceData.result) {
-        // 將 nanoTON 轉換為 TON
-        const balanceInTON = (parseInt(balanceData.result) / 1e9).toFixed(4);
-        return balanceInTON;
-      } else {
-        console.error('獲取錢包餘額失敗:', balanceData);
-        return null;
-      }
-    } catch (error) {
-      console.error('獲取錢包餘額失敗:', error);
-      return null;
     }
+
+    console.error('獲取錢包餘額的所有重試都失敗');
+    return null;
   }
 
   // 檢查餘額是否足夠

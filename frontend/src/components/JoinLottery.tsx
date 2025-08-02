@@ -55,26 +55,48 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   // 檢查用戶是否已連接錢包
   const isWalletConnected = !!address;
 
-  // 載入錢包餘額（含重試機制）
+  // 載入錢包餘額（改進的重試機制）
   const loadWalletBalance = useCallback(async (isRetry = false, currentRetryCount = 0) => {
-    if (!address || !connectionRestored) return;
+    if (!address || !connectionRestored) {
+      console.log('載入餘額被跳過: 沒有地址或連接未恢復');
+      return;
+    }
 
     if (!isRetry) {
       setIsLoadingBalance(true);
       setBalanceRetryCount(0);
+      console.log(`開始載入錢包餘額: ${address}`);
     }
 
     try {
+      // WalletService.getWalletBalance 現在已經有內建的重試機制
       const balance = await WalletService.getWalletBalance(address);
-      setWalletBalance(balance);
-      setBalanceRetryCount(0);
-    } catch (error) {
-      console.error('載入錢包餘額失敗:', error);
+      
+      if (balance !== null) {
+        console.log(`餘額載入成功: ${balance} TON`);
+        setWalletBalance(balance);
+        setBalanceRetryCount(0);
+        
+        // 成功載入後給用戶反饋
+        if (isRetry && currentRetryCount > 0) {
+          toast.success('餘額載入成功', `您的錢包餘額: ${WalletService.formatTON(balance)}`);
+        }
+      } else {
+        throw new Error('API 返回空值');
+      }
+    } catch (error: any) {
+      console.error('載入錢包餘額失敗:', {
+        address,
+        error: error.message,
+        isRetry,
+        currentRetryCount
+      });
       
       const retryCountToUse = isRetry ? currentRetryCount : balanceRetryCount;
       
+      // 由於 WalletService 已經有重試機制，這裡只做少量額外重試
       if (retryCountToUse < MAX_BALANCE_RETRY && !isRetry) {
-        // 自動重試
+        // 自動重試（延遲更長時間）
         const newRetryCount = retryCountToUse + 1;
         setBalanceRetryCount(newRetryCount);
         
@@ -82,10 +104,16 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         
         setTimeout(() => {
           loadWalletBalance(true, newRetryCount);
-        }, BALANCE_RETRY_DELAY);
+        }, BALANCE_RETRY_DELAY * newRetryCount); // 遞增延遲
       } else {
-        // 重試次數用盡
-        toast.error('餘額載入失敗', '無法獲取錢包餘額，請檢查網路連接或手動重試');
+        // 重試次數用盡，給出詳細的錯誤信息
+        const errorMessage = error.message?.includes('timeout') 
+          ? '網路連接超時，請檢查網路狀況' 
+          : error.message?.includes('400')
+          ? '錢包地址格式錯誤'
+          : '無法獲取錢包餘額，請檢查網路連接或稍後重試';
+          
+        toast.error('餘額載入失敗', errorMessage);
         setWalletBalance(null);
       }
     } finally {
@@ -282,7 +310,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     if (!lotteryActive) return '抽獎未開放';
     if (currentParticipants >= maxParticipants) return '抽獎已滿員';
     if (isLoadingBalance) return '正在載入餘額...';
-    if (!hasEnoughBalance) return `餘額不足 (需要 ${requiredAmount} TON)`;
+    if (!hasEnoughBalance) return `需讀取餘額`;
     if (transactionStatus !== TransactionStatus.IDLE) return '交易進行中...';
     return null;
   };
@@ -381,10 +409,9 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
                 hasEnoughBalance ? 'sufficient' : 'insufficient'
               }`}
             >
-              💰 餘額: {WalletService.formatTON(walletBalance)}
-              {!hasEnoughBalance && (
-                <span className="insufficient-notice">
-                  (不足 {requiredAmount} TON)
+              {hasEnoughBalance && (
+                <span>
+                  💰 餘額: {WalletService.formatTON(walletBalance)}
                 </span>
               )}
             </span>
@@ -477,10 +504,10 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       <div className="instructions">
         <h4>📋 參加說明</h4>
         <ul>
-          <li>• 每次參加需要支付 0.02 TON (包含參與費和 gas 費用)</li>
-          <li>• 每個錢包地址只能參加一次</li>
-          <li>• 當參與人數達到 {maxParticipants} 人時，抽獎將自動開始</li>
-          <li>• 中獎者將獲得限量版貓咪 NFT</li>
+          <li>每次參加需要支付 0.02 TON (包含參與費和 gas 費用)</li>
+          <li>每個錢包地址只能參加一次</li>
+          <li>當參與人數達到 {maxParticipants} 人時，抽獎將自動開始</li>
+          <li>中獎者將獲得限量版貓咪 NFT</li>
         </ul>
       </div>
     </div>
