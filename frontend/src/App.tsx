@@ -14,7 +14,7 @@ function App() {
           <WalletConnect />
 
           {/* 合約狀態組件 */}
-          <ContractStatus contractAddress="EQC0482t814YivoEaIea43khv6jo4Mp_sXtx0eOIgtzUsl13" />
+          <ContractStatus contractAddress="EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY" />
 
           <div className="card">
             <h2>錢包連接功能已完成 ✅</h2>
