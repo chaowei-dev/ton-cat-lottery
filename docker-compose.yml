@@ -1,31 +1,6 @@
 # 🐳 TON Cat Lottery Docker Compose
-# 統一管理智能合約和後端服務
+# 統一管理後端服務和前端應用
 services:
-  # ================================
-  # 智能合約服務
-  # ================================
-  contracts:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.contracts
-    container_name: ton-cat-lottery-contracts
-    networks:
-      - ton-lottery-network
-    volumes:
-      # 將構建產物持久化到宿主機
-      - ./contracts/build:/app/build
-      - ./contracts/deployments:/app/deployments
-    environment:
-      - NODE_ENV=development
-      - TON_NETWORK=testnet
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD', 'test', '-f', './build/CatLottery_CatLottery.ts']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
   # ================================
   # 後端服務
   # ================================
@@ -38,36 +13,36 @@ services:
       - '8080:8080'
     networks:
       - ton-lottery-network
+    env_file:
+      - .env # 從根目錄的 .env 檔案讀取環境變數
     environment:
-      # 服務配置
-      - ENVIRONMENT=docker
-      - LOG_LEVEL=info
-      - PORT=8080
+      # 服務配置 - 從 .env 讀取，允許覆蓋
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PORT=${PORT:-8080}
 
-      # TON 網路配置
-      - TON_API_ENDPOINT=https://testnet.toncenter.com/api/v2/
-      - TON_NETWORK=testnet
+      # TON 網路配置 - 從 .env 讀取
+      - TON_API_ENDPOINT=${TON_API_ENDPOINT:-https://testnet.toncenter.com/api/v2/}
+      - TON_NETWORK=${TON_NETWORK:-testnet}
 
-      # 合約地址 (需要實際部署後填入)
-      - LOTTERY_CONTRACT_ADDRESS=${LOTTERY_CONTRACT_ADDRESS:-EQBGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8G}
-      - NFT_CONTRACT_ADDRESS=${NFT_CONTRACT_ADDRESS:-EQDGhqLAZseEqRXz4ByFPTGV7SVMlI4hrbs-Sps_Xzx01x8H}
+      # 合約地址 - 從 .env 讀取
+      - LOTTERY_CONTRACT_ADDRESS=${LOTTERY_CONTRACT_ADDRESS}
+      - NFT_CONTRACT_ADDRESS=${NFT_CONTRACT_ADDRESS}
 
-      # 錢包配置
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
+      # 錢包配置 - 從 .env 讀取
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
 
-      # 抽獎參數
-      - DRAW_INTERVAL=5m
-      - MAX_PARTICIPANTS=5
-      - MIN_PARTICIPANTS=2
-      - ENTRY_FEE_TON=0.1
-      - AUTO_DRAW=false
+      # 抽獎參數 - 從 .env 讀取
+      - DRAW_INTERVAL=${DRAW_INTERVAL:-5m}
+      - MAX_PARTICIPANTS=${MAX_PARTICIPANTS:-3}
+      - MIN_PARTICIPANTS=${MIN_PARTICIPANTS:-1}
+      - ENTRY_FEE_TON=${ENTRY_FEE_TON:-0.01}
+      - AUTO_DRAW=${AUTO_DRAW:-false}
 
-      # 重試配置
-      - RETRY_COUNT=3
-      - RETRY_DELAY=5s
-    depends_on:
-      contracts:
-        condition: service_healthy
+      # 重試配置 - 從 .env 讀取
+      - RETRY_COUNT=${RETRY_COUNT:-3}
+      - RETRY_DELAY=${RETRY_DELAY:-5s}
+
     restart: unless-stopped
     # 後端是守護進程，不提供 HTTP API，暫時註釋健康檢查
     # healthcheck:
@@ -78,26 +53,50 @@ services:
     #   start_period: 15s
 
   # ================================
-  # 監控服務 (可選)
+  # 前端服務
   # ================================
-  monitor:
-    image: prom/prometheus:latest
-    container_name: ton-cat-lottery-monitor
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: production
+    container_name: ton-cat-lottery-frontend
     ports:
-      - '9090:9090'
+      - '3000:80'
     networks:
       - ton-lottery-network
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+    environment:
+      - NODE_ENV=production
+
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:80/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ================================
+  # 前端開發服務 (可選)
+  # ================================
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+      target: development
+    container_name: ton-cat-lottery-frontend-dev
+    ports:
+      - '5173:5173'
+    networks:
+      - ton-lottery-network
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     profiles:
-      - monitoring
+      - development
+    restart: unless-stopped
 
 # ================================
 # 網路配置
@@ -106,12 +105,3 @@ networks:
   ton-lottery-network:
     driver: bridge
     name: ton-lottery-network
-
-# ================================
-# 數據卷配置
-# ================================
-volumes:
-  contracts-build:
-    name: ton-lottery-contracts-build
-  backend-logs:
-    name: ton-lottery-backend-logs

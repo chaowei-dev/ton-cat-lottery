@@ -41,9 +41,6 @@ WORKDIR /app
 # 從構建階段複製二進制文件
 COPY --from=builder /app/ton-cat-lottery-backend .
 
-# 複製環境配置範例
-COPY --from=builder /app/.env.example .
-
 # 更改文件擁有者
 RUN chown -R lottery:lottery /app
 
