@@ -184,6 +184,57 @@ export class ContractService {
   }
 }
 
+// 交易錯誤類型
+export const TransactionError = {
+  INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  USER_REJECTED: 'USER_REJECTED',
+  CONTRACT_ERROR: 'CONTRACT_ERROR',
+  LOTTERY_FULL: 'LOTTERY_FULL',
+  LOTTERY_INACTIVE: 'LOTTERY_INACTIVE',
+  ALREADY_PARTICIPATED: 'ALREADY_PARTICIPATED',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+} as const;
+
+export type TransactionErrorType =
+  (typeof TransactionError)[keyof typeof TransactionError];
+
+// 錯誤訊息映射
+export const ERROR_MESSAGES = {
+  [TransactionError.INSUFFICIENT_BALANCE]: {
+    title: '餘額不足',
+    message: '您的錢包餘額不足以完成這筆交易，請充值後再試',
+  },
+  [TransactionError.NETWORK_ERROR]: {
+    title: '網路錯誤',
+    message: '網路連接異常，請檢查網路連接後重試',
+  },
+  [TransactionError.USER_REJECTED]: {
+    title: '交易被拒絕',
+    message: '您取消了交易，如需參加抽獎請重新嘗試',
+  },
+  [TransactionError.CONTRACT_ERROR]: {
+    title: '合約錯誤',
+    message: '智能合約執行失敗，請稍後重試',
+  },
+  [TransactionError.LOTTERY_FULL]: {
+    title: '抽獎已滿',
+    message: '當前抽獎參與人數已滿，請等待下一輪抽獎',
+  },
+  [TransactionError.LOTTERY_INACTIVE]: {
+    title: '抽獎未開放',
+    message: '當前抽獎未開放參與，請等待下一輪開始',
+  },
+  [TransactionError.ALREADY_PARTICIPATED]: {
+    title: '已經參與',
+    message: '您已經參與了當前輪次的抽獎，請等待抽獎結果',
+  },
+  [TransactionError.UNKNOWN_ERROR]: {
+    title: '未知錯誤',
+    message: '發生了未知錯誤，請稍後重試或聯繫客服',
+  },
+};
+
 // 獲取錢包餘額服務
 export class WalletService {
   // 獲取錢包 TON 餘額
@@ -214,6 +265,73 @@ export class WalletService {
       console.error('獲取錢包餘額失敗:', error);
       return null;
     }
+  }
+
+  // 檢查餘額是否足夠
+  static async checkSufficientBalance(
+    address: string,
+    requiredAmount: number
+  ): Promise<{ sufficient: boolean; balance: number; required: number }> {
+    try {
+      const balanceStr = await this.getWalletBalance(address);
+      const balance = balanceStr ? parseFloat(balanceStr) : 0;
+
+      return {
+        sufficient: balance >= requiredAmount,
+        balance,
+        required: requiredAmount,
+      };
+    } catch (error) {
+      console.error('檢查餘額失敗:', error);
+      return {
+        sufficient: false,
+        balance: 0,
+        required: requiredAmount,
+      };
+    }
+  }
+
+  // 分析交易錯誤
+  static analyzeTransactionError(error: any): TransactionErrorType {
+    if (!error) return TransactionError.UNKNOWN_ERROR;
+
+    const errorMessage = error.message?.toLowerCase() || '';
+    const errorCode = error.code;
+
+    // 用戶拒絕交易
+    if (errorCode === 4001 || errorMessage.includes('user rejected')) {
+      return TransactionError.USER_REJECTED;
+    }
+
+    // 餘額不足
+    if (
+      errorMessage.includes('insufficient') ||
+      errorMessage.includes('balance') ||
+      errorCode === -32000
+    ) {
+      return TransactionError.INSUFFICIENT_BALANCE;
+    }
+
+    // 網路錯誤
+    if (
+      errorMessage.includes('network') ||
+      errorMessage.includes('fetch') ||
+      errorMessage.includes('timeout') ||
+      errorCode === -32603
+    ) {
+      return TransactionError.NETWORK_ERROR;
+    }
+
+    // 合約錯誤
+    if (
+      errorMessage.includes('contract') ||
+      errorMessage.includes('execution') ||
+      errorCode === -32015
+    ) {
+      return TransactionError.CONTRACT_ERROR;
+    }
+
+    return TransactionError.UNKNOWN_ERROR;
   }
 
   // 格式化 TON 金額顯示

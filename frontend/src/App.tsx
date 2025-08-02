@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import WalletConnect from './components/WalletConnect';
 import ContractStatus from './components/ContractStatus';
 import JoinLottery from './components/JoinLottery';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './hooks/useToast';
 import { createContractService } from './services/contractService';
 import type { ContractInfo } from './services/contractService';
 import './styles/App.css';
@@ -10,6 +12,7 @@ function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const contractAddress = 'EQDUbgkuc2X3bbhzWXk8hn16JeG_qRsOrpv1h8DUkXf1XQO2';
   const contractService = createContractService(contractAddress);
+  const toast = useToast();
 
   // 載入合約狀態
   const loadContractStatus = async () => {
@@ -18,6 +21,7 @@ function App() {
       setContractInfo(info);
     } catch (error) {
       console.error('載入合約狀態失敗:', error);
+      toast.error('載入失敗', '無法載入合約狀態，請檢查網路連接');
     }
   };
 
@@ -55,6 +59,7 @@ function App() {
               currentParticipants={contractInfo.participantCount}
               lotteryActive={contractInfo.lotteryActive}
               onJoinSuccess={loadContractStatus}
+              toast={toast}
             />
           ) : (
             <div className="card">
@@ -68,6 +73,9 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Toast 通知容器 */}
+      <ToastContainer toasts={toast.toasts} onRemove={toast.removeToast} />
     </div>
   );
 }

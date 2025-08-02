@@ -60,6 +60,9 @@
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 20px;
+}
+
+.wallet-notice {
   text-align: center;
 }
 
@@ -69,10 +72,53 @@
   font-size: 0.9rem;
 }
 
-.wallet-info p {
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wallet-connect-address span {
   color: #4caf50;
-  margin: 0;
   font-size: 0.9rem;
+  display: block;
+}
+
+.wallet-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loading-balance {
+  color: #ffd700;
+  font-size: 0.85rem;
+}
+
+.join-lottery-balance {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.balance.sufficient {
+  color: #4caf50;
+}
+
+.balance.insufficient {
+  color: #ff9800;
+}
+
+.insufficient-notice {
+  color: #ff5722;
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.balance-error {
+  color: #f44336;
+  font-size: 0.85rem;
 }
 
 /* 參加按鈕區域 */
@@ -112,6 +158,11 @@
   box-shadow: none;
 }
 
+.join-btn.processing {
+  background: linear-gradient(45deg, #2196f3, #03a9f4);
+  box-shadow: 0 4px 16px rgba(33, 150, 243, 0.3);
+}
+
 /* 載入動畫 */
 .loading-spinner {
   width: 16px;
@@ -129,7 +180,8 @@
 
 /* 狀態訊息 */
 .lottery-closed,
-.lottery-full {
+.lottery-full,
+.lottery-disabled {
   background: rgba(255, 152, 0, 0.2);
   border: 1px solid rgba(255, 152, 0, 0.3);
   border-radius: 8px;
@@ -138,7 +190,8 @@
 }
 
 .lottery-closed p,
-.lottery-full p {
+.lottery-full p,
+.lottery-disabled p {
   color: #ff9800;
   margin: 0;
   font-weight: 500;
@@ -151,6 +204,37 @@
 
 .lottery-full p {
   color: #4caf50;
+}
+
+.lottery-disabled.insufficient-balance {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.lottery-disabled.insufficient-balance p {
+  color: #f44336;
+}
+
+/* 刷新餘額按鈕 */
+.refresh-balance-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.2s;
+}
+
+.refresh-balance-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.refresh-balance-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 錯誤和成功訊息 */
@@ -196,6 +280,69 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* 交易進度條 */
+.transaction-progress {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-step {
+  display: inline-block;
+  padding: 6px 12px;
+  margin: 4px;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.progress-step.active {
+  background: linear-gradient(45deg, #2196f3, #03a9f4);
+  color: white;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.progress-step.completed {
+  background: linear-gradient(45deg, #4caf50, #8bc34a);
+  color: white;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.progress-step.completed.active {
+  animation: success-pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes success-pulse {
+  0% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.1);
+  }
+  100% { 
+    transform: scale(1);
+  }
+}
+
 /* 說明文字 */
 .instructions {
   background: rgba(255, 255, 255, 0.05);
@@ -237,9 +384,24 @@
     gap: 8px;
   }
 
+  .wallet-balance {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .join-btn {
     padding: 14px 24px;
     font-size: 1rem;
+  }
+
+  .transaction-progress {
+    padding: 12px;
+  }
+
+  .progress-step {
+    display: block;
+    margin: 6px 0;
+    text-align: center;
   }
 
   .instructions {
