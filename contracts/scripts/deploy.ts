@@ -15,8 +15,8 @@ export async function run(provider: NetworkProvider, args: string[]) {
   ui.write(`🚀 正在部署 CatLottery 合約到 ${network}...`);
 
   // 合約初始化參數
-  const ENTRY_FEE = toNano('0.1'); // 0.1 TON 參與費用
-  const MAX_PARTICIPANTS = 10; // 最大參與人數
+  const ENTRY_FEE = toNano('0.01'); // 0.01 TON 參與費用 (降低費用)
+  const MAX_PARTICIPANTS = 3; // 最大參與人數 (降低門檻便於測試)
 
   // 獲取部署者錢包
   const deployer = provider.sender();

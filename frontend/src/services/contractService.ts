@@ -62,7 +62,7 @@ export class ContractService {
         if (stack && stack.length >= 6) {
           // 解析返回的數據
           const entryFeeNano = parseInt(stack[1][1], 16); // 0x5f5e100 = 100000000
-          const maxParticipants = parseInt(stack[2][1], 16); // 0xa = 10
+          const maxParticipants = parseInt(stack[2][1], 16); // 0x3 = 3
           const currentRound = parseInt(stack[3][1], 16); // 0x1 = 1
           const lotteryActiveRaw = parseInt(stack[4][1], 16); // -0x1 = -1
           const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
@@ -95,8 +95,8 @@ export class ContractService {
       // 錯誤時返回模擬數據
       return {
         owner: this.contractAddress,
-        entryFee: '0.1',
-        maxParticipants: 10,
+        entryFee: '0.01',
+        maxParticipants: 3,
         currentRound: 1,
         lotteryActive: true,
         participantCount: 0,
@@ -174,8 +174,8 @@ export class ContractService {
   private getFallbackData(): ContractInfo {
     return {
       owner: this.contractAddress,
-      entryFee: '0.01', // 暫時降低顯示費用
-      maxParticipants: 10,
+      entryFee: '0.01', // 降低顯示費用
+      maxParticipants: 3,
       currentRound: 1,
       lotteryActive: true,
       participantCount: 0,

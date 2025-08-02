@@ -9,7 +9,7 @@ export async function run(provider: NetworkProvider) {
 
   // 合約初始化參數
   const ENTRY_FEE = toNano('0.01'); // 0.01 TON 參與費用 (降低費用)
-  const MAX_PARTICIPANTS = 10; // 最大參與人數
+  const MAX_PARTICIPANTS = 3; // 最大參與人數 (降低門檻便於測試)
 
   // 獲取部署者地址
   const deployerAddress = provider.sender().address;
@@ -22,6 +22,7 @@ export async function run(provider: NetworkProvider) {
   const uniqueEntryFee = ENTRY_FEE + BigInt(timestamp % 1000); // 添加小的隨機變化
 
   ui.write(`📦 部署者地址: ${deployerAddress}`);
+  ui.write(`🔗 測試網址：https://testnet.tonviewer.com/${deployerAddress}`);
   ui.write(`💰 參與費用: ${Number(ENTRY_FEE) / 1e9} TON`);
   ui.write(`👥 最大參與人數: ${MAX_PARTICIPANTS}`);
 
@@ -60,7 +61,7 @@ export async function run(provider: NetworkProvider) {
   }
 
   // 部署合約
-  ui.write(`🔨 正在部署合約...`);
+  ui.write(`🔨 正在部署合約（請記得在 Tonkeeper 中確認交易）...`);
 
   await catLottery.send(
     provider.sender(),
