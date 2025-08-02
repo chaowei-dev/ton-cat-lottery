@@ -91,6 +91,9 @@ Thumbs.db
 # Yarn integrity file
 .yarn-integrity
 
+# Vite cache directory
+.vite/
+
 # Go specific files
 *.exe
 *.exe~
