@@ -17,6 +17,10 @@ export async function run(provider: NetworkProvider) {
     throw new Error('無法獲取部署者地址');
   }
 
+  // 使用時間戳作為隨機因子來生成不同的合約地址
+  const timestamp = Date.now();
+  const uniqueEntryFee = ENTRY_FEE + BigInt(timestamp % 1000); // 添加小的隨機變化
+
   ui.write(`📦 部署者地址: ${deployerAddress}`);
   ui.write(`💰 參與費用: ${Number(ENTRY_FEE) / 1e9} TON`);
   ui.write(`👥 最大參與人數: ${MAX_PARTICIPANTS}`);
@@ -25,10 +29,12 @@ export async function run(provider: NetworkProvider) {
   const catLottery = provider.open(
     await CatLottery.fromInit(
       deployerAddress,
-      ENTRY_FEE,
+      uniqueEntryFee,
       BigInt(MAX_PARTICIPANTS)
     )
   );
+
+  ui.write(`📍 合約地址: ${catLottery.address}`);
 
   // 檢查合約是否已部署
   if (await provider.isContractDeployed(catLottery.address)) {
