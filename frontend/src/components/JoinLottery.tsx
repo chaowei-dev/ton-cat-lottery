@@ -42,9 +42,10 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       setSuccess(false);
 
       // 準備交易消息 - 使用正確的 TON Core BOC 格式
+      // 合約要求 0.01000067 TON，加上 gas 費用，總共支付 0.02 TON 確保足夠
       const message = {
         address: contractAddress,
-        amount: '10000000', // 0.05 TON (包含參與費 + gas 費)
+        amount: '20000000', // 0.02 TON (包含參與費 + gas 費，確保足夠)
         payload: 'te6cckEBAQEACgAAEAAAAABqb2lukPEtIw==', // 正確的 "join" 文字消息 BOC
       };
 
@@ -57,9 +58,11 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       console.log('交易已發送:', result);
       setSuccess(true);
 
-      // 觸發成功回調
+      // 等待區塊鏈確認後再刷新狀態 (延遲 5 秒)
       if (onJoinSuccess) {
-        onJoinSuccess();
+        setTimeout(() => {
+          onJoinSuccess();
+        }, 5000);
       }
 
       // 3秒後重置成功狀態
@@ -137,7 +140,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
                 正在參加...
               </>
             ) : (
-              <>🎲 參加抽獎 ({entryFee} TON)</>
+              <>🎲 參加抽獎 (0.02 TON)</>
             )}
           </button>
         )}
@@ -164,7 +167,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       <div className="instructions">
         <h4>📋 參加說明</h4>
         <ul>
-          <li>• 每次參加需要支付 {entryFee} TON 參與費用</li>
+          <li>• 每次參加需要支付 0.02 TON (包含參與費和 gas 費用)</li>
           <li>• 每個錢包地址只能參加一次</li>
           <li>• 當參與人數達到 {maxParticipants} 人時，抽獎將自動開始</li>
           <li>• 中獎者將獲得限量版貓咪 NFT</li>
