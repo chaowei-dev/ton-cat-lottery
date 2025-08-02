@@ -208,6 +208,7 @@ Email：liu.chaowei.dev@gmail.com
 - [x] 使用 `tact` CLI 部署至 testnet
 - [x] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
 - [x] 鑄造並部署預設的 NFT（貓咪圖像）
+- [x] 部署合約到 TON 測試網
 
 ### 後端服務模組（Go）
 

@@ -1,6 +1,6 @@
 # 🐱 TON Cat Lottery - 智能合約文檔
 
-> 基於 TON 區塊鏈的貓咪 NFT 抽獎系統智能合約完整指南
+> 基於 TON 區塊鏈的貓咪 NFT 抽獎系統
 
 ---
 
@@ -8,44 +8,38 @@
 
 - [項目概覽](#項目概覽)
 - [合約架構](#合約架構)
-- [功能詳細說明](#功能詳細說明)
-- [安裝與設置](#安裝與設置)
-- [命令參考](#命令參考)
-- [部署指南](#部署指南)
-- [測試指南](#測試指南)
+- [快速開始](#快速開始)
+- [部署到測試網](#部署到測試網)
 - [API 參考](#api-參考)
-- [使用範例](#使用範例)
 - [故障排除](#故障排除)
 
 ---
 
 ## 🎯 項目概覽
 
-TON Cat Lottery 是一個完整的鏈上抽獎系統，包含兩個主要合約：
+TON Cat Lottery 包含兩個主要智能合約：
 
 ### 🎪 核心合約
 
 1. **CatLottery.tact** - 主抽獎合約
 
-   - 管理抽獎流程
-   - 處理參與者註冊
-   - 執行隨機抽獎
+   - 管理抽獎流程和參與者
+   - 執行隨機抽獎機制
    - 自動發送 NFT 獎勵
 
 2. **CatNFT.tact** - 貓咪 NFT 合約
    - 鑄造獨特的貓咪 NFT
-   - 4 種稀有度等級
+   - 4 種稀有度等級 (Common, Rare, Epic, Legendary)
    - 完整的所有權管理
-   - 轉移功能
 
 ### 🎨 NFT 稀有度系統
 
-| 稀有度        | 名稱             | 描述                                |
-| ------------- | ---------------- | ----------------------------------- |
-| **Common**    | Orange Tabby     | 友善的橘色虎斑貓 (Tabby)            |
-| **Rare**      | Siamese Princess | 優雅的暹羅貓 (Siamese)，藍色眼睛    |
-| **Epic**      | Maine Coon King  | 威嚴的緬因貓 (Maine Coon)，王者風範 |
-| **Legendary** | Cosmic Cat       | 神秘的宇宙貓 (Cosmic)，來自星空     |
+| 稀有度        | 名稱             | 描述                   |
+| ------------- | ---------------- | ---------------------- |
+| **Common**    | Orange Tabby     | 友善的橘色虎斑貓       |
+| **Rare**      | Siamese Princess | 優雅的暹羅貓，藍色眼睛 |
+| **Epic**      | Maine Coon King  | 威嚴的緬因貓，王者風範 |
+| **Legendary** | Cosmic Cat       | 神秘的宇宙貓，來自星空 |
 
 ---
 
@@ -66,285 +60,178 @@ TON Cat Lottery 系統
     └── 合約管理
 ```
 
----
+### 🎯 核心功能
 
-## 🔧 功能詳細說明
+#### CatLottery 功能
 
-### CatLottery 合約功能
+- **參與抽獎**: 支付 0.1 TON 參與當前輪次
+- **執行抽獎**: 隨機選出中獎者並自動發送 NFT
+- **參與者管理**: 防止重複參與，達到上限自動關閉
 
-#### 🎯 核心抽獎功能
+#### CatNFT 功能
 
-- **參與抽獎** (`join`): 支付 TON 參與當前輪次
-- **執行抽獎** (`drawWinner`): 隨機選出中獎者
-- **自動 NFT 發送**: 中獎後自動鑄造並發送 NFT
-
-#### 👥 參與者管理
-
-- **參與者儲存**: 記錄所有參與者地址和金額
-- **重複檢查**: 防止同一地址重複參與
-- **上限控制**: 達到最大參與人數自動關閉
-
-#### 🎲 隨機機制
-
-- **時間戳隨機**: 基於區塊時間戳
-- **Gas 費用隨機**: 結合交易 Gas 費用
-- **參與者數量**: 加入參與者數量作為隨機因子
-
-#### 🏆 獎勵系統
-
-- **NFT ID 生成**: 基於輪次和隨機數
-- **貓咪類型選擇**: 隨機分配 4 種貓咪類型
-- **自動發送**: 直接鑄造到中獎者錢包
-
-### CatNFT 合約功能
-
-#### 🎨 NFT 鑄造
-
-- **基礎鑄造** (`mint`): 鑄造 NFT 給合約擁有者
-- **指定鑄造** (`MintTo`): 鑄造 NFT 給指定地址
-- **自動 ID 管理**: 自動分配遞增 NFT ID
-
-#### 🔄 NFT 轉移
-
-- **安全轉移** (`TransferNFT`): 驗證擁有者身份
-- **事件日誌**: 記錄所有轉移操作
-- **權限檢查**: 確保只有擁有者可以轉移
-
-#### 📊 查詢功能
-
-- **擁有者查詢**: 查詢特定 NFT 的擁有者
-- **存在性檢查**: 檢查 NFT 是否存在
-- **貓咪資訊**: 獲取貓咪的詳細資訊
-- **合約狀態**: 查詢總供應量等信息
+- **NFT 鑄造**: 鑄造貓咪 NFT 給指定地址
+- **所有權轉移**: 安全的 NFT 轉移機制
+- **查詢功能**: 查詢 NFT 擁有者和貓咪資訊
 
 ---
 
-## 🚀 安裝與設置
+## 🚀 快速開始
 
-### 系統需求
+### 環境要求
 
 ```bash
-Node.js >= 18.0.0
+Node.js >= 22.0.0
 npm >= 8.0.0
 ```
 
-### 安裝步驟
-
-1. **克隆項目**
+### 安裝與編譯
 
 ```bash
-git clone <your-repo-url>
-cd ton-cat-lottery/contracts
-```
+# 進入合約目錄
+cd contracts
 
-2. **安裝依賴**
-
-```bash
+# 安裝依賴
 npm install
-```
 
-3. **驗證安裝**
-
-```bash
+# 編譯合約
 npm run build
 ```
 
----
-
-## 📋 命令參考
-
-### 🔨 編譯命令
-
-```bash
-# 編譯所有合約
-npm run build
-
-# 等同於
-tact --config ./tact.config.json
-```
-
-**輸出產物：**
-
-- `build/CatLottery_CatLottery.*` - 抽獎合約編譯文件
-- `build/CatNFT_CatNFT.*` - NFT 合約編譯文件
-
-### 🧪 測試命令
+### 運行測試
 
 ```bash
 # 運行所有測試
 npm test
-# 或
-npm run test:all
 
-# 運行特定測試文件
+# 運行特定測試
 npm test -- tests/CatLottery.test.ts
-
-# 監視模式運行測試
-npm run test:watch
-```
-
-### 🚀 部署命令
-
-#### 部署到測試網
-
-```bash
-# 部署抽獎合約
-npm run deploy:testnet
-# 或
-npx ts-node scripts/deploy.ts --network testnet
-
-# 部署 NFT 合約 (模板)
-npx ts-node scripts/deploy-nft.ts
-```
-
-#### 部署到主網
-
-```bash
-# 部署抽獎合約
-npm run deploy:mainnet
-# 或
-npx ts-node scripts/deploy.ts --network mainnet
-```
-
-### 🔍 驗證命令
-
-```bash
-# 驗證合約
-npm run verify
-# 或
-npx tsx scripts/verify.ts
-```
-
-### 🎮 互動命令
-
-```bash
-# 與合約互動
-npx ts-node scripts/interact.ts
-```
-
-### 🧹 清理命令
-
-```bash
-# 清理編譯產物
-rm -rf build/*
-
-# 重新編譯
-npm run build
 ```
 
 ---
 
-## 🚀 部署指南
+## 🌐 部署到測試網
 
-### 步驟 1: 編譯合約
+### 前置準備
+
+1. **確認 Node.js 版本**
+
+   版本需要 >= 22.18.0
+
+2. **更新依賴版本**
+   確保 `package.json` 包含正確版本：
+
+```json
+{
+  "dependencies": {
+    "@tact-lang/compiler": "^1.6.5",
+    "@ton/blueprint": "^0.38.0",
+    "@ton/core": "^0.61.0",
+    "@ton/ton": "^15.0.0"
+  },
+  "devDependencies": {
+    "@ton/sandbox": "^0.35.0",
+    "@ton/test-utils": "^0.9.0",
+    "tsx": "latest",
+    "typescript": "^5.6.0"
+  }
+}
+```
+
+3. **獲取測試網 TON**
+   - 安裝 Tonkeeper 錢包並切換到測試網
+   - 使用 Telegram Bot `@testgiver_ton_bot` 獲取免費測試 TON
+   - 確保錢包有至少 1 TON 用於部署
+
+### 部署步驟
+
+1. **編譯合約**
 
 ```bash
 npm run build
 ```
 
-### 步驟 2: 部署 NFT 合約
+2. **創建部署腳本** `scripts/deployCatLottery.ts`
+
+```typescript
+import { NetworkProvider } from '@ton/blueprint';
+import { toNano } from '@ton/core';
+import { CatLottery } from '../build/CatLottery_CatLottery';
+
+export async function run(provider: NetworkProvider) {
+  const owner = provider.sender().address!;
+  const entryFee = toNano('0.1'); // 0.1 TON 參與費
+  const maxParticipants = 10;
+
+  const catLottery = provider.open(
+    CatLottery.fromInit(owner, entryFee, maxParticipants)
+  );
+
+  await catLottery.send(
+    provider.sender(),
+    {
+      value: toNano('0.2'), // 部署費用
+    },
+    {
+      $$type: 'Deploy',
+      queryId: 0n,
+    }
+  );
+
+  await provider.waitForDeploy(catLottery.address);
+  console.log('✅ 合約部署成功!');
+  console.log('📍 合約地址:', catLottery.address.toString());
+
+  return catLottery.address;
+}
+```
+
+3. **執行部署**
 
 ```bash
-npx ts-node scripts/deploy-nft.ts
+# 使用 Blueprint 部署
+npx blueprint run deployCatLottery --testnet --tonconnect
 ```
 
-**輸出範例：**
-
-```
-🚀 部署 CatNFT 合約...
-📦 部署者地址: EQABC...
-📍 合約地址: EQDEF...
-🔗 TON Explorer: https://testnet.tonviewer.com/EQDEF...
-```
-
-### 步驟 3: 部署抽獎合約
+4. **驗證部署**
 
 ```bash
-npm run deploy:testnet
+# 檢查合約狀態
+npx tsx scripts/interact.ts
 ```
 
-### 步驟 4: 設定 NFT 合約地址
+### 成功部署示例
 
-使用 `SetNFTContract` 消息將 NFT 合約地址設定到抽獎合約中。
-
-### 步驟 5: 驗證部署
-
-1. 在 TON Explorer 中檢查合約
-2. 運行測試確認功能正常
-3. 嘗試參與測試抽獎
-
----
-
-## 🧪 測試指南
-
-### 運行測試套件
-
-```bash
-# 完整測試
-npm test
-
-# 具體測試範例
-npm test -- --testNamePattern="should join lottery"
 ```
-
-### 測試涵蓋範圍
-
-#### CatLottery 測試
-
-- ✅ 合約部署
-- ✅ 參與抽獎功能
-- ✅ 抽獎機制
-- ✅ NFT 發送集成
-- ✅ 權限控制
-- ✅ 錯誤處理
-
-#### CatNFT 測試 (需要實現)
-
-- ⚠️ NFT 鑄造功能
-- ⚠️ 轉移機制
-- ⚠️ 查詢功能
-- ⚠️ 權限控制
-
-### 手動測試
-
-```bash
-# 1. 部署合約
-npm run build
-npx ts-node scripts/deploy-nft.ts
-
-# 2. 與合約互動
-npx ts-node scripts/interact.ts
-
-# 3. 驗證功能
-npx tsx scripts/verify.ts
+✅ 合約部署成功!
+📍 合約地址: EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY
+🔗 TON Testnet Explorer: https://testnet.tonviewer.com/EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY
 ```
 
 ---
 
 ## 📚 API 參考
 
-### CatLottery 合約 API
+### CatLottery 合約
 
 #### 接收消息
 
-| 消息              | 參數                   | 描述          | 權限     |
-| ----------------- | ---------------------- | ------------- | -------- |
-| `"join"`          | -                      | 參與抽獎      | 任何人   |
-| `"drawWinner"`    | -                      | 執行抽獎      | 僅擁有者 |
-| `"startNewRound"` | -                      | 開始新輪次    | 僅擁有者 |
-| `"withdraw"`      | -                      | 提取餘額      | 僅擁有者 |
-| `SetNFTContract`  | `nftContract: Address` | 設定 NFT 合約 | 僅擁有者 |
+| 消息              | 參數      | 描述          | 權限     |
+| ----------------- | --------- | ------------- | -------- |
+| `"join"`          | -         | 參與抽獎      | 任何人   |
+| `"drawWinner"`    | -         | 執行抽獎      | 僅擁有者 |
+| `"startNewRound"` | -         | 開始新輪次    | 僅擁有者 |
+| `SetNFTContract`  | `Address` | 設定 NFT 合約 | 僅擁有者 |
 
 #### 查詢方法
 
-| 方法                    | 返回值           | 描述           |
-| ----------------------- | ---------------- | -------------- |
-| `getContractInfo()`     | `ContractInfo`   | 獲取合約狀態   |
-| `getParticipant(index)` | `Participant?`   | 獲取參與者資訊 |
-| `getWinner(round)`      | `LotteryResult?` | 獲取中獎記錄   |
-| `getBalance()`          | `Int`            | 獲取合約餘額   |
+| 方法                   | 返回值           | 描述           |
+| ---------------------- | ---------------- | -------------- |
+| `getGetContractInfo()` | `ContractInfo`   | 獲取合約狀態   |
+| `getGetParticipant(i)` | `Participant?`   | 獲取參與者資訊 |
+| `getGetWinner(round)`  | `LotteryResult?` | 獲取中獎記錄   |
 
-### CatNFT 合約 API
+### CatNFT 合約
 
 #### 接收消息
 
@@ -353,16 +240,14 @@ npx tsx scripts/verify.ts
 | `"mint"`      | -                               | 鑄造 NFT 給自己     | 僅擁有者      |
 | `MintTo`      | `to: Address`                   | 鑄造 NFT 給指定地址 | 僅擁有者      |
 | `TransferNFT` | `nftId: Int, newOwner: Address` | 轉移 NFT            | 僅 NFT 擁有者 |
-| `"withdraw"`  | -                               | 提取餘額            | 僅擁有者      |
 
 #### 查詢方法
 
-| 方法                 | 返回值         | 描述              |
-| -------------------- | -------------- | ----------------- |
-| `getContractInfo()`  | `ContractInfo` | 獲取合約資訊      |
-| `getNftOwner(nftId)` | `Address?`     | 獲取 NFT 擁有者   |
-| `nftExists(nftId)`   | `Bool`         | 檢查 NFT 是否存在 |
-| `getCatInfo(nftId)`  | `CatInfo`      | 獲取貓咪資訊      |
+| 方法                 | 返回值         | 描述            |
+| -------------------- | -------------- | --------------- |
+| `getContractInfo()`  | `ContractInfo` | 獲取合約資訊    |
+| `getNftOwner(nftId)` | `Address?`     | 獲取 NFT 擁有者 |
+| `getCatInfo(nftId)`  | `CatInfo`      | 獲取貓咪資訊    |
 
 ---
 
@@ -371,11 +256,11 @@ npx tsx scripts/verify.ts
 ### 完整抽獎流程
 
 ```typescript
-// 1. 部署並設定合約
+// 1. 部署合約
 const lottery = await CatLottery.fromInit(owner, entryFee, maxParticipants);
 const nft = await CatNFT.fromInit(owner);
 
-// 2. 設定 NFT 合約地址
+// 2. 設定 NFT 合約
 await lottery.send(owner, value, {
   $$type: 'SetNFTContract',
   nftContract: nft.address,
@@ -387,91 +272,103 @@ await lottery.send(user, { value: entryFee }, 'join');
 // 4. 執行抽獎
 await lottery.send(owner, value, 'drawWinner');
 
-// 5. 查詢中獎結果
-const winner = await lottery.getWinner(1);
-console.log(`中獎者: ${winner.winner}`);
-console.log(`NFT ID: ${winner.nftId}`);
-```
-
-### NFT 操作範例
-
-```typescript
-// 鑄造 NFT
-await nftContract.send(owner, value, {
-  $$type: 'MintTo',
-  to: recipientAddress,
-});
-
-// 轉移 NFT
-await nftContract.send(currentOwner, value, {
-  $$type: 'TransferNFT',
-  nftId: 1,
-  newOwner: newOwnerAddress,
-});
-
-// 查詢貓咪資訊
-const catInfo = await nftContract.getCatInfo(1);
-console.log(`貓咪: ${catInfo.name} (${catInfo.rarity})`);
+// 5. 查詢結果
+const winner = await lottery.getGetWinner(1);
 ```
 
 ---
 
 ## 🛠️ 故障排除
 
-### 常見問題
+### 常見部署問題
 
-#### 1. 編譯錯誤
-
-**問題：** `Cannot find module '@tact-lang/compiler'`
+#### 1. 依賴版本衝突
 
 ```bash
 # 解決方案
-npm install @tact-lang/compiler
+npm install --legacy-peer-deps
+# 或重新安裝
+rm -rf node_modules package-lock.json && npm install
 ```
 
-#### 2. 部署失敗
-
-**問題：** `Invalid address checksum`
+#### 2. Node.js 版本過低
 
 ```bash
-# 檢查地址格式，確保使用正確的 TON 地址格式
-# EQ... 或 UQ... 開頭
+# 解決方案
+nvm install 22.18 && nvm use 22.18
 ```
 
-#### 3. 測試失敗
-
-**問題：** 測試運行失敗
+#### 3. 錢包餘額不足
 
 ```bash
-# 重新編譯並運行測試
-npm run build
-npm test
+# 解決方案
+# 1. 從 @testgiver_ton_bot 獲取更多測試 TON
+# 2. 降低部署費用 (0.5 → 0.2 TON)
 ```
 
-#### 4. NFT 鑄造失敗
-
-**問題：** `Only owner can mint`
+#### 4. 合約方法錯誤
 
 ```bash
-# 確保使用正確的擁有者地址發送交易
+# 問題: getContractInfo 不存在
+# 解決: 使用 getGetContractInfo
+```
+
+#### 5. 導入路徑錯誤
+
+```typescript
+// 正確的導入路徑
+import { CatLottery } from '../build/CatLottery_CatLottery';
 ```
 
 ### 除錯技巧
 
-1. **檢查編譯輸出**
-
 ```bash
+# 檢查編譯輸出
 npm run build 2>&1 | tee build.log
-```
 
-2. **使用詳細日誌**
-
-```bash
+# 詳細測試日誌
 npm test -- --verbose
-```
 
-3. **檢查合約狀態**
-
-```bash
+# 檢查合約狀態
 npx tsx scripts/verify.ts
 ```
+
+---
+
+## 📋 命令參考
+
+### 常用命令
+
+```bash
+# 編譯
+npm run build
+
+# 測試
+npm test
+
+# 部署到測試網
+npx blueprint run deployCatLottery --testnet --tonconnect
+
+# 與合約互動
+npx tsx scripts/interact.ts
+
+# 清理編譯產物
+rm -rf build/* && npm run build
+```
+
+---
+
+## 📚 參考資源
+
+- [TON Blueprint](https://github.com/ton-org/blueprint)
+- [TON Testnet Explorer](https://testnet.tonviewer.com/)
+- [Tact 語言文檔](https://docs.tact-lang.org/)
+- [TON Connect](https://docs.ton.org/develop/dapps/ton-connect/)
+
+---
+
+> 🎉 **已成功部署的合約地址**
+>
+> **CatLottery**: `EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY`
+>
+> 🔗 [在 TON Explorer 中查看](https://testnet.tonviewer.com/EQCTPU-Wo7_2TDoi6Os3fy53iwIEG-3ZsNXYcAr0F_qWSoQY)
