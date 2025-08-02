@@ -48,9 +48,55 @@ ton-cat-lottery/
 │       ├── CatLottery_*       # 抽獎合約構建文件
 │       └── CatNFT_*           # NFT 合約構建文件
 ├── backend/               # Go 抽獎機器人服務
-│   └── main.go
+│   ├── main.go               # 主程式入口
+│   ├── go.mod                # Go 模組定義
+│   ├── test.sh               # 測試腳本
+│   ├── config/               # 配置模組
+│   ├── pkg/                  # 公共包
+│   │   └── logger/           # 日誌模組
+│   │       ├── logger.go
+│   │       └── logger_test.go
+│   └── internal/             # 內部業務模組
+│       ├── config/           # 配置管理
+│       ├── lottery/          # 抽獎核心邏輯
+│       │   ├── service.go
+│       │   ├── service_test.go
+│       │   └── integration_test.go
+│       ├── wallet/           # 錢包管理
+│       │   ├── manager.go
+│       │   └── manager_test.go
+│       ├── transaction/      # 交易監控
+│       │   ├── monitor.go
+│       │   └── monitor_test.go
+│       └── ton/              # TON 區塊鏈客戶端
+│           ├── client.go
+│           └── client_test.go
 ├── frontend/              # React + TonConnect 前端 dApp
-│   └── src/
+│   ├── package.json          # NPM 依賴管理
+│   ├── vite.config.ts        # Vite 構建配置
+│   ├── tsconfig.json         # TypeScript 配置
+│   ├── index.html            # HTML 入口
+│   ├── public/               # 靜態資源
+│   │   ├── index.html
+│   │   ├── tonconnect-manifest.json
+│   │   └── vite.svg
+│   └── src/                  # 源代碼
+│       ├── main.tsx          # React 入口
+│       ├── App.tsx           # 主應用組件
+│       ├── App.css           # 應用樣式
+│       ├── index.css         # 全局樣式
+│       ├── components/       # React 組件
+│       │   ├── WalletConnect.tsx     # 錢包連接組件
+│       │   ├── ContractStatus.tsx    # 合約狀態顯示
+│       │   ├── JoinLottery.tsx       # 參與抽獎組件
+│       │   └── Toast.tsx             # 通知組件
+│       ├── services/         # 業務服務
+│       │   └── contractService.ts    # 合約服務
+│       ├── hooks/            # React Hooks
+│       │   └── useToast.ts
+│       ├── styles/           # 樣式文件
+│       ├── assets/           # 靜態資源
+│       └── utils/            # 工具函數
 ├── monitoring/            # Prometheus / Grafana 設定
 │   ├── prometheus.yml
 │   └── dashboards/
@@ -68,6 +114,8 @@ ton-cat-lottery/
 
 ### 🎯 智能合約（CatLottery.tact）
 
+- 完整合約說明請參考： [NFT 合約文檔](contracts/NFTREADME.md)
+- 故事說明請參考： [貓咪樂園抽獎故事](contracts/NFTStory.md)
 - 定義抽獎規則 (3 人滿員抽獎)
 - 管理參與者資料 (地址、費用、時間)
 - 執行隨機抽獎 (基於區塊鏈隨機性)
@@ -83,6 +131,7 @@ ton-cat-lottery/
 
 ### 🧰 後端自動抽獎機器人（Go）
 
+- 完整後端說明請參考： [後端文檔](backend/BackREADME.md)
 - 定時檢查合約狀態 (每 30 分鐘)
 - 自動觸發抽獎 (當人數達到 3 人)
 - 發送 drawWinner 交易
@@ -101,6 +150,7 @@ ton-cat-lottery/
 
 ## ⚙️ DevOps 架構細節
 
+- Docker 說明請參考： [Docker 文檔](docker/DockerREADME.md)
 - 使用 Docker Compose 啟動完整環境（前後端 + Node + 監控）
 - Prometheus 收集：
   - Node block 高度、延遲
@@ -115,54 +165,91 @@ ton-cat-lottery/
 ## 🛠️ 環境需求
 
 ```
-- Node.js >=
-- Go >=
+- Node.js >= 22.18.0
+- Go >= 1.24.5
 - Docker & Docker Compose
-- Tact CLI (`npm install -g tact`)
+- Tact CLI
 ```
 
----
-
-## 🚀 快速啟動指南
-
-### 1️⃣ Clone 專案並安裝依賴
-
-```bash
-git clone https://github.com/yourname/ton-cat-lottery.git
-cd ton-cat-lottery
-```
-
-### 2️⃣ 啟動所有容器
-
-```bash
-docker-compose up --build -d
-```
-
-### 3️⃣ 編譯並部署智能合約（首次執行）
-
-```bash
-cd contracts
-tact compile CatLottery.tact
-tact deploy CatLottery
-```
-
-### 4️⃣ 開啟前端：瀏覽 http://localhost:3000
 
 ---
 
 ## 🧪 測試指令
 
-- 單元測試 Go 自動抽獎腳本
+### 測試智能合約
+
+```bash
+cd contracts
+npm run test
+```
+
+### 測試 Go 後端
 
 ```bash
 cd backend
-go test ./...
+./test.sh
 ```
 
-- 合約模擬測試
+### 測試前端
 
 ```bash
-tact test CatLottery.tact
+cd frontend
+npm run build
+```
+
+---
+
+## 🚀 智能合約部署
+
+> 在運行應用之前，需要先部署智能合約到 TON 區塊鏈。
+
+### 部署到測試網
+
+```bash
+# 進入合約目錄
+cd contracts
+
+# 安裝依賴
+npm install
+
+# 部署合約到測試網
+npx blueprint run deployCatLottery --testnet --tonconnec
+```
+
+### 部署後設定
+
+1. **記錄合約地址**: 部署完成後，將顯示的合約地址記錄下來
+2. **更新環境變數**: 在 `.env` 檔案中設定合約地址
+   ```bash
+   LOTTERY_CONTRACT_ADDRESS=你的抽獎合約地址
+   NFT_CONTRACT_ADDRESS=你的NFT合約地址
+   ```
+
+#### 部署到主網
+
+```bash
+# 部署到主網 (請確保錢包有足夠的 TON)
+npx blueprint run deployCatLottery --mainnet --tonconnec
+```
+
+⚠️ **注意**: 主網部署需要真實的 TON 代幣作為 gas 費用。
+
+---
+
+## 🚀 快速開始
+
+1. 部署智能合約，請參考：[智能合約部署](#智能合約部署)
+
+2. 新增環境變數
+
+```bash
+cp .env.example .env
+```
+
+3. 使用 docker compose 啟動所有服務
+
+```bash
+docker compose up -d
 ```
 
 ---
@@ -224,8 +311,6 @@ Email：liu.chaowei.dev@gmail.com
 
 > 精簡版後端，專注於核心抽獎功能，減少實作複雜度但保持專案完整性。
 
-#### 核心必要功能
-
 **基礎設施**
 
 - [x] 初始化 Go 專案與模組設定（go.mod, 目錄結構）
@@ -253,24 +338,6 @@ Email：liu.chaowei.dev@gmail.com
 - [x] 撰寫核心功能單元測試
 - [x] 基礎集成測試（抽獎流程測試）
 
-#### 進階功能
-
-**基本 API 服務**
-
-- [ ] 健康檢查端點 (`/health`)
-- [ ] 抽獎狀態查詢 API (`/api/lottery/status`)
-- [ ] Prometheus Metrics 端點 (`/metrics`)
-
-**監控與運維**
-
-- [ ] 結構化日志系統 (JSON 格式輸出)
-- [ ] 基礎 Metrics 收集 (抽獎次數、錯誤率)
-- [ ] 優雅關閉機制 (SIGTERM 處理)
-
-**可選功能**
-
-- [ ] 基本查詢功能 (`GetWinner`, `GetBalance`)
-- [ ] 簡單管理端點 (重啟服務、查看狀態)
 
 ### 前端 dApp（React + TonConnect）
 
@@ -298,41 +365,6 @@ Email：liu.chaowei.dev@gmail.com
 - [ ] 實作即時狀態更新 - 定期刷新合約狀態（每 30 秒）
 - [ ] 顯示獎池資訊 - 當前合約餘額和預計獎金
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
-
-### 🚀 智能合約部署
-
-> 在運行應用之前，需要先部署智能合約到 TON 區塊鏈。
-
-#### 部署到測試網
-
-```bash
-# 進入合約目錄
-cd contracts
-
-# 安裝依賴
-npm install
-
-# 部署合約到測試網
-npx blueprint run deployCatLottery --testnet --tonconnec
-```
-
-#### 部署後設定
-
-1. **記錄合約地址**: 部署完成後，將顯示的合約地址記錄下來
-2. **更新環境變數**: 在 `.env` 檔案中設定合約地址
-   ```bash
-   LOTTERY_CONTRACT_ADDRESS=你的抽獎合約地址
-   NFT_CONTRACT_ADDRESS=你的NFT合約地址
-   ```
-
-#### 部署到主網
-
-```bash
-# 部署到主網 (請確保錢包有足夠的 TON)
-npx blueprint run deployCatLottery --mainnet --tonconnec
-```
-
-⚠️ **注意**: 主網部署需要真實的 TON 代幣作為 gas 費用。
 
 ### DevOps / 部署自動化
 
