@@ -367,13 +367,13 @@ docker compose up -d
 
 > 階段式 DevOps 實作流程：Docker + Kubernetes + GCP + Terraform + CI/CD + GitHub Actions
 
-|階段| 內容 | 技術 | 目標 |
-|---| --- |---| ---- |
-|1 | 基礎容器化              | Docker + Docker Compose    | 本地環境 |
-|2 | GCP 環境建立與手動部署    | GCP + GKE + k8s + Docker  | 雲端驗證 |
-|3 | Terraform + 基礎 CI/CD | Terraform + GitHub Actions | 自動化基礎 |
-|4 | 完整 CI/CD Pipeline    | GitHub Actions + Multi-env | 企業級流程 |
-|5 | 進階 DevOps（未來實作）  | 完整工具鏈	                 | 生產就緒 |
+| 階段 | 內容                    | 技術                       | 目標       |
+| ---- | ----------------------- | -------------------------- | ---------- |
+| 1    | 基礎容器化              | Docker + Docker Compose    | 本地環境   |
+| 2    | GCP 環境建立與手動部署  | GCP + GKE + k8s + Docker   | 雲端驗證   |
+| 3    | Terraform + 基礎 CI/CD  | Terraform + GitHub Actions | 自動化基礎 |
+| 4    | 完整 CI/CD Pipeline     | GitHub Actions + Multi-env | 企業級流程 |
+| 5    | 進階 DevOps（未來實作） | 完整工具鏈                 | 生產就緒   |
 
 #### 階段 1：基礎容器化
 
@@ -390,29 +390,67 @@ docker compose up -d
 **技術棧：GCP + GKE + Kubernetes + Docker**  
 **目標：建立雲端基礎環境，手動部署驗證可行性**
 
-- [ ] **GCP 專案初始設定**：
+- [x] **GCP 專案初始設定**：
 
-  - [ ] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
-  - [ ] 建立專案 `ton-cat-lottery-dev`
-  - [ ] 啟用必要 API（GKE、Container Registry、Cloud Build）
-  - [ ] 設定計費帳戶與預算告警（$50/月 開發限制）
+  - [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
+  - [x] 建立專案 `ton-cat-lottery-dev`
+  - [x] 啟用必要 API（GKE、Container Registry、Cloud Build）
+  - [x] 設定計費帳戶與預算告警（$50/月 開發限制）
 
-- [ ] **本地開發工具安裝**：
+- [x] **本地開發工具安裝**：
 
-  - [ ] 安裝 Google Cloud SDK：`curl https://sdk.cloud.google.com | bash`
-  - [ ] 設定認證：`gcloud auth login`
-  - [ ] 設定專案：`gcloud config set project PROJECT_ID`
-  - [ ] 安裝 kubectl：`gcloud components install kubectl`
+  - [x] 安裝 Google Cloud SDK：`curl https://sdk.cloud.google.com | bash`
+  - [x] 設定認證：`gcloud auth login`
+  - [x] 設定專案：`gcloud config set project ton-cat-lottery-dev`
+  - [x] 安裝 kubectl：`gcloud components install kubectl`
 
-- [ ] **手動建立 GKE 叢集與部署**：
-  - [ ] 建立 Autopilot GKE 叢集（自動管理，成本低）
-  - [ ] 取得叢集憑證：`gcloud container clusters get-credentials`
-  - [ ] 驗證連接：`kubectl cluster-info`
-  - [ ] 建構並推送 Docker 映像到 Google Container Registry
-  - [ ] 建立基本 K8s Deployment 檔案（backend + frontend）
-  - [ ] 手動部署應用到 GKE
-  - [ ] 建立 LoadBalancer Service 取得外部 IP
-  - [ ] **驗證**：確保應用在雲端正常運作
+- [x] **手動建立 GKE 叢集與部署**：
+
+  - [x] 建立 Autopilot GKE 叢集（自動管理，成本低）（需等待 5-10 分鐘）
+  - [x] 取得叢集憑證：`gcloud container clusters get-credentials`
+  - [x] 驗證連接：`kubectl cluster-info`
+  - [x] 建構並推送 Docker 映像到 Google Container Registry
+  - [x] 建立基本 K8s Deployment 檔案（backend + frontend）
+  - [x] 手動部署應用到 GKE
+  - [x] 建立 LoadBalancer Service 取得外部 IP
+  - [x] **驗證**：確保應用在雲端正常運作
+
+- [x] **設定 Cloudflare 域名解析**：請參考 [Cloudflare 域名解析](docs/cloudflare-setup.md)
+
+**常用指令**：
+
+```bash
+# 檢查叢集狀態
+kubectl get pods
+kubectl get services
+kubectl get deployments
+
+# 查看 Pod 日誌
+kubectl logs <pod-name>
+kubectl logs -f <pod-name>  # 即時追蹤日誌
+
+# 重新部署應用
+kubectl rollout restart deployment/frontend-deployment
+
+# 應用配置變更
+kubectl apply -f k8s/frontend-deployment.yaml
+
+# 建構並推送 Docker 映像
+docker buildx build --platform linux/amd64 --target production -f docker/Dockerfile.frontend -t gcr.io/ton-cat-lottery-dev/frontend:latest .
+docker push gcr.io/ton-cat-lottery-dev/frontend:latest
+
+# 檢查叢集資訊
+kubectl cluster-info
+kubectl get nodes
+
+# 進入 Pod 內部
+kubectl exec -it <pod-name> -- sh
+
+# Cloudflare 域名管理
+kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'  # 獲取外部 IP
+nslookup dev.yourdomain.com  # 檢查域名解析
+curl -I https://dev.yourdomain.com  # 測試域名訪問
+```
 
 #### 階段 3：Terraform 基礎設施自動化 + 基礎 CI/CD
 
