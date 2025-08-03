@@ -216,101 +216,132 @@ nslookup dev.yourdomain.com  # 檢查域名解析
 curl -I https://dev.yourdomain.com  # 測試域名訪問
 ```
 
-## Terraform 基礎設施即代碼 (Infrastructure as Code)
+## Terraform 基礎設施
 
 ### 概述
-Terraform 用於管理 GCP 基礎設施，確保環境一致性和可重複性。通過代碼管理基礎設施，實現版本控制和自動化部署。
+此目錄包含 TON Cat Lottery 專案的 Terraform 基礎設施即代碼配置，用於自動化部署 GCP 基礎設施。通過代碼管理基礎設施，實現版本控制和自動化部署。
 
-### 目標架構
-- **GKE Autopilot 集群**: 自動管理的 Kubernetes 集群
-- **Container Registry**: Docker 映像倉庫
-- **Load Balancer**: 外部流量入口
-- **IAM 角色**: 服務帳戶和權限管理
-- **Networking**: VPC、子網路和防火牆規則
+### 📋 基礎設施組件
 
-### 待建立的文件結構
+- **GKE Autopilot 叢集**: 自動管理的 Kubernetes 叢集
+- **VPC 網路**: 自定義虛擬私有網路與子網路
+- **IAM 服務帳戶**: GKE 和 Terraform 操作的服務帳戶
+- **防火牆規則**: 網路安全配置
+- **Container Registry**: Docker 映像儲存
+- **GCS 儲存桶**: Terraform 狀態檔案儲存
+
+### 已建立的文件結構
 ```
 terraform/
-├── main.tf              # 主要資源定義
-├── variables.tf         # 變數定義
-├── outputs.tf          # 輸出值
-├── versions.tf         # Provider 版本
-├── environments/
-│   ├── dev/
-│   │   ├── terraform.tfvars
-│   │   └── backend.tf
-│   ├── staging/
-│   │   ├── terraform.tfvars
-│   │   └── backend.tf
-│   └── prod/
-│       ├── terraform.tfvars
-│       └── backend.tf
-└── modules/
-    ├── gke/
-    ├── networking/
-    └── iam/
+├── .gitignore              # 保護敏感資訊
+├── README.md               # 完整使用指南
+├── providers.tf            # Provider 與後端配置
+├── variables.tf            # 變數定義
+├── terraform.tfvars.example # 配置範例
+├── terraform.tfvars        # 實際配置檔案
+├── main.tf                 # 主要基礎設施配置
+└── outputs.tf              # 輸出值定義
 ```
 
-### 設置步驟
+### 🚀 快速開始
 
-#### 1. 安裝 Terraform
+#### 前置條件
+
+**設定 GCP 認證**:
 ```bash
-# macOS
-brew install terraform
-
-# 驗證安裝
-terraform version
+gcloud auth login
+gcloud config set project ton-cat-lottery-dev
+gcloud auth application-default login
 ```
 
-#### 2. 設置 GCP 服務帳戶
+#### 部署步驟
+
+1. **複製配置檔案**:
+   ```bash
+   cd terraform
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+
+2. **編輯配置變數**:
+   ```bash
+   # 編輯 terraform.tfvars 檔案，設定正確的專案 ID 和區域
+   vim terraform.tfvars
+   ```
+
+3. **初始化 Terraform**:
+   ```bash
+   terraform init
+   ```
+
+4. **檢查執行計畫**:
+   ```bash
+   terraform plan
+   ```
+
+5. **套用基礎設施 (基礎設施層)**:
+   ```bash
+   terraform apply
+   ```
+  - 創建 GCP 雲端資源
+  - 設定網路和安全規則
+  - 準備 Kubernetes 叢集環境
+
+
+6. **配置 kubectl (應用程式層)**:
+   ```bash
+   # 使用輸出的指令配置 kubectl
+   gcloud container clusters get-credentials ton-cat-lottery-cluster \
+     --location asia-east1 \
+     --project ton-cat-lottery-dev
+   ```
+  - 部署你的應用程式容器
+  - 配置服務和負載均衡
+  - 管理應用程式生命週期
+
+### 📝 重要注意事項
+
+#### 狀態檔案管理
+
+- **初次部署**: 使用本地狀態檔案
+- **團隊協作**: 建議使用 GCS 後端儲存狀態檔案
+
+啟用 GCS 後端:
+1. 註解掉 `providers.tf` 中的 backend 區塊進行初次部署
+2. 部署完成後，取消註解 backend 配置
+3. 執行 `terraform init` 遷移狀態到 GCS
+
+#### 成本控制
+
+- **GKE Autopilot**: 按使用量計費，自動優化成本
+- **開發環境**: 建議設定預算告警 ($50/月)
+- **生產環境**: 根據實際需求調整資源配置
+
+#### 安全考量
+
+- **.gitignore**: 已配置忽略敏感檔案
+- **IAM 權限**: 遵循最小權限原則
+- **網路安全**: 配置適當的防火牆規則
+
+### 🔧 常用指令
+
 ```bash
-# 創建服務帳戶
-gcloud iam service-accounts create terraform-sa \
-    --display-name="Terraform Service Account"
-
-# 授予必要權限
-gcloud projects add-iam-policy-binding ton-cat-lottery-dev \
-    --member="serviceAccount:terraform-sa@ton-cat-lottery-dev.iam.gserviceaccount.com" \
-    --role="roles/editor"
-
-# 創建金鑰
-gcloud iam service-accounts keys create terraform-key.json \
-    --iam-account=terraform-sa@ton-cat-lottery-dev.iam.gserviceaccount.com
-
-# 設置環境變數
-export GOOGLE_APPLICATION_CREDENTIALS="./terraform-key.json"
-```
-
-#### 3. 初始化 Terraform
-```bash
-cd terraform
-terraform init
-terraform plan
-terraform apply
-```
-
-### 常用指令
-```bash
-# 初始化工作目錄
-terraform init
-
-# 檢查配置語法
-terraform validate
-
-# 預覽變更
-terraform plan
-
-# 應用變更
-terraform apply
-
-# 查看當前狀態
+# 檢查基礎設施狀態
 terraform show
 
-# 銷毀資源
+# 查看輸出值
+terraform output
+
+# 更新基礎設施
+terraform plan && terraform apply
+
+# 銷毀基礎設施
 terraform destroy
 
 # 格式化代碼
 terraform fmt
+
+# 驗證配置
+terraform validate
 
 # 切換工作空間（環境）
 terraform workspace new dev
@@ -318,15 +349,72 @@ terraform workspace select dev
 terraform workspace list
 ```
 
-### 狀態管理
+### 📊 輸出資訊
+
+部署完成後，Terraform 會輸出以下重要資訊：
+
+- **叢集連接指令**: kubectl 配置指令
+- **Container Registry URL**: Docker 映像推送地址  
+- **服務帳戶**: 各種操作所需的服務帳戶信息
+- **網路配置**: VPC 和子網路詳細資訊
+
+### 🔄 與現有 K8s 配置整合
+
+部署完成後，可以使用現有的 Kubernetes manifests:
+
 ```bash
-# 設置遠端狀態存儲（Google Cloud Storage）
-terraform {
-  backend "gcs" {
-    bucket = "ton-cat-lottery-terraform-state"
-    prefix = "dev/terraform.tfstate"
-  }
-}
+# 部署應用程式
+kubectl apply -f ../k8s/backend-deployment.yaml
+kubectl apply -f ../k8s/frontend-deployment.yaml
+
+# 檢查服務狀態
+kubectl get pods
+kubectl get services
+```
+
+### 🐛 故障排除
+
+#### 常見問題
+
+1. **API 未啟用錯誤**:
+   ```bash
+   gcloud services enable container.googleapis.com
+   gcloud services enable compute.googleapis.com
+   ```
+
+2. **權限不足錯誤**:
+   ```bash
+   # 確保帳戶有足夠權限
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="user:your-email@gmail.com" \
+     --role="roles/owner"
+   ```
+
+3. **配額不足錯誤**:
+   - 檢查 GCP 配額限制
+   - 申請增加配額或更換區域
+
+#### 清理資源
+
+⚠️ **注意**: 此操作會刪除所有基礎設施資源
+
+```bash
+terraform destroy
+```
+
+### 📚 進階配置
+
+#### 多環境部署
+
+建議為不同環境建立獨立的 Terraform 工作區：
+
+```bash
+# 建立工作區
+terraform workspace new staging
+terraform workspace new production
+
+# 切換工作區
+terraform workspace select development
 ```
 
 ## GitHub Actions CI/CD 自動化
