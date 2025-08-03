@@ -452,112 +452,108 @@ nslookup dev.yourdomain.com  # 檢查域名解析
 curl -I https://dev.yourdomain.com  # 測試域名訪問
 ```
 
-#### 階段 3：Terraform 基礎設施自動化 + 基礎 CI/CD
+#### 階段 3：基礎自動化部署
 
 **技術棧：Terraform + GitHub Actions + GCP + Kubernetes**  
-**目標：基礎設施即代碼 + 自動化部署流程**
+**目標：將手動操作自動化，保持簡單實用**
 
-- [ ] **建立 Terraform 專案結構**：
+- [ ] **建立 Terraform 基礎設施**：
 
   ```
   terraform/
-  ├── environments/dev/     # 開發環境配置
-  │   ├── main.tf
-  │   ├── variables.tf
-  │   └── terraform.tfvars
-  └── modules/
-      ├── vpc/             # VPC 網路模組
-      ├── gke/             # GKE 叢集模組
-      └── registry/        # Container Registry 模組
+  ├── gke.tf          # GKE 叢集配置
+  ├── variables.tf    # 變數定義
+  ├── outputs.tf      # 輸出值
+  └── versions.tf     # 版本約束
   ```
 
-- [ ] **撰寫核心 Terraform 模組**：
+- [ ] **撰寫 Terraform 配置**：
 
-  - [ ] `modules/vpc/` - 基本 VPC 與 Subnets
-  - [ ] `modules/gke/` - Autopilot GKE 叢集
-  - [ ] `modules/registry/` - Google Container Registry
-  - [ ] `environments/dev/` - 開發環境整合
+  - [ ] `gke.tf` - Autopilot GKE 叢集管理
+  - [ ] `variables.tf` - 專案 ID、區域等變數
+  - [ ] `outputs.tf` - 叢集資訊輸出
+  - [ ] 驗證 Terraform 部署與手動建立結果一致
 
 - [ ] **Terraform 狀態管理**：
 
-  - [ ] 建立 GCS Bucket 儲存 Terraform State
-  - [ ] 設定 Backend 配置
-  - [ ] 驗證 Terraform 部署與手動建立結果一致
+  - [ ] 使用本地狀態管理（開發階段）
+  - [ ] 測試 `terraform apply` 和 `terraform destroy`
+  - [ ] 驗證可以重現現有的 GKE 設定
 
 - [ ] **基礎 CI/CD 設定**：
-  - [ ] 建立 `k8s/` 目錄結構與 Deployment 檔案
-  - [ ] 建立 `.github/workflows/deploy-dev.yml`
+  - [ ] 建立 `.github/workflows/deploy.yml`
   - [ ] 設定 GCP Service Account 認證
   - [ ] 實現流程：Build Docker → Push to GCR → Deploy to GKE
   - [ ] 設定 GitHub Secrets（GCP 認證、專案 ID）
   - [ ] 端到端測試：修改程式碼 → Push → 自動部署 → 驗證
 
-#### 階段 4：完整 CI/CD Pipeline 與多環境部署
+#### 階段 4：進階 CI/CD 與多環境部署
 
 **技術棧：GitHub Actions + Terraform + Kubernetes + GCP**  
-**目標：企業級多環境 CI/CD 流程**
+**目標：企業級自動化部署流程**
 
 - [ ] **多環境 Terraform 配置**：
 
-  - [ ] `environments/staging/` - 測試環境
-  - [ ] `environments/prod/` - 生產環境
-  - [ ] 環境別變數管理（節點數、機器類型、資源配額）
-  - [ ] 建立 `.github/workflows/infrastructure.yml` - Terraform 自動化
+  ```
+  terraform/
+  ├── environments/
+  │   ├── dev/         # 開發環境
+  │   ├── staging/     # 測試環境
+  │   └── prod/        # 生產環境
+  └── modules/
+      └── gke/         # GKE 叢集模組
+  ```
 
-- [ ] **多階段 CI/CD Pipeline 設計**：
+- [ ] **多階段 CI/CD Pipeline**：
 
-  - [ ] **Build Stage**: 多架構 Docker 建構與推送到 GCR
-  - [ ] **Test Stage**: 單元測試、集成測試、安全掃描
-  - [ ] **Infrastructure Stage**: Terraform plan/apply 基礎設施變更
+  - [ ] **Build Stage**: Docker 建構與推送到 GCR
+  - [ ] **Test Stage**: 單元測試、集成測試
   - [ ] **Deploy Stage**: Kubernetes 滾動更新部署
   - [ ] **Verify Stage**: 健康檢查與煙霧測試
 
-- [ ] **進階 GitHub Actions 工作流程**：
+- [ ] **GitHub Actions 工作流程**：
 
   - [ ] `ci.yml` - Pull Request 持續整合驗證
-  - [ ] `cd-dev.yml` - 開發環境自動部署
-  - [ ] `cd-staging.yml` - 測試環境部署
-  - [ ] `cd-prod.yml` - 生產環境部署（手動核准）
+  - [ ] `deploy-dev.yml` - 開發環境自動部署
+  - [ ] `deploy-staging.yml` - 測試環境部署
+  - [ ] `deploy-prod.yml` - 生產環境部署（手動核准）
 
 - [ ] **環境管理與部署策略**：
   - [ ] 設定 GitHub Environments 與 Protection Rules
-  - [ ] Kubernetes 部署策略（Rolling Update / Blue-Green）
+  - [ ] Kubernetes 部署策略（Rolling Update）
   - [ ] 自動回滾機制與健康檢查
-  - [ ] 建立 Ingress 配置（SSL + 域名）
+  - [ ] 域名與 SSL 自動化配置
 
 #### 階段 5：進階 DevOps 實踐（未來實作）
 
-**技術棧：完整企業級 DevOps 工具鏈**  
-**目標：生產就緒的安全性、監控與治理**
-
-- [ ] **進階基礎設施**：
-
-  - [ ] `modules/database/` - Cloud SQL PostgreSQL
-  - [ ] `modules/storage/` - Cloud Storage + CDN
-  - [ ] `modules/dns/` - Cloud DNS + SSL 憑證自動化
-  - [ ] `modules/monitoring/` - Prometheus + Grafana
-
-- [ ] **安全性與認證**：
-
-  - [ ] Workload Identity Federation（無金鑰認證）
-  - [ ] GCP Secret Manager 整合
-  - [ ] Pod Security Standards + Network Policies
-  - [ ] Container 漏洞掃描（Trivy + Snyk）
+**技術棧：企業級監控與安全**  
+**目標：生產就緒的監控、安全與成本優化**
 
 - [ ] **監控與可觀測性**：
 
   - [ ] Prometheus + Grafana 部署到 K8s
   - [ ] 自定義監控指標（抽獎成功率、NFT 發送延遲）
-  - [ ] 分散式追蹤（Jaeger）
   - [ ] 日誌聚合（Fluentd + Cloud Logging）
-  - [ ] 告警設定（PagerDuty / Slack 整合）
+  - [ ] 告警設定（Slack 整合）
+
+- [ ] **安全性與認證**：
+
+  - [ ] Workload Identity Federation（無金鑰認證）
+  - [ ] GCP Secret Manager 整合
+  - [ ] Pod Security Standards
+  - [ ] Container 漏洞掃描（Trivy）
 
 - [ ] **成本優化與治理**：
 
   - [ ] Cluster Autoscaler（節點自動縮放）
-  - [ ] Vertical Pod Autoscaler（資源優化）
-  - [ ] Spot Instances / Preemptible VMs
   - [ ] GCP 預算告警與成本監控
+  - [ ] 資源使用優化
+
+- [ ] **進階功能**（可選）：
+
+  - [ ] 分散式追蹤（Jaeger）
+  - [ ] 自動化測試與部署策略
+  - [ ] 災難恢復與備份策略
 
 - [ ] **進階部署策略**：
   - [ ] GitOps 工作流（ArgoCD / Flux）
