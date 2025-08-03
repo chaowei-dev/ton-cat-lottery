@@ -109,3 +109,4 @@ go.work
 
 # Claude code
 CLAUDE.md
+*.drawio.bkp
