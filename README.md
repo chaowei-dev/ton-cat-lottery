@@ -417,150 +417,56 @@ docker compose up -d
 
 - [x] **設定 Cloudflare 域名解析**：請參考 [Cloudflare 域名解析](docs/cloudflare-setup.md)
 
-**常用指令**：
-
-```bash
-# 檢查叢集狀態
-kubectl get pods
-kubectl get services
-kubectl get deployments
-
-# 查看 Pod 日誌
-kubectl logs <pod-name>
-kubectl logs -f <pod-name>  # 即時追蹤日誌
-
-# 重新部署應用
-kubectl rollout restart deployment/frontend-deployment
-
-# 應用配置變更
-kubectl apply -f k8s/frontend-deployment.yaml
-
-# 建構並推送 Docker 映像
-docker buildx build --platform linux/amd64 --target production -f docker/Dockerfile.frontend -t gcr.io/ton-cat-lottery-dev/frontend:latest .
-docker push gcr.io/ton-cat-lottery-dev/frontend:latest
-
-# 檢查叢集資訊
-kubectl cluster-info
-kubectl get nodes
-
-# 進入 Pod 內部
-kubectl exec -it <pod-name> -- sh
-
-# Cloudflare 域名管理
-kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'  # 獲取外部 IP
-nslookup dev.yourdomain.com  # 檢查域名解析
-curl -I https://dev.yourdomain.com  # 測試域名訪問
-```
 
 #### 階段 3：基礎自動化部署
 
-**技術棧：Terraform + GitHub Actions + GCP + Kubernetes**  
-**目標：將手動操作自動化，保持簡單實用**
+**技術棧：Terraform + GitHub Actions**  
+**目標：自動化現有手動部署流程**
 
-- [ ] **建立 Terraform 基礎設施**：
+- [ ] **Terraform 基礎設施即代碼**：
+  - [ ] 建立 `terraform/` 目錄結構
+  - [ ] 創建 GKE 叢集配置 (`main.tf`)
+  - [ ] 設置 GCP 服務帳戶權限
+  - [ ] 測試 terraform apply/destroy 流程
 
-  ```
-  terraform/
-  ├── gke.tf          # GKE 叢集配置
-  ├── variables.tf    # 變數定義
-  ├── outputs.tf      # 輸出值
-  └── versions.tf     # 版本約束
-  ```
+- [ ] **GitHub Actions CI/CD**：
+  - [ ] 建立 `.github/workflows/` 目錄
+  - [ ] 創建自動測試工作流程
+  - [ ] 創建自動部署工作流程
+  - [ ] 設定 GitHub Secrets (GCP 認證)
 
-- [ ] **撰寫 Terraform 配置**：
+#### 階段 4：進階多環境部署 (可選)
 
-  - [ ] `gke.tf` - Autopilot GKE 叢集管理
-  - [ ] `variables.tf` - 專案 ID、區域等變數
-  - [ ] `outputs.tf` - 叢集資訊輸出
-  - [ ] 驗證 Terraform 部署與手動建立結果一致
+**目標：企業級多環境自動化**
 
-- [ ] **Terraform 狀態管理**：
+- [ ] **多環境配置**：
+  - [ ] 建立 dev/staging/prod 環境
+  - [ ] 配置環境變數與 GitHub Secrets
+  - [ ] 設置環境保護規則
 
-  - [ ] 使用本地狀態管理（開發階段）
-  - [ ] 測試 `terraform apply` 和 `terraform destroy`
-  - [ ] 驗證可以重現現有的 GKE 設定
+- [ ] **進階工作流程**：
+  - [ ] Pull Request 自動測試
+  - [ ] 自動部署到開發環境
+  - [ ] 手動審批生產部署
 
-- [ ] **基礎 CI/CD 設定**：
-  - [ ] 建立 `.github/workflows/deploy.yml`
-  - [ ] 設定 GCP Service Account 認證
-  - [ ] 實現流程：Build Docker → Push to GCR → Deploy to GKE
-  - [ ] 設定 GitHub Secrets（GCP 認證、專案 ID）
-  - [ ] 端到端測試：修改程式碼 → Push → 自動部署 → 驗證
+#### 階段 5：進階監控與安全 (未來擴展)
 
-#### 階段 4：進階 CI/CD 與多環境部署
+**目標：生產就緒的完整 DevOps**
 
-**技術棧：GitHub Actions + Terraform + Kubernetes + GCP**  
-**目標：企業級自動化部署流程**
+- [ ] **監控系統**：
+  - [ ] Prometheus + Grafana 監控
+  - [ ] 自定義指標和告警
+  - [ ] 日誌聚合和分析
 
-- [ ] **多環境 Terraform 配置**：
+- [ ] **安全強化**：
+  - [ ] 容器安全掃描
+  - [ ] 秘密管理優化
+  - [ ] 網路安全策略
 
-  ```
-  terraform/
-  ├── environments/
-  │   ├── dev/         # 開發環境
-  │   ├── staging/     # 測試環境
-  │   └── prod/        # 生產環境
-  └── modules/
-      └── gke/         # GKE 叢集模組
-  ```
-
-- [ ] **多階段 CI/CD Pipeline**：
-
-  - [ ] **Build Stage**: Docker 建構與推送到 GCR
-  - [ ] **Test Stage**: 單元測試、集成測試
-  - [ ] **Deploy Stage**: Kubernetes 滾動更新部署
-  - [ ] **Verify Stage**: 健康檢查與煙霧測試
-
-- [ ] **GitHub Actions 工作流程**：
-
-  - [ ] `ci.yml` - Pull Request 持續整合驗證
-  - [ ] `deploy-dev.yml` - 開發環境自動部署
-  - [ ] `deploy-staging.yml` - 測試環境部署
-  - [ ] `deploy-prod.yml` - 生產環境部署（手動核准）
-
-- [ ] **環境管理與部署策略**：
-  - [ ] 設定 GitHub Environments 與 Protection Rules
-  - [ ] Kubernetes 部署策略（Rolling Update）
-  - [ ] 自動回滾機制與健康檢查
-  - [ ] 域名與 SSL 自動化配置
-
-#### 階段 5：進階 DevOps 實踐（未來實作）
-
-**技術棧：企業級監控與安全**  
-**目標：生產就緒的監控、安全與成本優化**
-
-- [ ] **監控與可觀測性**：
-
-  - [ ] Prometheus + Grafana 部署到 K8s
-  - [ ] 自定義監控指標（抽獎成功率、NFT 發送延遲）
-  - [ ] 日誌聚合（Fluentd + Cloud Logging）
-  - [ ] 告警設定（Slack 整合）
-
-- [ ] **安全性與認證**：
-
-  - [ ] Workload Identity Federation（無金鑰認證）
-  - [ ] GCP Secret Manager 整合
-  - [ ] Pod Security Standards
-  - [ ] Container 漏洞掃描（Trivy）
-
-- [ ] **成本優化與治理**：
-
-  - [ ] Cluster Autoscaler（節點自動縮放）
-  - [ ] GCP 預算告警與成本監控
-  - [ ] 資源使用優化
-
-- [ ] **進階功能**（可選）：
-
-  - [ ] 分散式追蹤（Jaeger）
-  - [ ] 自動化測試與部署策略
-  - [ ] 災難恢復與備份策略
-
-- [ ] **進階部署策略**：
-  - [ ] GitOps 工作流（ArgoCD / Flux）
-  - [ ] Canary 發佈（Flagger / Argo Rollouts）
-  - [ ] Feature Flags 管理
-  - [ ] Database Migration 自動化
-  - [ ] 跨區域災難恢復
+- [ ] **成本優化**：
+  - [ ] 資源使用監控
+  - [ ] 自動縮放策略
+  - [ ] 成本告警設置
 
 ### 測試與驗證
 
