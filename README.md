@@ -268,16 +268,15 @@ docker compose up -d
 
 ## 📚 技術棧
 
-| 類別     | 技術                            |
-| -------- | ------------------------------- |
+| 類別     | 技術                           |
+| -------- | ------------------------------ |
 | 程式語言 | Typescript, Go, Node.js, React |
-| 區塊鏈   | TON, Tact, TonConnect           |
-| 後端     | Go, Node.js    |
-| 前端     | React       |
-| 部署     | Docker, GitHub Actions, k8s       |
-| 監控     | Prometheus, Grafana             |
-| 基礎設施 | Terraform, GCP |
-
+| 區塊鏈   | TON, Tact, TonConnect          |
+| 後端     | Go, Node.js                    |
+| 前端     | React                          |
+| 部署     | Docker, GitHub Actions, k8s    |
+| 監控     | Prometheus, Grafana            |
+| 基礎設施 | Terraform, GCP                 |
 
 ---
 
@@ -366,106 +365,168 @@ docker compose up -d
 
 ### DevOps / 雲端自動化部署
 
-> 基於 GCP + Kubernetes + Terraform，建構現代化 DevOps 流程，從基礎設施即代碼到完整 CI/CD 管線。
+> 階段式 DevOps 實作流程：Docker + Kubernetes + GCP + Terraform + CI/CD + GitHub Actions
 
-#### 基礎容器化
+|階段| 內容 | 技術 | 目標 |
+|---| --- |---| ---- |
+|1 | 基礎容器化              | Docker + Docker Compose    | 本地環境 |
+|2 | GCP 環境建立與手動部署    | GCP + GKE + k8s + Docker  | 雲端驗證 |
+|3 | Terraform + 基礎 CI/CD | Terraform + GitHub Actions | 自動化基礎 |
+|4 | 完整 CI/CD Pipeline    | GitHub Actions + Multi-env | 企業級流程 |
+|5 | 進階 DevOps（未來實作）  | 完整工具鏈	                 | 生產就緒 |
+
+#### 階段 1：基礎容器化
+
+**技術棧：Docker + Docker Compose**
 
 - [x] 撰寫 `Dockerfile`（backend）
 - [x] 撰寫 `Dockerfile`（frontend）
 - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
 - [x] 撰寫 `.env` 檔案與 secret 管理
+- [x] 本地 Docker 環境驗證與測試
 
-#### GCP 基礎設施即代碼（Terraform）
+#### 階段 2：GCP 環境建立與手動部署
 
-- [ ] 設計 GCP 專案架構（Project、VPC、Subnets）
-- [ ] 撰寫 Terraform 模組：
-  - [ ] `modules/gke/` - GKE Cluster 與 Node Pools
-  - [ ] `modules/vpc/` - VPC 網路與子網設定
-  - [ ] `modules/dns/` - Cloud DNS 域名管理
-  - [ ] `modules/storage/` - Cloud Storage 靜態檔案託管
-  - [ ] `modules/database/` - Cloud SQL PostgreSQL（監控資料）
-- [ ] 撰寫環境別 Terraform 配置：
-  - [ ] `environments/dev/` - 開發環境（單節點 GKE）
-  - [ ] `environments/staging/` - 測試環境（標準 GKE）
-  - [ ] `environments/prod/` - 生產環境（高可用 GKE）
-- [ ] （可選）設定 Terraform Cloud / GCS Backend（狀態管理）
-- [ ] 撰寫 `terraform/scripts/` 自動化腳本
+**技術棧：GCP + GKE + Kubernetes + Docker**  
+**目標：建立雲端基礎環境，手動部署驗證可行性**
 
-#### Kubernetes 容器編排
+- [ ] **GCP 專案初始設定**：
 
-- [ ] 設計 K8s 架構與 Namespace 策略
-- [ ] 撰寫 Kubernetes manifests：
-  - [ ] `k8s/base/` - 基礎配置（ConfigMap、Secret、Service）
-  - [ ] `k8s/apps/backend/` - Go 後端服務 Deployment
-  - [ ] `k8s/apps/frontend/` - React 前端 Deployment
-  - [ ] `k8s/apps/monitoring/` - Prometheus + Grafana 部署
-- [ ] 使用 Kustomize 管理多環境配置：
-  - [ ] `k8s/overlays/dev/` - 開發環境配置
-  - [ ] `k8s/overlays/staging/` - 測試環境配置
-  - [ ] `k8s/overlays/prod/` - 生產環境配置
-- [ ] （可選）設定 Horizontal Pod Autoscaler（HPA）
-- [ ] 配置 Ingress + SSL 憑證自動化（cert-manager）
-- [ ] （可選）實作 Pod Security Standards
+  - [ ] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
+  - [ ] 建立專案 `ton-cat-lottery-dev`
+  - [ ] 啟用必要 API（GKE、Container Registry、Cloud Build）
+  - [ ] 設定計費帳戶與預算告警（$50/月 開發限制）
 
-#### GitHub Actions CI/CD 進階流程
+- [ ] **本地開發工具安裝**：
 
-- [ ] 設計多階段 CI/CD Pipeline：
-  - [ ] **Build Stage**: Docker 映像建構與推送到 GCR
+  - [ ] 安裝 Google Cloud SDK：`curl https://sdk.cloud.google.com | bash`
+  - [ ] 設定認證：`gcloud auth login`
+  - [ ] 設定專案：`gcloud config set project PROJECT_ID`
+  - [ ] 安裝 kubectl：`gcloud components install kubectl`
+
+- [ ] **手動建立 GKE 叢集與部署**：
+  - [ ] 建立 Autopilot GKE 叢集（自動管理，成本低）
+  - [ ] 取得叢集憑證：`gcloud container clusters get-credentials`
+  - [ ] 驗證連接：`kubectl cluster-info`
+  - [ ] 建構並推送 Docker 映像到 Google Container Registry
+  - [ ] 建立基本 K8s Deployment 檔案（backend + frontend）
+  - [ ] 手動部署應用到 GKE
+  - [ ] 建立 LoadBalancer Service 取得外部 IP
+  - [ ] **驗證**：確保應用在雲端正常運作
+
+#### 階段 3：Terraform 基礎設施自動化 + 基礎 CI/CD
+
+**技術棧：Terraform + GitHub Actions + GCP + Kubernetes**  
+**目標：基礎設施即代碼 + 自動化部署流程**
+
+- [ ] **建立 Terraform 專案結構**：
+
+  ```
+  terraform/
+  ├── environments/dev/     # 開發環境配置
+  │   ├── main.tf
+  │   ├── variables.tf
+  │   └── terraform.tfvars
+  └── modules/
+      ├── vpc/             # VPC 網路模組
+      ├── gke/             # GKE 叢集模組
+      └── registry/        # Container Registry 模組
+  ```
+
+- [ ] **撰寫核心 Terraform 模組**：
+
+  - [ ] `modules/vpc/` - 基本 VPC 與 Subnets
+  - [ ] `modules/gke/` - Autopilot GKE 叢集
+  - [ ] `modules/registry/` - Google Container Registry
+  - [ ] `environments/dev/` - 開發環境整合
+
+- [ ] **Terraform 狀態管理**：
+
+  - [ ] 建立 GCS Bucket 儲存 Terraform State
+  - [ ] 設定 Backend 配置
+  - [ ] 驗證 Terraform 部署與手動建立結果一致
+
+- [ ] **基礎 CI/CD 設定**：
+  - [ ] 建立 `k8s/` 目錄結構與 Deployment 檔案
+  - [ ] 建立 `.github/workflows/deploy-dev.yml`
+  - [ ] 設定 GCP Service Account 認證
+  - [ ] 實現流程：Build Docker → Push to GCR → Deploy to GKE
+  - [ ] 設定 GitHub Secrets（GCP 認證、專案 ID）
+  - [ ] 端到端測試：修改程式碼 → Push → 自動部署 → 驗證
+
+#### 階段 4：完整 CI/CD Pipeline 與多環境部署
+
+**技術棧：GitHub Actions + Terraform + Kubernetes + GCP**  
+**目標：企業級多環境 CI/CD 流程**
+
+- [ ] **多環境 Terraform 配置**：
+
+  - [ ] `environments/staging/` - 測試環境
+  - [ ] `environments/prod/` - 生產環境
+  - [ ] 環境別變數管理（節點數、機器類型、資源配額）
+  - [ ] 建立 `.github/workflows/infrastructure.yml` - Terraform 自動化
+
+- [ ] **多階段 CI/CD Pipeline 設計**：
+
+  - [ ] **Build Stage**: 多架構 Docker 建構與推送到 GCR
   - [ ] **Test Stage**: 單元測試、集成測試、安全掃描
-  - [ ] **Infrastructure Stage**: Terraform plan/apply 基礎設施
+  - [ ] **Infrastructure Stage**: Terraform plan/apply 基礎設施變更
   - [ ] **Deploy Stage**: Kubernetes 滾動更新部署
   - [ ] **Verify Stage**: 健康檢查與煙霧測試
-- [ ] 撰寫 `.github/workflows/`：
-  - [ ] `ci.yml` - 持續整合流程
-  - [ ] `cd-dev.yml` - 開發環境部署
+
+- [ ] **進階 GitHub Actions 工作流程**：
+
+  - [ ] `ci.yml` - Pull Request 持續整合驗證
+  - [ ] `cd-dev.yml` - 開發環境自動部署
   - [ ] `cd-staging.yml` - 測試環境部署
-  - [ ] `cd-prod.yml` - 生產環境部署（需手動核准）
-  - [ ] `infrastructure.yml` - Terraform 基礎設施管理
-- [ ] 設定 GitHub Environments 與 Protection Rules
-- [ ] （可選）整合 GitHub Actions 與 GCP Service Account（OIDC）
+  - [ ] `cd-prod.yml` - 生產環境部署（手動核准）
 
-#### 安全性與密鑰管理
+- [ ] **環境管理與部署策略**：
+  - [ ] 設定 GitHub Environments 與 Protection Rules
+  - [ ] Kubernetes 部署策略（Rolling Update / Blue-Green）
+  - [ ] 自動回滾機制與健康檢查
+  - [ ] 建立 Ingress 配置（SSL + 域名）
 
-- [ ] 設定 GCP Secret Manager 整合
-- [ ] 配置 Workload Identity（GKE 與 GCP 服務整合）
-- [ ] 實作 Pod Security Context 與 Network Policies
-- [ ] （可選）設定 Google Cloud Armor（DDoS 防護）
-- [ ] （可選）整合 Container Analysis API（漏洞掃描）
-- [ ] （可選）配置 Binary Authorization（映像簽名驗證）
+#### 階段 5：進階 DevOps 實踐（未來實作）
 
-#### 監控、日誌與可觀測性
+**技術棧：完整企業級 DevOps 工具鏈**  
+**目標：生產就緒的安全性、監控與治理**
 
-- [ ] 部署 Prometheus + Grafana 到 K8s
-- [ ] （可選）整合 Google Cloud Monitoring 與 Logging
-- [ ] （可選）設定 Jaeger 分散式追蹤
-- [ ] （可選）配置 Fluentd 日誌聚合
-- [ ] 撰寫自定義監控指標（抽獎成功率、NFT 發送延遲）
-- [ ] （可選）設定 PagerDuty / Slack 告警整合
-- [ ] （可選）建立 SLI/SLO 指標與 Error Budget
+- [ ] **進階基礎設施**：
 
-#### 多環境與發佈策略
+  - [ ] `modules/database/` - Cloud SQL PostgreSQL
+  - [ ] `modules/storage/` - Cloud Storage + CDN
+  - [ ] `modules/dns/` - Cloud DNS + SSL 憑證自動化
+  - [ ] `modules/monitoring/` - Prometheus + Grafana
 
-- [ ] （可選）實作 Blue-Green 部署策略
-- [ ] （可選）設定 Canary 發佈（使用 Flagger 或 Argo Rollouts）
-- [ ] （可選）配置 Feature Flags（使用 ConfigMap 或外部服務）
-- [ ] （可選）實作 Database Migration 自動化
-- [ ] （可選）設定跨區域災難恢復
+- [ ] **安全性與認證**：
 
-#### 成本優化與治理
+  - [ ] Workload Identity Federation（無金鑰認證）
+  - [ ] GCP Secret Manager 整合
+  - [ ] Pod Security Standards + Network Policies
+  - [ ] Container 漏洞掃描（Trivy + Snyk）
 
-- [ ] （可選）設定 GCP 預算告警與成本監控
-- [ ] （可選）實作 Cluster Autoscaler（節點自動縮放）
-- [ ] （可選）配置 Vertical Pod Autoscaler（資源優化）
-- [ ] （可選）使用 Spot Instances / Preemptible VMs
-- [ ] （可選）設定資源配額與限制
+- [ ] **監控與可觀測性**：
 
-#### 進階 DevOps 實踐
+  - [ ] Prometheus + Grafana 部署到 K8s
+  - [ ] 自定義監控指標（抽獎成功率、NFT 發送延遲）
+  - [ ] 分散式追蹤（Jaeger）
+  - [ ] 日誌聚合（Fluentd + Cloud Logging）
+  - [ ] 告警設定（PagerDuty / Slack 整合）
 
-- [ ] （可選）實作 GitOps 工作流（使用 ArgoCD 或 Flux）
-- [ ] （可選）設定 Chaos Engineering 測試（使用 Chaos Monkey）
-- [ ] （可選）建立自動化備份與恢復流程
-- [ ] （可選）實作 Immutable Infrastructure 原則
-- [ ] （可選）建立 Runbook 與事故響應流程
+- [ ] **成本優化與治理**：
+
+  - [ ] Cluster Autoscaler（節點自動縮放）
+  - [ ] Vertical Pod Autoscaler（資源優化）
+  - [ ] Spot Instances / Preemptible VMs
+  - [ ] GCP 預算告警與成本監控
+
+- [ ] **進階部署策略**：
+  - [ ] GitOps 工作流（ArgoCD / Flux）
+  - [ ] Canary 發佈（Flagger / Argo Rollouts）
+  - [ ] Feature Flags 管理
+  - [ ] Database Migration 自動化
+  - [ ] 跨區域災難恢復
 
 ### 測試與驗證
 
