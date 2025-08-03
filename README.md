@@ -114,8 +114,8 @@ ton-cat-lottery/
 
 ### 🎯 智能合約（CatLottery.tact）
 
-- 完整合約說明請參考： [NFT 合約文檔](contracts/NFTREADME.md)
-- 故事說明請參考： [貓咪樂園抽獎故事](contracts/NFTStory.md)
+- 完整合約說明請參考： [NFT 合約文檔](docs/NFTREADME.md)
+- 故事說明請參考： [貓咪樂園抽獎故事](docs/NFTStory.md)
 - 定義抽獎規則 (3 人滿員抽獎)
 - 管理參與者資料 (地址、費用、時間)
 - 執行隨機抽獎 (基於區塊鏈隨機性)
@@ -131,7 +131,7 @@ ton-cat-lottery/
 
 ### 🧰 後端自動抽獎機器人（Go）
 
-- 完整後端說明請參考： [後端文檔](backend/BackREADME.md)
+- 完整後端說明請參考： [後端文檔](docs/BackREADME.md)
 - 定時檢查合約狀態 (每 30 分鐘)
 - 自動觸發抽獎 (當人數達到 3 人)
 - 發送 drawWinner 交易
@@ -150,7 +150,7 @@ ton-cat-lottery/
 
 ## ⚙️ DevOps 架構細節
 
-- Docker 說明請參考： [Docker 文檔](docker/DockerREADME.md)
+- Docker 說明請參考： [Docker 文檔](docs/DockerREADME.md)
 - 使用 Docker Compose 啟動完整環境（前後端 + Node + 監控）
 - Prometheus 收集：
   - Node block 高度、延遲
