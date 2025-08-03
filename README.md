@@ -335,6 +335,7 @@ docker compose up -d
 - [ ] 顯示獎池資訊 - 當前合約餘額和預計獎金
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
 
+---
 ### DevOps / 雲端自動化部署
 
 > 階段式 DevOps 實作流程：Docker + Kubernetes + GCP + Terraform + CI/CD + GitHub Actions
@@ -342,11 +343,12 @@ docker compose up -d
 | 階段 | 內容                    | 技術                       | 目標       |
 | ---- | ----------------------- | -------------------------- | ---------- |
 | 1    | 基礎容器化              | Docker + Docker Compose    | 本地環境   |
-| 2    | GCP 環境建立與手動部署  | GCP + GKE + k8s + Docker   | 雲端驗證   |
+| 2    | GCP 帳號設定            | GCP Console + 手動設定     | 雲端準備   |
 | 3    | Terraform + 基礎 CI/CD  | Terraform + GitHub Actions | 自動化基礎 |
 | 4    | 完整 CI/CD Pipeline     | GitHub Actions + Multi-env | 企業級流程 |
 | 5    | 進階 DevOps（未來實作） | 完整工具鏈                 | 生產就緒   |
 
+---
 #### 階段 1：基礎容器化
 
 **技術棧：Docker + Docker Compose**
@@ -358,95 +360,182 @@ docker compose up -d
 - [x] 撰寫 `.env` 檔案與 secret 管理
 - [x] 本地 Docker 環境驗證與測試
 
-#### 階段 2：GCP 環境建立與手動部署
+---
+#### 階段 2：GCP 帳號設定
 
 **技術棧：GCP Console + 手動設定**  
-**目標：建立雲端基礎環境**
+**目標：完成無法自動化的帳號層級設定**
 
-- [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
-- [x] 建立專案 `ton-cat-lottery-dev`
-- [ ] 啟用必要 API：
-  - [ ] 啟用 `Kubernetes Engine API`
-  - [ ] 啟用 `Container Registry API`
-  - [ ] 啟用 `Cloud Build API`
-  - [ ] 啟用 `Compute Engine API`
-- [ ] 本地開發工具：
-  - [ ] 安裝 Google Cloud SDK
-  - [ ] 設定認證：gcloud auth login
-  - [ ] 設定專案：gcloud config set project ton-cat-lottery-dev
-  - [ ] 安裝 kubectl：gcloud components install kubectl
-- [ ] 服務帳戶與權限設定：
+- [x] **GCP 帳號與計費設定**（無法自動化的部分）：
+  - [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
+  - [x] 建立專案 `ton-cat-lottery-dev`
+  - [x] 設定計費帳戶與預算告警（$50/月 開發限制）
+  
+- [ ] **本地開發工具安裝：**
+  - [ ] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
+  - [ ] 安裝 Terraform：`brew install terraform`
+  - [ ] 安裝 kubectl：`gcloud components install kubectl`
+  - [ ] 設定認證：`gcloud auth login`
+  
+- [ ] **Terraform 服務帳戶設定：**
   - [ ] 建立 Terraform 服務帳戶
-  - [ ] 分配必要權限（Kubernetes Engine Admin, Storage Admin 等）
+  - [ ] 分配 Terraform 服務帳戶必要權限：
+    - Project Editor
+    - Kubernetes Engine Admin  
+    - Service Account Admin
   - [ ] 下載服務帳戶金鑰 JSON 檔案
-  - [ ] 驗證：測試 gcloud auth activate-service-account 正常運作
+  - [ ] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
 
-
+---
 #### 階段 3：基礎自動化部署
 
-**技術棧：Terraform + GitHub Actions + GEK**  
+**技術棧：Terraform + GitHub Actions + GKE**  
 **目標：用 Infrastructure as Code 建立完整雲端環境**
 
 ##### **Terraform 基礎設施即代碼：**
 
-- [ ] 建立 terraform/ 目錄結構
-- [ ] Terraform 部署 Checklist（基礎設施清單）：
-  |         terraform          |     內容     |
-  | -------------------------- | ---------------- |
-  |google_container_cluster    | GKE Autopilot 叢集|
-  | google_compute_network     | VPC 網路 |
-  | google_compute_subnetwork  | 子網路 |
-  | google_compute_firewall    | 防火牆規則 |
-  | google_container_registry  | Container Registry（或 Artifact Registry） |
-  | google_compute_address     | 靜態外部 IP（LoadBalancer 用） |
-  | google_project_iam_binding | IAM 權限設定 |
-  | google_service_account     | GKE 節點服務帳戶 |
- - [ ] 創建主要配置檔案：
-    ```
-    main.tf - 主要資源定義
-    variables.tf - 變數定義
-    outputs.tf - 輸出值（叢集端點、IP 等）
-    versions.tf - Provider 版本鎖定
-    ```
-- [ ] 測試 terraform plan/apply/destroy 流程
-- [ ] 驗證：確保 Terraform 可以完整建立/刪除 GKE 環境
+- [ ] 建立 `terraform/` 目錄結構
 
+- [ ] **GCP API 啟用 Checklist：**
+  > 需要啟用的服務許可
+  1. **計算與容器服務**
+      ```
+      container.googleapis.com        # Kubernetes Engine API (GKE)
+      compute.googleapis.com          # Compute Engine API (VPC, 防火牆, IP)
+      ```
+  2. **容器映像儲存**
+      ```
+      containerregistry.googleapis.com  # Container Registry API (傳統)
+      artifactregistry.googleapis.com   # Artifact Registry API (新版，推薦)
+      ```
+  3. **CI/CD 與建構**
+      ```
+      cloudbuild.googleapis.com         # Cloud Build API (自動建構)
+      ```
+  4. **權限與安全**
+      ```
+      iam.googleapis.com                 # Identity and Access Management API
+      cloudresourcemanager.googleapis.com # Resource Manager API (專案管理)
+      ```
+  5. **網路服務**
+      ```
+      servicenetworking.googleapis.com   # Service Networking API (VPC 連接)
+      dns.googleapis.com                 # Cloud DNS API (如果使用 Cloud DNS)
+      ```
 
-- [ ] 容器映像建構與推送：
+- [ ] **Terraform 資源建立 Checklist：**
+  > 實際要建立的雲端資源
 
-  - [ ] 建構 backend/frontend Docker Image
-  - [ ] 推送 images 到 Google Container Registry
-  - [ ] 建立 K8s Deployment 和 Service YAML 檔案
-  - [ ] 手動測試一次完整部署流程
+  |         Terraform Resource         |     內容     |
+  | ---------------------------------- | ------------ |
+  | google_project_service             | API 啟用 |
+  | google_container_cluster           | GKE Autopilot 叢集 |
+  | google_compute_network             | VPC 網路 |
+  | google_compute_subnetwork          | 子網路 |
+  | google_compute_firewall            | 防火牆規則 |
+  | google_container_registry          | Container Registry（或 Artifact Registry） |
+  | google_compute_address             | 靜態外部 IP（LoadBalancer 用） |
+  | google_project_iam_member          | IAM 權限設定 |
+  | google_service_account             | GKE 節點服務帳戶 |
 
-##### **GitHub Actions CI/CD**：
-- [ ] 創建 CI
-- [ ] 創建 CD
-- [ ] 設定 GitHub Secrets (GCP 服務帳戶金鑰)
-- [ ] 驗證：推送代碼後自動觸發部署
-- [ ] 域名與 LoadBalancer 設定：
-  - [ ] 用 Terraform 建立 LoadBalancer Service
-  - [ ] 取得外部 IP 並設定 Cloudflare DNS
-  - [ ] 驗證：確保應用可透過域名正常訪問
+- [ ] **創建主要配置檔案：**
+  - [ ] `main.tf` - 主要資源定義
+  - [ ] `variables.tf` - 變數定義
+  - [ ] `outputs.tf` - 輸出值（叢集端點、IP 等）
+  - [ ] `versions.tf` - Provider 版本鎖定
+  - [ ] `terraform.tfvars` - 實際變數值
 
-#### 階段 4：進階多環境部署 (可選)
+- [ ] **測試 Terraform 流程：**
+  - [ ] `terraform init` - 初始化
+  - [ ] `terraform plan` - 檢查部署計畫
+  - [ ] `terraform apply` - 執行部署
+  - [ ] **驗證**：確保 Terraform 可以完整建立/刪除 GKE 環境
 
+##### **K8s 應用部署準備（手動驗證一次）：**
+
+- [ ] **建構與推送容器映像：**
+  - [ ] 建構 backend Docker Image
+  - [ ] 建構 frontend Docker Image
+  - [ ] 推送 Images 到 Google Container Registry
+  - [ ] **驗證映像**：確認映像可以正常拉取
+
+- [ ] **建立 K8s 部署檔案：**
+  - [ ] 建立 `k8s/` 目錄結構
+  - [ ] 撰寫 backend Deployment YAML
+  - [ ] 撰寫 backend Service YAML
+  - [ ] 撰寫 frontend Deployment YAML
+  - [ ] 撰寫 frontend Service YAML
+  - [ ] 撰寫 LoadBalancer Service YAML
+
+- [ ] **手動測試一次完整部署流程：**
+  - [ ] 取得 GKE 叢集憑證：`gcloud container clusters get-credentials`
+  - [ ] 手動部署 backend：`kubectl apply -f k8s/backend/`
+  - [ ] 手動部署 frontend：`kubectl apply -f k8s/frontend/`
+
+- [ ] **驗證應用：**
+  - [ ] Pod 狀態為 Running
+  - [ ] Service 正常工作
+  - [ ] LoadBalancer 取得外部 IP
+  - [ ] 應用可以透過 IP 訪問
+
+##### **GitHub Actions CI/CD：**
+
+- [ ] 建立 `.github/workflows/` 目錄
+
+- [ ] **撰寫 CI 工作流程 (`ci.yml`)：**
+  - [ ] 代碼檢查和測試
+  - [ ] Docker 映像建構
+  - [ ] 映像安全掃描
+
+- [ ] **撰寫 CD 工作流程 (`cd.yml`)：**
+  - [ ] 映像推送到 Container Registry
+  - [ ] 自動部署到 GKE
+  - [ ] 部署狀態檢查
+
+- [ ] **設定 GitHub Secrets：**
+  - [ ] 添加 `GCP_SA_KEY`（服務帳戶金鑰）
+  - [ ] 添加 `GCP_PROJECT_ID`
+  - [ ] 添加 `GKE_CLUSTER_NAME`
+  - [ ] 添加 `GKE_ZONE`
+
+- [ ] **測試自動化流程：**
+  - [ ] 提交代碼變更觸發 CI/CD
+  - [ ] **驗證自動化：**
+    - [ ] CI 流程自動執行
+    - [ ] Image 自動建構並推送
+    - [ ] 應用自動部署到 GKE
+    - [ ] 部署完成後應用正常運行
+
+##### **域名與外部訪問設定：**
+
+- [ ] **設定 LoadBalancer：**
+  - [ ] 確認 Terraform 已建立靜態 IP
+  - [ ] 設定 K8s LoadBalancer Service 使用靜態 IP
+  - [ ] **驗證 LoadBalancer**：取得正確的外部 IP
+
+- [ ] **Cloudflare DNS 設定：**
+  - [ ] 取得 LoadBalancer 外部 IP：`terraform output external_ip`
+  - [ ] 在 Cloudflare 設定 A record 指向外部 IP
+  - [ ] **驗證域名訪問**：確保應用可透過域名正常訪問
+
+---
+#### 階段 4：進階多環境部署 (未來擴展)
+
+**技術棧：GitHub Actions + Multi-environment**  
 **目標：企業級多環境自動化**
 
 - [ ] **多環境 Terraform 配置：**
-
   - [ ] 建立 dev/staging/prod 環境變數檔案
   - [ ] 配置不同環境的 GKE 叢集規格
   - [ ] 設置環境隔離的網路配置
 
-
 - [ ] **GitHub Actions 進階工作流程：**
-
   - [ ] Pull Request 自動測試和預覽部署
   - [ ] 分支策略：dev → staging → prod
   - [ ] 手動審批生產環境部署
   - [ ] 配置環境保護規則和通知
 
+---
 #### 階段 5：進階監控與安全 (未來擴展)
 
 **目標：生產就緒的完整 DevOps**
@@ -466,6 +555,7 @@ docker compose up -d
   - [ ] GKE 自動縮放策略
   - [ ] 成本告警和優化建議
 
+---
 ### 測試與驗證
 
 > 確保各模組運作正常，並驗證整體流程。
@@ -476,6 +566,7 @@ docker compose up -d
 - [ ] 整合測試：參加 ➜ 抽獎 ➜ NFT 發送 ➜ 前端顯示
 - [ ] 多用戶壓力測試（使用 Locust 或腳本）
 
+---
 ### 文件與展示
 
 - [ ] 完善 `README.md`（專案簡介、啟動指南、技術棧）
