@@ -146,6 +146,7 @@ gcloud projects get-iam-policy ton-cat-lottery-dev-468008 --filter="bindings.mem
   - GKE Autopilot 叢集配置 (enable_autopilot = true)
   - VPC 網路和子網路設定 (10.0.0.0/24, pods: 10.1.0.0/16, services: 10.2.0.0/16)
   - 防火牆規則 (HTTP/HTTPS, SSH, 內部流量)
+  - Cloud Router 和 NAT Gateway (私有集群外網訪問)
   - 靜態 IP 和 Artifact Registry 倉庫
   - 服務帳號和 IAM 角色綁定
   - Google Cloud APIs 啟用
@@ -648,3 +649,5 @@ kubectl rollout status deployment/frontend -n ton-cat-lottery-prod --watch
 # 檢查部署歷史
 kubectl rollout history deployment/backend -n ton-cat-lottery-prod
 ```
+
+## DNS 和 HTTPS 設定
