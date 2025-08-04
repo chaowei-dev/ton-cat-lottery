@@ -435,6 +435,8 @@ docker compose up -d
   | google_compute_network             | VPC 網路 |
   | google_compute_subnetwork          | 子網路 |
   | google_compute_firewall            | 防火牆規則 |
+  | google_compute_router              | Cloud Router（NAT 用） |
+  | google_compute_router_nat          | NAT Gateway（私有集群外網訪問） |
   | google_container_registry          | Container Registry（或 Artifact Registry） |
   | google_compute_address             | 靜態外部 IP（LoadBalancer 用） |
   | google_project_iam_member          | IAM 權限設定 |
@@ -563,95 +565,107 @@ docker compose up -d
   - [x] `GCP_SA_KEY`：Terraform 服務帳戶的 JSON 金鑰
   - [x] `GCP_PROJECT_ID`：GCP 專案 ID
   
-###### **進階流程 (可選)：企業級 DevOps 特性**
+---
+##### 進階流程（可選）：企業級 DevOps 強化
 
-- [ ] **進階 CI 功能：**
-  - [ ] 多 Node.js 版本矩陣測試 (18.x, 20.x, 22.x)
-  - [ ] 前端 Lint 檢查：`npm run lint`
-  - [ ] Go 後端 Lint 檢查：`golangci-lint run`
-  - [ ] 安全性掃描：Trivy 容器映像漏洞掃描
-  - [ ] 依賴安全掃描：npm audit, govulncheck
-  - [ ] 映像大小優化檢查
-  - [ ] 容器功能性測試
+**CI：進階品質與安全檢查**
+- [ ] 支援 Node.js 多版本測試矩陣（18.x / 20.x / 22.x）
+- [ ] 前端 Lint 檢查：`npm run lint`
+- [ ] Go Lint 檢查：`golangci-lint run`
+- [ ] 安全性掃描：
+  - [ ] Trivy 掃描容器映像
+  - [ ] `npm audit` / `govulncheck` 掃描依賴
+- [ ] 測試映像功能性與大小優化
 
-- [ ] **進階 CD 功能：**
-  - [ ] 多環境部署策略 (develop→開發環境, main→生產環境)
-  - [ ] 版本標籤 (git tag) 觸發穩定版部署
-  - [ ] 動態環境配置 (ConfigMap/Secret 管理)
-  - [ ] 外部訪問測試：通過 Ingress 訪問應用
-  - [ ] 煙霧測試：基礎功能驗證 (API 端點檢查)
-  - [ ] **自動回滾機制**：`kubectl rollout undo deployment/SERVICE`
+**CD：進階部署與穩定性機制**
 
-- [ ] **企業級監控與通知：**
-  - [ ] GitHub Environment Protection (生產環境手動審批)
-  - [ ] 部署成功/失敗通知機制
-  - [ ] 集成執行時間監控
-  - [ ] 部署頻率和成功率統計
+- [ ] 多環境部署策略（develop → dev，main → prod）
+- [ ] Git tag 推送穩定版部署
+- [ ] ConfigMap / Secret 動態配置支持
+- [ ] 基礎健康檢查 + 煙霧測試（API 通順）
+- [ ] 自動回滾：`kubectl rollout undo deployment/SERVICE`
 
-- [ ] **額外應用程式 Secrets (按需設定)：**
-  - [ ] `LOTTERY_CONTRACT_ADDRESS`：智能合約地址
-  - [ ] `NFT_CONTRACT_ADDRESS`：NFT 合約地址
-  - [ ] `WALLET_PRIVATE_KEY`：後端錢包私鑰
-  - [ ] `TON_NETWORK`：TON 網路環境
+**監控與通知整合**
 
-- [ ] **工作流程進階配置：**
-  - [ ] **條件部署策略：**
-    - [ ] 只有在 CI 通過時才執行 CD
-    - [ ] 生產環境部署需要手動審批 (GitHub Environment Protection)
-    - [ ] 設定部署時間窗口 (避免高峰期部署)
-  
-  - [ ] **通知機制：**
-    - [ ] 部署成功/失敗 Slack 通知
-    - [ ] 郵件通知關鍵人員
-    - [ ] GitHub Issue 自動創建 (部署失敗時)
-  
-  - [ ] **監控與可觀測性：**
-    - [ ] 集成 GitHub Actions 執行時間監控
-    - [ ] 部署頻率和成功率統計
-    - [ ] 建構時間趨勢分析
+- [ ] GitHub Environment Protection（生產環境需手動審批）
+- [ ] Slack / Email 通知：部署成功與失敗
+- [ ] 監控整合：
+  - [ ] GitHub Actions 執行時間
+  - [ ] 部署頻率 / 成功率趨勢
+  - [ ] 建構耗時分析（可透過 Grafana 整合）
 
-- [ ] **測試完整 CI/CD 流程：**
-  - [ ] **CI 流程測試：**
-    - [ ] 提交代碼變更觸發 CI 工作流程
-    - [ ] **驗證所有檢查通過**：
-      - [ ] 代碼品質檢查無誤
-      - [ ] 所有測試用例通過
-      - [ ] 安全掃描無高風險問題
-      - [ ] Docker 映像建構成功
-  
-  - [ ] **CD 流程測試：**
-    - [ ] 合併到 `main` 分支觸發 CD 工作流程
-    - [ ] **驗證自動部署流程**：
-      - [ ] 映像自動推送到 Artifact Registry
-      - [ ] GKE 叢集自動更新應用
-      - [ ] 健康檢查通過
-      - [ ] 應用透過域名正常訪問
-  
-  - [ ] **失敗情況測試：**
-    - [ ] 測試建構失敗時的工作流程中斷
-    - [ ] 測試部署失敗時的自動回滾機制
-    - [ ] 驗證失敗通知機制正常運作
+**秘密與參數管理（依需求）**
 
-- [ ] **文件與最佳實踐：**
-  - [ ] 更新 `.gitignore`：添加 GitHub Actions 相關忽略規則
-  - [ ] 更新 CI/CD 的說明到 `docs/DevOpsREADME.md` 中，包含簡介、檔案結構、指令、故障排除
-  - [ ] 建立 CI/CD Badge：顯示建構和部署狀態
-  - [ ] **驗證文件完整性**：確保新成員可以根據文件獨立操作
+- [ ] `LOTTERY_CONTRACT_ADDRESS`
+- [ ] `NFT_CONTRACT_ADDRESS`
+- [ ] `WALLET_PRIVATE_KEY`
+- [ ] `TON_NETWORK`
 
-##### **域名與外部訪問設定：**
+**完整流程測試驗證**
 
-- [ ] **設定 LoadBalancer：**
-  - [ ] 確認 Terraform 已建立靜態 IP
-  - [ ] 設定 K8s LoadBalancer Service 使用靜態 IP
-  - [ ] **驗證 LoadBalancer**：取得正確的外部 IP
+- [ ] **CI 測試**：確認變更觸發測試並全部通過
+- [ ] **CD 測試**：
+  - [ ] 合併後觸發部署、自動推送映像
+  - [ ] GKE 滾動更新應用並通過健康檢查
+- [ ] **異常測試**：
+  - [ ] 模擬 CI/CD 失敗場景
+  - [ ] 驗證自動回滾與通知機制正常
 
-- [ ] **Cloudflare DNS 設定：**
-  - [ ] 取得 LoadBalancer 外部 IP：`terraform output external_ip`
-  - [ ] 在 Cloudflare 設定 A record 指向外部 IP
-  - [ ] **驗證域名訪問**：確保應用可透過域名正常訪問
+**文件與維運最佳實踐**
+
+- [ ] 更新 `.gitignore`（忽略 workflow 中間產物）
+- [ ] 完善 `docs/DevOpsREADME.md` 說明與部署教學
 
 ---
-#### 階段 4：進階多環境部署 (未來擴展)
+#### 階段4 域名與外部訪問設定：
+
+- [ ] **前置準備：**
+  - [ ] 確認已有 GCP 靜態 IP（由 Terraform 建立）
+  - [ ] 確認 Ingress 已綁定該靜態 IP：
+
+- [ ] **設定 DNS（以 Cloudflare 為例）**：
+  - [ ] 在 Cloudflare 新增 A 記錄：
+    ```
+    Name: 你的子域名（如 lottery）
+    IPv4: 上一步查到的靜態 IP
+    Proxy: 關閉（選擇 "DNS only"）
+    ```
+  - [ ] 驗證 DNS 是否生效：
+    ```bash
+    dig your-domain.com A
+    ```
+- [ ] **安裝並配置 cert-manager（TLS 證書）：**
+  - [ ] 安裝請參考：https://cert-manager.io/docs/installation/kubectl/
+  - [ ] 建立 Let's Encrypt ClusterIssuer
+
+- [ ] **更新 Ingress 配置（加上 TLS）：**
+  - [ ] 替換 Ingress 中的 host 為你自己的網域
+  - [ ] 加上 annotation 使用 ClusterIssuer
+
+- [ ] **驗證 HTTPS 配置：**
+  - [ ] 查看證書狀態：
+    ```bash
+    kubectl get certificate -n ton-cat-lottery
+    kubectl describe certificate your-domain-tls -n ton-cat-lottery
+    ```
+  - [ ] 驗證網站可透過 HTTPS 訪問：`curl -I https://your-domain.com`
+
+- [ ] **強化安全性與完整性：**
+  - [ ] 測試 HTTP 自動轉 HTTPS（GCE Ingress 預設支援）
+  - [ ] 確保不支援透過 IP 直接訪問：`curl -I http://<EXTERNAL_IP>`
+  - [ ] 使用 SSL Labs 檢查安全性：https://www.ssllabs.com/ssltest/
+
+- [ ] **錯誤排除建議：**
+  - [ ] 若證書簽發失敗：
+    ```bash
+    kubectl describe certificaterequest -n ton-cat-lottery
+    kubectl logs -n cert-manager deployment/cert-manager
+    ```
+  - [ ] 若 DNS 無法解析：`dig your-domain.com @8.8.8.8`
+  - [ ] 如需回滾：`kubectl apply -f ingress-backup.yaml`
+
+---
+#### 階段 5：進階多環境部署 (未來擴展)
 
 **技術棧：GitHub Actions + Multi-environment**  
 **目標：企業級多環境自動化**
@@ -668,7 +682,7 @@ docker compose up -d
   - [ ] 配置環境保護規則和通知
 
 ---
-#### 階段 5：進階監控與安全 (未來擴展)
+#### 階段 6：進階監控與安全 (未來擴展)
 
 **目標：生產就緒的完整 DevOps**
 
