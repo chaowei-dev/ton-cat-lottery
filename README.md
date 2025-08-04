@@ -519,34 +519,124 @@ docker compose up -d
 
 ##### **GitHub Actions CI/CD：**
 
-- [ ] 建立 `.github/workflows/` 目錄
+- [ ] **準備階段：**
+  - [ ] 建立 `.github/workflows/` 目錄結構
+  - [ ] 建立 `.github/` 相關的 `.gitignore` 規則
+  - [ ] 準備工作流程模板檔案
 
-- [ ] **撰寫 CI 工作流程 (`ci.yml`)：**
-  - [ ] 代碼檢查和測試
-  - [ ] Docker 映像建構
-  - [ ] 映像安全掃描
+- [ ] **CI 工作流程建立 (`ci.yml`)：**
+  - [ ] **代碼品質檢查：**
+    - [ ] 設定多 Node.js 版本矩陣測試 (18.x, 20.x, 22.x)
+    - [ ] 智能合約測試：`cd contracts && npm run test`
+    - [ ] 前端 Lint 檢查：`cd frontend && npm run lint`
+    - [ ] 前端建構測試：`cd frontend && npm run build`
+    - [ ] Go 後端測試：`cd backend && ./test.sh`
+    - [ ] Go 後端 Lint 檢查：`cd backend && golangci-lint run`
+  
+  - [ ] **安全性掃描：**
+    - [ ] 整合 Trivy 容器映像漏洞掃描
+    - [ ] 添加 npm audit 檢查 (frontend/contracts)
+    - [ ] 添加 Go 依賴安全掃描：`govulncheck`
+    - [ ] 設定安全掃描失敗閾值
+  
+  - [ ] **Docker 映像建構與測試：**
+    - [ ] 建構 backend Docker 映像 (多架構 linux/amd64)
+    - [ ] 建構 frontend Docker 映像 (多架構 linux/amd64)
+    - [ ] 映像安全掃描：`trivy image`
+    - [ ] 映像大小優化檢查
+    - [ ] **驗證映像功能性**：容器啟動測試
 
-- [ ] **撰寫 CD 工作流程 (`cd.yml`)：**
-  - [ ] 映像推送到 Container Registry
-  - [ ] 自動部署到 GKE
-  - [ ] 部署狀態檢查
+- [ ] **CD 工作流程建立 (`cd.yml`)：**
+  - [ ] **觸發條件設定：**
+    - [ ] `main` 分支推送自動部署到生產環境
+    - [ ] `develop` 分支推送自動部署到開發環境
+    - [ ] 手動觸發部署選項 (workflow_dispatch)
+    - [ ] 版本標籤 (git tag) 觸發穩定版部署
+  
+  - [ ] **映像推送到 Artifact Registry：**
+    - [ ] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
+    - [ ] 配置 Docker 認證：`gcloud auth configure-docker asia-east1-docker.pkg.dev`
+    - [ ] 推送 backend 映像：標籤策略 (latest, git-sha, version)
+    - [ ] 推送 frontend 映像：標籤策略 (latest, git-sha, version)
+    - [ ] **驗證映像推送成功**：檢查 Artifact Registry
+  
+  - [ ] **GKE 部署自動化：**
+    - [ ] 取得 GKE 憑證：`gcloud container clusters get-credentials`
+    - [ ] 更新 K8s ConfigMap 配置 (環境變數)
+    - [ ] 更新 K8s Secret 配置 (敏感資訊)
+    - [ ] 執行滾動更新：`kubectl set image deployment/backend backend=NEW_IMAGE`
+    - [ ] 執行滾動更新：`kubectl set image deployment/frontend frontend=NEW_IMAGE`
+    - [ ] **等待部署完成**：`kubectl rollout status deployment/backend`
+  
+  - [ ] **部署後驗證：**
+    - [ ] 健康檢查：驗證所有 Pod 為 Running 狀態
+    - [ ] 服務連通性測試：內部服務通信檢查
+    - [ ] 外部訪問測試：通過 Ingress 訪問應用
+    - [ ] 煙霧測試：基礎功能驗證 (API 端點檢查)
+    - [ ] **部署失敗自動回滾**：`kubectl rollout undo deployment/SERVICE`
 
-- [ ] **設定 GitHub Secrets：**
-  - [ ] 添加 `GCP_SA_KEY`（服務帳戶金鑰）
-  - [ ] 添加 `GCP_PROJECT_ID`
-  - [ ] 添加 `GKE_CLUSTER_NAME`
-  - [ ] 添加 `GKE_ZONE`
+- [ ] **GitHub Secrets 配置 Checklist：**
+  > 在 GitHub Repository → Settings → Secrets and variables → Actions 中添加
+  
+  - [ ] **GCP 認證相關：**
+    - [ ] `GCP_SA_KEY`：Terraform 服務帳戶的 JSON 金鑰 (base64 編碼)
+    - [ ] `GCP_PROJECT_ID`：GCP 專案 ID (`ton-cat-lottery-dev`)
+    - [ ] `GCP_REGISTRY_URL`：Artifact Registry URL (`asia-east1-docker.pkg.dev`)
+  
+  - [ ] **GKE 叢集相關：**
+    - [ ] `GKE_CLUSTER_NAME`：GKE 叢集名稱 (`ton-cat-lottery-cluster`)
+    - [ ] `GKE_CLUSTER_REGION`：GKE 叢集區域 (`asia-east1`)
+    - [ ] `GKE_NAMESPACE`：K8s 命名空間 (`ton-cat-lottery`)
+  
+  - [ ] **應用程式相關：**
+    - [ ] `LOTTERY_CONTRACT_ADDRESS`：智能合約地址
+    - [ ] `NFT_CONTRACT_ADDRESS`：NFT 合約地址
+    - [ ] `WALLET_PRIVATE_KEY`：後端錢包私鑰 (用於自動抽獎)
+    - [ ] `TON_NETWORK`：TON 網路環境 (`testnet` 或 `mainnet`)
 
-- [ ] **測試自動化流程：**
-  - [ ] 提交代碼變更觸發 CI/CD
-  - [ ] **驗證自動化：**
-    - [ ] CI 流程自動執行
-    - [ ] Image 自動建構並推送
-    - [ ] 應用自動部署到 GKE
-    - [ ] 部署完成後應用正常運行
+- [ ] **工作流程進階配置：**
+  - [ ] **條件部署策略：**
+    - [ ] 只有在 CI 通過時才執行 CD
+    - [ ] 生產環境部署需要手動審批 (GitHub Environment Protection)
+    - [ ] 設定部署時間窗口 (避免高峰期部署)
+  
+  - [ ] **通知機制：**
+    - [ ] 部署成功/失敗 Slack 通知
+    - [ ] 郵件通知關鍵人員
+    - [ ] GitHub Issue 自動創建 (部署失敗時)
+  
+  - [ ] **監控與可觀測性：**
+    - [ ] 集成 GitHub Actions 執行時間監控
+    - [ ] 部署頻率和成功率統計
+    - [ ] 建構時間趨勢分析
 
-- [ ] 更新 CI/CD 相關的內容到 `.gitignore`
-- [ ] 整理內容到 `DevOpsREADME.md` 中
+- [ ] **測試完整 CI/CD 流程：**
+  - [ ] **CI 流程測試：**
+    - [ ] 提交代碼變更觸發 CI 工作流程
+    - [ ] **驗證所有檢查通過**：
+      - [ ] 代碼品質檢查無誤
+      - [ ] 所有測試用例通過
+      - [ ] 安全掃描無高風險問題
+      - [ ] Docker 映像建構成功
+  
+  - [ ] **CD 流程測試：**
+    - [ ] 合併到 `main` 分支觸發 CD 工作流程
+    - [ ] **驗證自動部署流程**：
+      - [ ] 映像自動推送到 Artifact Registry
+      - [ ] GKE 叢集自動更新應用
+      - [ ] 健康檢查通過
+      - [ ] 應用透過域名正常訪問
+  
+  - [ ] **失敗情況測試：**
+    - [ ] 測試建構失敗時的工作流程中斷
+    - [ ] 測試部署失敗時的自動回滾機制
+    - [ ] 驗證失敗通知機制正常運作
+
+- [ ] **文件與最佳實踐：**
+  - [ ] 更新 `.gitignore`：添加 GitHub Actions 相關忽略規則
+  - [ ] 更新 CI/CD 的說明到 `docs/DevOpsREADME.md` 中，包含簡介、檔案結構、指令、故障排除
+  - [ ] 建立 CI/CD Badge：顯示建構和部署狀態
+  - [ ] **驗證文件完整性**：確保新成員可以根據文件獨立操作
 
 ##### **域名與外部訪問設定：**
 
