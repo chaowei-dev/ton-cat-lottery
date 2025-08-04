@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-loadbalancer
+  namespace: ton-cat-lottery
+  labels:
+    app: frontend
+    component: loadbalancer
+  annotations:
+    # 使用 Terraform 建立的靜態 IP
+    cloud.google.com/load-balancer-type: "External"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 35.201.160.58  # Terraform 建立的靜態 IP
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 80
