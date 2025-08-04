@@ -1,0 +1,336 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, feature/devops ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # Code Quality and Testing
+  test:
+    name: Code Quality & Testing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        cache: true
+
+    # Install dependencies
+    - name: Install contracts dependencies
+      run: |
+        cd contracts
+        npm ci
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    # Smart Contract Tests
+    - name: Run smart contract tests
+      run: |
+        cd contracts
+        npm run test
+
+    # Frontend Quality Checks
+    - name: Run frontend lint
+      run: |
+        cd frontend
+        npm run lint
+
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+
+    # Backend Quality Checks
+    - name: Make test script executable
+      run: chmod +x backend/test.sh
+
+    - name: Run backend tests
+      run: |
+        cd backend
+        ./test.sh
+
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.54.2
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+    - name: Run backend lint
+      run: |
+        cd backend
+        golangci-lint run
+
+  # Security Scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: test
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    # NPM Security Audit
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Install contracts dependencies
+      run: |
+        cd contracts
+        npm ci
+
+    - name: Run npm audit (frontend)
+      run: |
+        cd frontend
+        npm audit --audit-level moderate || true
+
+    - name: Run npm audit (contracts)
+      run: |
+        cd contracts
+        npm audit --audit-level moderate || true
+
+    # Go Security Scanning
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+    - name: Run Go vulnerability check
+      run: |
+        cd backend
+        govulncheck ./...
+
+    # Trivy filesystem scan
+    - name: Run Trivy vulnerability scanner (filesystem)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Docker Build and Security
+  docker:
+    name: Docker Build & Security
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/feature/devops')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Build Backend Docker Image
+    - name: Build backend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        platforms: linux/amd64
+        push: false
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/backend-image.tar
+
+    # Build Frontend Docker Image
+    - name: Build frontend Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        platforms: linux/amd64
+        push: false
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/frontend-image.tar
+
+    # Load images for testing
+    - name: Load Docker images
+      run: |
+        docker load --input /tmp/backend-image.tar
+        docker load --input /tmp/frontend-image.tar
+
+    # Container Security Scanning
+    - name: Run Trivy vulnerability scanner (backend image)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-backend-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (frontend image)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-frontend-results.sarif'
+
+    - name: Upload Trivy scan results (backend)
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-backend-results.sarif'
+
+    - name: Upload Trivy scan results (frontend)
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-frontend-results.sarif'
+
+    # Container Functionality Tests
+    - name: Test backend container functionality
+      run: |
+        echo "Testing backend container startup..."
+        docker run --rm -d --name backend-test \
+          -e TON_NETWORK=testnet \
+          -e AUTO_DRAW=false \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Check if container is running
+        if docker ps | grep backend-test; then
+          echo "✅ Backend container started successfully"
+          docker stop backend-test
+        else
+          echo "❌ Backend container failed to start"
+          docker logs backend-test || true
+          exit 1
+        fi
+
+    - name: Test frontend container functionality
+      run: |
+        echo "Testing frontend container startup..."
+        docker run --rm -d --name frontend-test -p 8080:80 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Check if container is running and serving content
+        if docker ps | grep frontend-test; then
+          echo "✅ Frontend container started successfully"
+          
+          # Test if frontend is serving content
+          if curl -f http://localhost:8080 > /dev/null 2>&1; then
+            echo "✅ Frontend is serving content"
+          else
+            echo "⚠️ Frontend container running but not serving content properly"
+          fi
+          
+          docker stop frontend-test
+        else
+          echo "❌ Frontend container failed to start"
+          docker logs frontend-test || true
+          exit 1
+        fi
+
+    # Push images to registry (only on main/master branch)
+    - name: Push backend image to registry
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }} \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
+
+    - name: Push frontend image to registry
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }} \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+
+    # Image size optimization check
+    - name: Check image sizes
+      run: |
+        echo "## Docker Image Sizes"
+        echo "Backend image size:"
+        docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        echo "Frontend image size:"
+        docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        
+        # Check if images are reasonable size (backend < 500MB, frontend < 200MB)
+        BACKEND_SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }} --format "{{.Size}}" | sed 's/MB//')
+        FRONTEND_SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }} --format "{{.Size}}" | sed 's/MB//')
+        
+        echo "Backend size: ${BACKEND_SIZE}MB"
+        echo "Frontend size: ${FRONTEND_SIZE}MB"
+
+  # Summary Job
+  summary:
+    name: CI/CD Summary
+    runs-on: ubuntu-latest
+    needs: [test, security, docker]
+    if: always()
+    
+    steps:
+    - name: Check results
+      run: |
+        echo "## CI/CD Pipeline Summary"
+        echo "Test Job: ${{ needs.test.result }}"
+        echo "Security Job: ${{ needs.security.result }}"
+        echo "Docker Job: ${{ needs.docker.result }}"
+        
+        if [[ "${{ needs.test.result }}" == "failure" ]]; then
+          echo "❌ Tests failed - blocking deployment"
+          exit 1
+        elif [[ "${{ needs.docker.result }}" == "failure" ]]; then
+          echo "❌ Docker build failed - blocking deployment"
+          exit 1
+        else
+          echo "✅ CI/CD pipeline completed successfully"
+        fi

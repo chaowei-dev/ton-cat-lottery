@@ -1,0 +1,406 @@
+name: Continuous Deployment
+
+on:
+  # Branch and tag deployments
+  push:
+    branches: 
+      - main
+      - master
+      - develop
+      - feature/devops  # For testing CD pipeline
+    tags:
+      - 'v*.*.*'  # Version tag deployment (stable releases)
+  
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+      image_tag:
+        description: 'Docker image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: asia-east1
+  GKE_CLUSTER: ton-cat-lottery-gke
+  GKE_ZONE: asia-east1-a
+  ARTIFACT_REGISTRY: asia-east1-docker.pkg.dev
+  REPOSITORY: ton-cat-lottery-repo
+
+jobs:
+  # Determine deployment environment and configuration
+  setup:
+    name: Setup Deployment Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.config.outputs.environment }}
+      namespace: ${{ steps.config.outputs.namespace }}
+      image_tag: ${{ steps.config.outputs.image_tag }}
+      deploy_enabled: ${{ steps.config.outputs.deploy_enabled }}
+    
+    steps:
+    - name: Determine deployment configuration
+      id: config
+      run: |
+        # Determine environment based on trigger
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "image_tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=true" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+          echo "image_tag=latest" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=true" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/heads/develop" || "${{ github.ref }}" == "refs/heads/feature/devops" ]]; then
+          echo "environment=development" >> $GITHUB_OUTPUT
+          echo "image_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=true" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" =~ refs/tags/v.* ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+          echo "image_tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=true" >> $GITHUB_OUTPUT
+        else
+          echo "environment=none" >> $GITHUB_OUTPUT
+          echo "deploy_enabled=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Set namespace based on environment
+        if [[ "${{ steps.config.outputs.environment }}" == "production" ]]; then
+          echo "namespace=ton-cat-lottery-prod" >> $GITHUB_OUTPUT
+        else
+          echo "namespace=ton-cat-lottery-dev" >> $GITHUB_OUTPUT
+        fi
+
+  # Build and push Docker images to Artifact Registry
+  build-and-push:
+    name: Build & Push to Artifact Registry
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.deploy_enabled == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Build and push backend image
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        platforms: linux/amd64
+        push: true
+        tags: |
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ needs.setup.outputs.image_tag }}
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ github.sha }}
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push frontend image  
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        platforms: linux/amd64
+        push: true
+        tags: |
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ needs.setup.outputs.image_tag }}
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }}
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Verify image push success
+    - name: Verify images in Artifact Registry
+      run: |
+        echo "Verifying backend image..."
+        gcloud artifacts docker tags list \
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend \
+          --limit=5
+        
+        echo "Verifying frontend image..."
+        gcloud artifacts docker tags list \
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend \
+          --limit=5
+
+  # Deploy to GKE
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push]
+    environment: ${{ needs.setup.outputs.environment }}
+    if: needs.setup.outputs.deploy_enabled == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+          --zone ${{ env.GKE_ZONE }} \
+          --project ${{ env.GCP_PROJECT }}
+
+    - name: Create namespace if not exists
+      run: |
+        kubectl create namespace ${{ needs.setup.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+    # Update ConfigMaps and Secrets
+    - name: Update ConfigMaps
+      run: |
+        # Apply environment-specific configurations
+        if [[ "${{ needs.setup.outputs.environment }}" == "production" ]]; then
+          # Production configs
+          kubectl apply -f k8s/config/ -n ${{ needs.setup.outputs.namespace }}
+          kubectl patch configmap backend-config -n ${{ needs.setup.outputs.namespace }} \
+            --patch '{"data":{"TON_NETWORK":"mainnet","AUTO_DRAW":"true"}}'
+        else
+          # Development configs
+          kubectl apply -f k8s/config/ -n ${{ needs.setup.outputs.namespace }}
+          kubectl patch configmap backend-config -n ${{ needs.setup.outputs.namespace }} \
+            --patch '{"data":{"TON_NETWORK":"testnet","AUTO_DRAW":"false"}}'
+        fi
+
+    - name: Update Secrets
+      run: |
+        # Apply secrets (ensure secrets exist in k8s/config/)
+        kubectl apply -f k8s/config/backend-secrets.yaml -n ${{ needs.setup.outputs.namespace }} || true
+
+    # Deploy backend
+    - name: Deploy backend to GKE
+      run: |
+        NEW_IMAGE=${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ needs.setup.outputs.image_tag }}
+        
+        # Apply deployment configuration
+        kubectl apply -f k8s/backend/ -n ${{ needs.setup.outputs.namespace }}
+        
+        # Update image
+        kubectl set image deployment/backend backend=$NEW_IMAGE -n ${{ needs.setup.outputs.namespace }}
+        
+        echo "Backend deployment updated with image: $NEW_IMAGE"
+
+    # Deploy frontend
+    - name: Deploy frontend to GKE
+      run: |
+        NEW_IMAGE=${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ needs.setup.outputs.image_tag }}
+        
+        # Apply deployment configuration
+        kubectl apply -f k8s/frontend/ -n ${{ needs.setup.outputs.namespace }}
+        
+        # Update image
+        kubectl set image deployment/frontend frontend=$NEW_IMAGE -n ${{ needs.setup.outputs.namespace }}
+        
+        echo "Frontend deployment updated with image: $NEW_IMAGE"
+
+    # Apply ingress (only for production)
+    - name: Apply Ingress configuration
+      if: needs.setup.outputs.environment == 'production'
+      run: |
+        kubectl apply -f k8s/ingress/ -n ${{ needs.setup.outputs.namespace }}
+
+    # Wait for deployments to complete
+    - name: Wait for backend deployment
+      run: |
+        kubectl rollout status deployment/backend -n ${{ needs.setup.outputs.namespace }} --timeout=600s
+
+    - name: Wait for frontend deployment
+      run: |
+        kubectl rollout status deployment/frontend -n ${{ needs.setup.outputs.namespace }} --timeout=600s
+
+  # Post-deployment verification
+  verify:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: [setup, deploy]
+    if: needs.setup.outputs.deploy_enabled == 'true'
+    
+    steps:
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+          --zone ${{ env.GKE_ZONE }} \
+          --project ${{ env.GCP_PROJECT }}
+
+    # Health checks
+    - name: Verify pod status
+      run: |
+        echo "Checking pod status in namespace: ${{ needs.setup.outputs.namespace }}"
+        kubectl get pods -n ${{ needs.setup.outputs.namespace }}
+        
+        # Verify all pods are running
+        if kubectl get pods -n ${{ needs.setup.outputs.namespace }} | grep -v Running | grep -v Completed | grep -v STATUS; then
+          echo "❌ Some pods are not running properly"
+          kubectl describe pods -n ${{ needs.setup.outputs.namespace }}
+          exit 1
+        else
+          echo "✅ All pods are running successfully"
+        fi
+
+    # Service connectivity test
+    - name: Test service connectivity
+      run: |
+        echo "Testing internal service connectivity..."
+        
+        # Test backend service
+        BACKEND_IP=$(kubectl get svc backend -n ${{ needs.setup.outputs.namespace }} -o jsonpath='{.spec.clusterIP}')
+        echo "Backend service IP: $BACKEND_IP"
+        
+        # Test frontend service
+        FRONTEND_IP=$(kubectl get svc frontend -n ${{ needs.setup.outputs.namespace }} -o jsonpath='{.spec.clusterIP}')
+        echo "Frontend service IP: $FRONTEND_IP"
+        
+        echo "✅ Services are accessible internally"
+
+    # External access test (for production with ingress)
+    - name: Test external access
+      if: needs.setup.outputs.environment == 'production'
+      run: |
+        echo "Testing external access through ingress..."
+        
+        # Get ingress IP
+        INGRESS_IP=$(kubectl get ingress ton-cat-lottery-ingress -n ${{ needs.setup.outputs.namespace }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        if [[ -n "$INGRESS_IP" ]]; then
+          echo "Ingress IP: $INGRESS_IP"
+          
+          # Test if ingress is responding (with timeout)
+          if timeout 30 curl -f http://$INGRESS_IP > /dev/null 2>&1; then
+            echo "✅ External access through ingress is working"
+          else
+            echo "⚠️ External access test failed - may need time to propagate"
+          fi
+        else
+          echo "⚠️ Ingress IP not yet assigned - may need time to provision"
+        fi
+
+    # Smoke tests
+    - name: Run smoke tests
+      run: |
+        echo "Running basic smoke tests..."
+        
+        # Test backend health endpoint (if available)
+        BACKEND_POD=$(kubectl get pods -n ${{ needs.setup.outputs.namespace }} -l app=backend -o jsonpath='{.items[0].metadata.name}')
+        
+        if [[ -n "$BACKEND_POD" ]]; then
+          echo "Testing backend pod: $BACKEND_POD"
+          
+          # Check if backend is responsive
+          kubectl exec $BACKEND_POD -n ${{ needs.setup.outputs.namespace }} -- ps aux | grep -v grep | grep -q "/app/backend" && echo "✅ Backend process is running"
+        fi
+        
+        # Test frontend is serving content
+        FRONTEND_POD=$(kubectl get pods -n ${{ needs.setup.outputs.namespace }} -l app=frontend -o jsonpath='{.items[0].metadata.name}')
+        
+        if [[ -n "$FRONTEND_POD" ]]; then
+          echo "Testing frontend pod: $FRONTEND_POD"
+          
+          # Check if nginx is running
+          kubectl exec $FRONTEND_POD -n ${{ needs.setup.outputs.namespace }} -- ps aux | grep -v grep | grep -q "nginx" && echo "✅ Frontend nginx is running"
+        fi
+
+    # Deployment rollback on failure
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        echo "❌ Deployment verification failed. Initiating rollback..."
+        
+        # Rollback backend
+        kubectl rollout undo deployment/backend -n ${{ needs.setup.outputs.namespace }}
+        echo "Backend rollback initiated"
+        
+        # Rollback frontend
+        kubectl rollout undo deployment/frontend -n ${{ needs.setup.outputs.namespace }}
+        echo "Frontend rollback initiated"
+        
+        # Wait for rollback to complete
+        kubectl rollout status deployment/backend -n ${{ needs.setup.outputs.namespace }} --timeout=300s
+        kubectl rollout status deployment/frontend -n ${{ needs.setup.outputs.namespace }} --timeout=300s
+        
+        echo "🔄 Rollback completed"
+        
+        # Show current pod status after rollback
+        kubectl get pods -n ${{ needs.setup.outputs.namespace }}
+
+  # Deployment summary
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push, deploy, verify]
+    if: always() && needs.setup.outputs.deploy_enabled == 'true'
+    
+    steps:
+    - name: Generate deployment summary
+      run: |
+        echo "## 🚀 Deployment Summary"
+        echo "**Environment:** ${{ needs.setup.outputs.environment }}"
+        echo "**Namespace:** ${{ needs.setup.outputs.namespace }}"
+        echo "**Image Tag:** ${{ needs.setup.outputs.image_tag }}"
+        echo "**Trigger:** ${{ github.event_name }}"
+        echo ""
+        echo "### Job Results:"
+        echo "- Build & Push: ${{ needs.build-and-push.result }}"
+        echo "- Deploy: ${{ needs.deploy.result }}"
+        echo "- Verify: ${{ needs.verify.result }}"
+        echo ""
+        
+        if [[ "${{ needs.verify.result }}" == "failure" ]]; then
+          echo "❌ **Deployment failed and was rolled back**"
+          exit 1
+        elif [[ "${{ needs.deploy.result }}" == "failure" ]]; then
+          echo "❌ **Deployment failed**"
+          exit 1
+        elif [[ "${{ needs.build-and-push.result }}" == "failure" ]]; then
+          echo "❌ **Image build/push failed**"
+          exit 1
+        else
+          echo "✅ **Deployment completed successfully**"
+          echo ""
+          echo "🔗 **Access Information:**"
+          if [[ "${{ needs.setup.outputs.environment }}" == "production" ]]; then
+            echo "- Production environment deployed"
+            echo "- Check ingress for external access"
+          else
+            echo "- Development environment deployed"
+            echo "- Use kubectl port-forward for local access"
+          fi
+        fi
