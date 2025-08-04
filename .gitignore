@@ -110,3 +110,6 @@ go.work
 # Claude code
 CLAUDE.md
 *.drawio.bkp
+
+# terraform
+terraform-sa-key.json

@@ -371,20 +371,22 @@ docker compose up -d
   - [x] 建立專案 `ton-cat-lottery-dev`
   - [x] 設定計費帳戶與預算告警（$50/月 開發限制）
   
-- [ ] **本地開發工具安裝：**
-  - [ ] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
-  - [ ] 安裝 Terraform：`brew install terraform`
-  - [ ] 安裝 kubectl：`gcloud components install kubectl`
-  - [ ] 設定認證：`gcloud auth login`
+- [x] **本地開發工具安裝：**
+  - [x] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
+  - [x] 安裝 Terraform：`brew install terraform`
+  - [x] 安裝 kubectl：`gcloud components install kubectl`
+  - [x] 設定認證：`gcloud auth login`
+  - [x] 檢查專案列表：`gcloud projects list`
+  - [x] 設定專案：`gcloud config set project {PROJECT_NAME}`
   
-- [ ] **Terraform 服務帳戶設定：**
-  - [ ] 建立 Terraform 服務帳戶
-  - [ ] 分配 Terraform 服務帳戶必要權限：
+- [x] **Terraform 服務帳戶設定：**
+  - [x] 建立 Terraform 服務帳戶
+  - [x] 分配 Terraform 服務帳戶必要權限：
     - Project Editor
     - Kubernetes Engine Admin  
     - Service Account Admin
-  - [ ] 下載服務帳戶金鑰 JSON 檔案
-  - [ ] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
+  - [x] 下載服務帳戶金鑰 JSON 檔案
+  - [x] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
 
 ---
 #### 階段 3：基礎自動化部署
