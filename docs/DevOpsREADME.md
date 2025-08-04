@@ -79,503 +79,160 @@ docker system prune -a
 docker stats
 ```
 
-## GCP 
+## GCP 設定
 
-### 環境設置
+### 架構
+- **項目**: ton-cat-lottery-dev
+- **區域**: asia-east1 (台灣)
+- **服務**: GKE Autopilot、Artifact Registry、VPC 網路、靜態 IP
+
+### 內容簡介
+Google Cloud Platform 雲端基礎設施，使用 GKE Autopilot 叢集部署容器化應用，包含完整的網路設定和容器鏡像倉庫。
+
+### 指令
 ```bash
-# 設定認證
-gcloud auth login
+# 驗證 GCP 認證
+gcloud auth list
+gcloud config list project
 
-# 設定專案
-gcloud config set project ton-cat-lottery-dev
+# 連接到 GKE 叢集
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1 --project ton-cat-lottery-dev-468008
 
-# 安裝 kubectl
-gcloud components install kubectl
+# 查看叢集狀態
+gcloud container clusters describe ton-cat-lottery-cluster --region asia-east1
+
+# 推送容器鏡像到 Artifact Registry
+docker tag image-name asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery/image-name
+docker push asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery/image-name
+
+# 查看 Artifact Registry 倉庫
+gcloud artifacts repositories list
+gcloud artifacts docker images list asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery
 ```
 
-### GKE 叢集管理
-
-#### 建立 Autopilot GKE 叢集
+### 故障排除
 ```bash
-# 建立 Autopilot GKE 叢集（自動管理，成本低）
-gcloud container clusters create-auto ton-cat-lottery-cluster \
-    --region=asia-east1 \
-    --enable-autorepair \
-    --enable-autoupgrade
-
-# 取得叢集憑證（需等待 5-10 分鐘）
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region=asia-east1
-
-# 驗證連接
-kubectl cluster-info
-```
-
-#### 建構並推送 Docker 映像到 Google Container Registry
-```bash
-# 配置 Docker 認證
-gcloud auth configure-docker
-
-# 建構前端映像
-docker buildx build --platform linux/amd64 --target production \
-    -f docker/Dockerfile.frontend \
-    -t gcr.io/ton-cat-lottery-dev/frontend:latest .
-
-# 建構後端映像
-docker buildx build --platform linux/amd64 \
-    -f docker/Dockerfile.backend \
-    -t gcr.io/ton-cat-lottery-dev/backend:latest .
-
-# 推送映像到 GCR
-docker push gcr.io/ton-cat-lottery-dev/frontend:latest
-docker push gcr.io/ton-cat-lottery-dev/backend:latest
-```
-
-### 部署管理
-
-#### 部署應用到 GKE
-```bash
-# 應用 Kubernetes 配置
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/frontend-deployment.yaml
-kubectl apply -f k8s/services.yaml
-
-# 建立 LoadBalancer Service 取得外部 IP
-kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-```
-
-#### 域名與 SSL 設定（Cloudflare）
-```bash
-# 獲取外部 IP
-kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-
-# 檢查域名解析
-nslookup dev.yourdomain.com
-
-# 測試域名訪問
-curl -I https://dev.yourdomain.com
-```
-
-### 常用指令
-```bash
-# 查看 GCP 專案資訊
-gcloud config list
-gcloud projects list
-
-# 查看 GKE 叢集
-gcloud container clusters list
-gcloud container clusters describe ton-cat-lottery-cluster --region=asia-east1
-
-# 查看 Container Registry 中的映像
-gcloud container images list --repository=gcr.io/ton-cat-lottery-dev
-
-# 刪除映像
-gcloud container images delete gcr.io/ton-cat-lottery-dev/frontend:latest
-
-# 檢查 API 狀態
-gcloud services list --enabled
-
-# 叢集維護
-gcloud container clusters resize ton-cat-lottery-cluster --num-nodes 1 --region=asia-east1
-gcloud container clusters delete ton-cat-lottery-cluster --region=asia-east1
-```
-
-## k8s 
-
-### 常用指令
-
-```bash
-# 檢查叢集狀態
-kubectl get pods
-kubectl get services
-kubectl get deployments
-
-# 查看 Pod 日誌
-kubectl logs <pod-name>
-kubectl logs -f <pod-name>  # 即時追蹤日誌
-
-# 重新部署應用
-kubectl rollout restart deployment/frontend-deployment
-
-# 應用配置變更
-kubectl apply -f k8s/frontend-deployment.yaml
-
-# 建構並推送 Docker 映像
-docker buildx build --platform linux/amd64 --target production -f docker/Dockerfile.frontend -t gcr.io/ton-cat-lottery-dev/frontend:latest .
-docker push gcr.io/ton-cat-lottery-dev/frontend:latest
-
-# 檢查叢集資訊
-kubectl cluster-info
-kubectl get nodes
-
-# 進入 Pod 內部
-kubectl exec -it <pod-name> -- sh
-
-# Cloudflare 域名管理
-kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'  # 獲取外部 IP
-nslookup dev.yourdomain.com  # 檢查域名解析
-curl -I https://dev.yourdomain.com  # 測試域名訪問
-```
-
-## Terraform 基礎設施
-
-### 概述
-此目錄包含 TON Cat Lottery 專案的 Terraform 基礎設施即代碼配置，用於自動化部署 GCP 基礎設施。通過代碼管理基礎設施，實現版本控制和自動化部署。
-
-### 📋 基礎設施組件
-
-- **GKE Autopilot 叢集**: 自動管理的 Kubernetes 叢集
-- **VPC 網路**: 自定義虛擬私有網路與子網路
-- **IAM 服務帳戶**: GKE 和 Terraform 操作的服務帳戶
-- **防火牆規則**: 網路安全配置
-- **Container Registry**: Docker 映像儲存
-- **GCS 儲存桶**: Terraform 狀態檔案儲存
-
-### 已建立的文件結構
-```
-terraform/
-├── .gitignore              # 保護敏感資訊
-├── README.md               # 完整使用指南
-├── providers.tf            # Provider 與後端配置
-├── variables.tf            # 變數定義
-├── terraform.tfvars.example # 配置範例
-├── terraform.tfvars        # 實際配置檔案
-├── main.tf                 # 主要基礎設施配置
-└── outputs.tf              # 輸出值定義
-```
-
-### 🚀 快速開始
-
-#### 前置條件
-
-**設定 GCP 認證**:
-```bash
-gcloud auth login
-gcloud config set project ton-cat-lottery-dev
+# 檢查 GCP 權限
 gcloud auth application-default login
+gcloud projects get-iam-policy ton-cat-lottery-dev-468008
+
+# 檢查網路連接
+gcloud compute networks describe ton-cat-lottery-network
+gcloud compute addresses list --regions=asia-east1
+
+# 重新設定 kubectl context
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+kubectl config current-context
+
+# 查看服務帳號權限
+gcloud iam service-accounts list
+gcloud projects get-iam-policy ton-cat-lottery-dev-468008 --filter="bindings.members:serviceAccount:gke-ton-cat-lottery-cluster-sa@ton-cat-lottery-dev-468008.iam.gserviceaccount.com"
 ```
 
-#### 部署步驟
+## Terraform
 
-1. **複製配置檔案**:
-   ```bash
-   cd terraform
-   cp terraform.tfvars.example terraform.tfvars
-   ```
+### 架構
+- **提供者**: Google Cloud (hashicorp/google v5.45.2)
+- **資源數**: 24 個 (GKE、VPC、防火牆、IAM、Artifact Registry)
+- **狀態管理**: 本地 terraform.tfstate 檔案
 
-2. **編輯配置變數**:
-   ```bash
-   # 編輯 terraform.tfvars 檔案，設定正確的專案 ID 和區域
-   vim terraform.tfvars
-   ```
+### 內容簡介
+基礎設施即代碼 (IaC) 工具，自動化管理 GCP 資源的生命週期，包含 GKE Autopilot 叢集、網路設定、服務帳號和權限管理。
 
-3. **初始化 Terraform**:
-   ```bash
-   terraform init
-   ```
+### 檔案結構
+> Terraform 配置採用模組化設計，將基礎設施定義分散到多個檔案中便於管理和維護。
 
-4. **檢查執行計畫**:
-   ```bash
-   terraform plan
-   ```
+- **`main.tf`**: 主要資源定義檔案
+  - GKE Autopilot 叢集配置 (enable_autopilot = true)
+  - VPC 網路和子網路設定 (10.0.0.0/24, pods: 10.1.0.0/16, services: 10.2.0.0/16)
+  - 防火牆規則 (HTTP/HTTPS, SSH, 內部流量)
+  - 靜態 IP 和 Artifact Registry 倉庫
+  - 服務帳號和 IAM 角色綁定
+  - Google Cloud APIs 啟用
 
-5. **套用基礎設施 (基礎設施層)**:
-   ```bash
-   terraform apply
-   ```
-  - 創建 GCP 雲端資源
-  - 設定網路和安全規則
-  - 準備 Kubernetes 叢集環境
+- **`variables.tf`**: 輸入變數定義
+  - 專案 ID、區域、叢集名稱等可配置參數
+  - 網路 CIDR 範圍和節點規格設定
+  - 預設值設定 (asia-east1, e2-standard-2)
 
+- **`outputs.tf`**: 輸出值定義
+  - 叢集連線資訊 (endpoint, CA certificate)
+  - Docker 倉庫 URL 和 kubectl 連線指令
+  - 網路和 IP 資源資訊
 
-6. **配置 kubectl (應用程式層)**:
-   ```bash
-   # 使用輸出的指令配置 kubectl
-   gcloud container clusters get-credentials ton-cat-lottery-cluster \
-     --location asia-east1 \
-     --project ton-cat-lottery-dev
-   ```
-  - 部署你的應用程式容器
-  - 配置服務和負載均衡
-  - 管理應用程式生命週期
+- **`versions.tf`**: 提供者版本約束
+  - Terraform 版本要求 (>= 1.0)
+  - Google 提供者版本約束 (~> 5.0)
+  - 提供者配置 (專案、區域設定)
 
-### 📝 重要注意事項
+- **`terraform.tfvars`**: 實際配置值
+  - 生產環境具體參數設定
+  - 專案 ID: ton-cat-lottery-dev-468008
+  - 叢集和網路命名約定
 
-#### 狀態檔案管理
+- **`terraform.tfvars.example`**: 配置範例檔案
+  - 新環境部署的參考模板
+  - 敏感資訊的佔位符說明
 
-- **初次部署**: 使用本地狀態檔案
-- **團隊協作**: 建議使用 GCS 後端儲存狀態檔案
-
-啟用 GCS 後端:
-1. 註解掉 `providers.tf` 中的 backend 區塊進行初次部署
-2. 部署完成後，取消註解 backend 配置
-3. 執行 `terraform init` 遷移狀態到 GCS
-
-#### 成本控制
-
-- **GKE Autopilot**: 按使用量計費，自動優化成本
-- **開發環境**: 建議設定預算告警 ($50/月)
-- **生產環境**: 根據實際需求調整資源配置
-
-#### 安全考量
-
-- **.gitignore**: 已配置忽略敏感檔案
-- **IAM 權限**: 遵循最小權限原則
-- **網路安全**: 配置適當的防火牆規則
-
-### 🔧 常用指令
-
+### 指令
 ```bash
-# 檢查基礎設施狀態
-terraform show
+# 初始化 Terraform
+terraform init
 
-# 查看輸出值
+# 檢查部署計畫
+terraform plan
+
+# 執行部署
+terraform apply
+
+# 查看部署狀態
+terraform show
 terraform output
 
-# 更新基礎設施
-terraform plan && terraform apply
+# 查看特定輸出
+terraform output cluster_name
+terraform output static_ip_address
+terraform output kubectl_connection_command
 
-# 銷毀基礎設施
+# 檢查資源變更
+terraform plan -detailed-exitcode
+
+# 銷毀所有資源 (謹慎使用)
 terraform destroy
+```
 
-# 格式化代碼
+### 故障排除
+```bash
+# 驗證 Terraform 配置
+terraform validate
 terraform fmt
 
-# 驗證配置
-terraform validate
+# 重新整理狀態
+terraform refresh
 
-# 切換工作空間（環境）
-terraform workspace new dev
-terraform workspace select dev
-terraform workspace list
+# 匯入現有資源 (如果狀態不同步)
+terraform import google_container_cluster.primary projects/ton-cat-lottery-dev-468008/locations/asia-east1/clusters/ton-cat-lottery-cluster
+
+# 檢查 Terraform 版本
+terraform version
+
+# 除錯模式
+export TF_LOG=DEBUG
+terraform plan
+
+# 解決狀態鎖定問題
+terraform force-unlock LOCK_ID
+
+# 檢查提供者版本
+terraform providers
 ```
 
-### 📊 輸出資訊
 
-部署完成後，Terraform 會輸出以下重要資訊：
+## GKE (k8s on GCP) 
 
-- **叢集連接指令**: kubectl 配置指令
-- **Container Registry URL**: Docker 映像推送地址  
-- **服務帳戶**: 各種操作所需的服務帳戶信息
-- **網路配置**: VPC 和子網路詳細資訊
 
-### 🔄 與現有 K8s 配置整合
+## GitHub Action (CI/CD)
 
-部署完成後，可以使用現有的 Kubernetes manifests:
+### CI
 
-```bash
-# 部署應用程式
-kubectl apply -f ../k8s/backend-deployment.yaml
-kubectl apply -f ../k8s/frontend-deployment.yaml
-
-# 檢查服務狀態
-kubectl get pods
-kubectl get services
-```
-
-### 🐛 故障排除
-
-#### 常見問題
-
-1. **API 未啟用錯誤**:
-   ```bash
-   gcloud services enable container.googleapis.com
-   gcloud services enable compute.googleapis.com
-   ```
-
-2. **權限不足錯誤**:
-   ```bash
-   # 確保帳戶有足夠權限
-   gcloud projects add-iam-policy-binding PROJECT_ID \
-     --member="user:your-email@gmail.com" \
-     --role="roles/owner"
-   ```
-
-3. **配額不足錯誤**:
-   - 檢查 GCP 配額限制
-   - 申請增加配額或更換區域
-
-#### 清理資源
-
-⚠️ **注意**: 此操作會刪除所有基礎設施資源
-
-```bash
-terraform destroy
-```
-
-### 📚 進階配置
-
-#### 多環境部署
-
-建議為不同環境建立獨立的 Terraform 工作區：
-
-```bash
-# 建立工作區
-terraform workspace new staging
-terraform workspace new production
-
-# 切換工作區
-terraform workspace select development
-```
-
-## GitHub Actions CI/CD 自動化
-
-### 概述
-實現從代碼提交到生產部署的完全自動化流程，包括測試、建構、部署多個環境。
-
-### CI/CD 流程設計
-
-#### 1. 觸發條件
-- **Pull Request**: 執行測試和建構驗證
-- **Push to main**: 自動部署到 staging 環境
-- **Release Tag**: 自動部署到 production 環境
-- **手動觸發**: 支援手動部署任何分支到指定環境
-
-#### 2. 工作流程階段
-```
-Code Push → Tests → Build → Security Scan → Deploy to Dev → Integration Tests → Deploy to Staging → Manual Approval → Deploy to Production
-```
-
-### 待建立的 GitHub Actions 工作流程
-
-#### 1. 測試工作流程 (.github/workflows/test.yml)
-```yaml
-name: Tests
-on: [push, pull_request]
-jobs:
-  frontend-test:
-    # React 應用測試
-  backend-test:
-    # Go 應用測試
-  contract-test:
-    # Smart Contract 測試
-```
-
-#### 2. 建構和部署工作流程 (.github/workflows/deploy.yml)
-```yaml
-name: Build and Deploy
-on:
-  push:
-    branches: [main]
-  release:
-    types: [published]
-jobs:
-  build:
-    # Docker 映像建構
-  deploy-dev:
-    # 部署到開發環境
-  deploy-staging:
-    # 部署到測試環境
-  deploy-prod:
-    # 部署到生產環境（需要手動批准）
-```
-
-#### 3. 基礎設施工作流程 (.github/workflows/infrastructure.yml)
-```yaml
-name: Infrastructure
-on:
-  push:
-    paths: ['terraform/**']
-jobs:
-  terraform-plan:
-    # Terraform 計劃檢查
-  terraform-apply:
-    # 應用基礎設施變更
-```
-
-### 環境管理策略
-
-#### 多環境配置
-- **Development**: 自動部署，用於開發測試
-- **Staging**: 自動部署，用於集成測試
-- **Production**: 手動批准部署，用於正式環境
-
-#### 秘密管理
-```bash
-# GitHub Secrets 需要設置：
-GCP_PROJECT_ID          # GCP 專案 ID
-GCP_SA_KEY              # 服務帳戶金鑰
-REGISTRY_URL            # Container Registry URL
-KUBE_CONFIG             # Kubernetes 配置
-CLOUDFLARE_API_TOKEN    # Cloudflare API Token
-```
-
-### 建立工作流程的步驟
-
-#### 1. 設置 GitHub Secrets
-```bash
-# 在 GitHub Repository Settings > Secrets 中添加：
-# - GCP_PROJECT_ID: ton-cat-lottery-dev
-# - GCP_SA_KEY: (服務帳戶 JSON 內容)
-# - 其他必要的秘密
-```
-
-#### 2. 創建工作流程文件
-```bash
-mkdir -p .github/workflows
-# 創建各種工作流程 YAML 文件
-```
-
-#### 3. 設置分支保護規則
-```bash
-# 在 GitHub Settings > Branches 設置：
-# - 要求 PR 審查
-# - 要求狀態檢查通過
-# - 限制推送到 main 分支
-```
-
-### 監控和通知
-- **建構狀態**: GitHub Actions 狀態徽章
-- **部署通知**: Slack/Discord 整合
-- **錯誤警報**: 自動通知相關人員
-- **性能監控**: 整合 Prometheus 監控
-
-## Terraform + GitHub Actions 整合最佳實踐
-
-### 1. 基礎設施即代碼原則
-- 所有基礎設施變更都通過 Terraform
-- 使用 Git 管理基礎設施版本
-- 實施代碼審查流程
-
-### 2. 安全性最佳實踐
-- 使用最小權限原則
-- 敏感資料使用 GitHub Secrets
-- 定期輪換存取金鑰
-- 實施資源標籤和成本控制
-
-### 3. 部署策略
-- 藍綠部署減少停機時間
-- 金絲雀部署降低風險
-- 自動回滾機制
-- 健康檢查和監控
-
-### 4. 成本控制
-- 自動清理測試環境
-- 資源使用監控和警報
-- 定期檢查未使用資源
-- 實施資源配額限制
-
-## 實施計劃
-
-### 階段 1: Terraform 基礎設施設置
-1. 建立 Terraform 配置文件
-2. 設置遠端狀態管理
-3. 創建開發環境基礎設施
-4. 驗證和測試
-
-### 階段 2: GitHub Actions CI/CD
-1. 設置基本測試工作流程
-2. 實施建構和部署管道
-3. 配置多環境部署
-4. 整合安全掃描
-
-### 階段 3: 整合和優化
-1. 整合 Terraform 到 CI/CD
-2. 實施監控和警報
-3. 優化性能和成本
-4. 文檔和培訓
-
-### 後續維護
-- 定期更新依賴項
-- 監控資源使用和成本
-- 檢查和改進安全配置
-- 持續優化部署流程
+### CD

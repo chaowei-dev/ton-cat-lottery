@@ -396,9 +396,9 @@ docker compose up -d
 
 ##### **Terraform 基礎設施即代碼：**
 
-- [ ] 建立 `terraform/` 目錄結構
+- [x] 建立 `terraform/` 目錄結構
 
-- [ ] **GCP API 啟用 Checklist：**
+- [x] **GCP API 啟用 Checklist：**
   > 需要啟用的服務許可
   1. **計算與容器服務**
       ```
@@ -425,7 +425,7 @@ docker compose up -d
       dns.googleapis.com                 # Cloud DNS API (如果使用 Cloud DNS)
       ```
 
-- [ ] **Terraform 資源建立 Checklist：**
+- [x] **Terraform 資源建立 Checklist：**
   > 實際要建立的雲端資源
 
   |         Terraform Resource         |     內容     |
@@ -440,18 +440,22 @@ docker compose up -d
   | google_project_iam_member          | IAM 權限設定 |
   | google_service_account             | GKE 節點服務帳戶 |
 
-- [ ] **創建主要配置檔案：**
-  - [ ] `main.tf` - 主要資源定義
-  - [ ] `variables.tf` - 變數定義
-  - [ ] `outputs.tf` - 輸出值（叢集端點、IP 等）
-  - [ ] `versions.tf` - Provider 版本鎖定
-  - [ ] `terraform.tfvars` - 實際變數值
+- [x] **創建主要配置檔案：**
+  - [x] `main.tf` - 主要資源定義
+  - [x] `variables.tf` - 變數定義
+  - [x] `outputs.tf` - 輸出值（叢集端點、IP 等）
+  - [x] `versions.tf` - Provider 版本鎖定
+  - [x] `terraform.tfvars` - 實際變數值
+    - [x] 先建立 `terraform.tfvars.example`
+    - [x] 再 `cp terraform.tfvars.example terraform.tfvars`
+    - [x] 最後，把 GCP Project ID 填入 `terraform.tfvars`
 
-- [ ] **測試 Terraform 流程：**
-  - [ ] `terraform init` - 初始化
-  - [ ] `terraform plan` - 檢查部署計畫
-  - [ ] `terraform apply` - 執行部署
-  - [ ] **驗證**：確保 Terraform 可以完整建立/刪除 GKE 環境
+- [x] **測試 Terraform 流程：**
+  - [x] `terraform init` - 初始化
+  - [x] `terraform plan` - 檢查部署計畫
+  - [x] `terraform apply` - 執行部署
+  - [x] **驗證**：確保 Terraform 可以完整建立/刪除 GKE 環境
+  - [x] 最後整理 terraform 的 `.gitignore`
 
 ##### **K8s 應用部署準備（手動驗證一次）：**
 
