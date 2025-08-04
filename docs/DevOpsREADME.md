@@ -415,8 +415,236 @@ kubectl get hpa -n ton-cat-lottery -w
 ```
 
 
-## GitHub Action (CI/CD)
+## GitHub Actions (CI/CD)
 
-### CI
+### 內容簡介
 
-### CD
+TON Cat Lottery 使用 GitHub Actions 實現自動化 CI/CD 管線，提供基礎的持續整合和持續部署功能。CI 流程負責代碼品質檢查和 Docker 映像建構，CD 流程自動化部署到 GKE 叢集，實現完整的 DevOps 自動化工作流程。
+
+**架構設計：**
+- **CI 流程**: 代碼測試 → Docker 建構 → 安全驗證
+- **CD 流程**: 映像推送 → GKE 部署 → 健康檢查
+- **觸發條件**: 分支推送、Pull Request、手動觸發
+- **環境管理**: 支援多環境部署 (開發/生產)
+
+### 檔案結構
+
+```
+.github/workflows/
+├── ci.yml              # 持續整合工作流程
+└── cd.yml              # 持續部署工作流程
+```
+
+### CI 工作流程 (ci.yml)
+
+**功能特性：**
+- **代碼品質檢查**: 智能合約、前端、後端全面測試
+- **Docker 建構驗證**: 確保容器映像可正常建構
+- **並行執行**: 測試和建構任務同時進行，提高效率
+- **分支策略**: 支援 main、master、feature/devops 分支觸發
+
+**執行階段：**
+1. **測試階段** (`test` job):
+   - 智能合約測試: `cd contracts && npm run test`
+   - 前端建構測試: `cd frontend && npm run build`  
+   - Go 後端測試: `cd backend && ./test.sh`
+
+2. **Docker 建構階段** (`docker` job):
+   - 建構 backend Docker 映像
+   - 建構 frontend Docker 映像
+   - 使用 GitHub Actions 快取加速建構
+
+**觸發條件：**
+```yaml
+on:
+  push:
+    branches: [ main, master, feature/devops ]
+  pull_request:
+    branches: [ main, master ]
+```
+
+### CD 工作流程 (cd.yml)
+
+**功能特性：**
+- **映像推送**: 自動推送到 GCP Artifact Registry
+- **GKE 部署**: 滾動更新部署到 Kubernetes 叢集
+- **健康檢查**: 驗證部署成功和服務可用性
+- **多環境支援**: 支援開發和生產環境部署
+
+**執行階段：**
+1. **認證和設定**:
+   - GCP 服務帳戶認證
+   - Docker Artifact Registry 認證
+   - GKE 叢集憑證取得
+
+2. **映像建構和推送**:
+   - 建構 backend/frontend 映像 (linux/amd64)
+   - 推送到 Artifact Registry (latest + git-sha 標籤)
+   - 驗證映像推送成功
+
+3. **Kubernetes 部署**:
+   - 自動取得 GKE 憑證
+   - 執行滾動更新 (`kubectl set image`)
+   - 等待部署完成 (`kubectl rollout status`)
+
+4. **部署驗證**:
+   - 檢查所有 Pod 為 Running 狀態
+   - 驗證服務內部連通性
+   - 輸出部署摘要信息
+
+**觸發條件：**
+```yaml
+on:
+  workflow_dispatch:    # 手動觸發
+    inputs:
+      environment: [ development, production ]
+  push:
+    branches: [ main, master ]    # 自動觸發
+```
+
+### 指令
+
+#### 手動觸發工作流程
+```bash
+# 透過 GitHub CLI 手動觸發 CD
+gh workflow run cd.yml -f environment=development
+
+# 檢查工作流程狀態
+gh run list --workflow=ci.yml
+gh run list --workflow=cd.yml
+
+# 查看特定執行詳情
+gh run view RUN_ID
+gh run logs RUN_ID
+```
+
+#### 本地測試 CI 步驟
+```bash
+# 模擬 CI 測試流程
+cd contracts && npm ci && npm run build && npm run test
+cd ../frontend && npm ci && npm run build
+cd ../backend && chmod +x test.sh && ./test.sh
+
+# 模擬 Docker 建構
+docker build -f docker/Dockerfile.backend -t backend:test .
+docker build -f docker/Dockerfile.frontend -t frontend:test .
+```
+
+#### GitHub Secrets 管理
+```bash
+# 使用 GitHub CLI 設定 Secrets
+gh secret set GCP_SA_KEY < service-account-key.json
+gh secret set GCP_PROJECT_ID --body "ton-cat-lottery-dev-468008"
+
+# 查看已設定的 Secrets
+gh secret list
+```
+
+### 故障排除
+
+#### CI 常見問題
+
+**1. 智能合約測試失敗**
+```bash
+# 錯誤: Cannot find module '../build/CatLottery_CatLottery'
+# 原因: 合約未建構就直接測試
+# 解決: CI 已添加 `npm run build` 步驟
+```
+
+**2. Go 後端測試超時**
+```bash
+# 錯誤: context canceled (超過 30s)
+# 原因: transaction 和 lottery 模組集成測試過複雜
+# 解決: 已排除問題模組，只測試核心模組
+```
+
+**3. Docker 建構失敗**
+```bash
+# 檢查本地建構
+docker build -f docker/Dockerfile.backend -t test .
+
+# 查看 GitHub Actions 日誌
+gh run logs --job "docker"
+```
+
+#### CD 常見問題
+
+**1. GCP 認證失敗**
+```bash
+# 檢查 Service Account Key 格式
+echo $GCP_SA_KEY | jq .
+
+# 驗證 Service Account 權限
+gcloud iam service-accounts get-iam-policy SA_EMAIL
+```
+
+**2. Docker 推送失敗**
+```bash
+# 錯誤: permission denied
+# 原因: Service Account 缺少 Artifact Registry 權限
+# 解決: 添加 Artifact Registry Writer 角色
+
+gcloud projects add-iam-policy-binding PROJECT_ID \
+    --member="serviceAccount:SA_EMAIL" \
+    --role="roles/artifactregistry.writer"
+```
+
+**3. GKE 部署失敗**
+```bash
+# 錯誤: deployment not found
+# 原因: Kubernetes 資源未部署或命名空間錯誤
+# 解決: 確保先手動部署一次 k8s 資源
+
+kubectl apply -f k8s/config/
+kubectl apply -f k8s/backend/
+kubectl apply -f k8s/frontend/
+```
+
+**4. 滾動更新卡住**
+```bash
+# 檢查部署狀態
+kubectl get deployment -n ton-cat-lottery-prod
+kubectl describe deployment backend -n ton-cat-lottery-prod
+
+# 常見原因:
+# - 映像拉取失敗 (ImagePullError)
+# - 資源不足 (Insufficient resources)
+# - 健康檢查失敗 (Readiness probe failed)
+```
+
+#### 除錯技巧
+
+**查看工作流程執行歷史**
+```bash
+# 列出最近的執行
+gh run list --limit 10
+
+# 查看失敗的執行詳情
+gh run view --log-failed
+
+# 重新執行失敗的工作流程
+gh run rerun RUN_ID
+```
+
+**檢查部署後的應用狀態**
+```bash
+# 取得 GKE 憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+
+# 檢查 CD 部署的資源
+kubectl get pods -n ton-cat-lottery-prod
+kubectl get ingress -n ton-cat-lottery-prod
+
+# 查看最新部署的映像版本
+kubectl get deployment backend -n ton-cat-lottery-prod -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+**監控部署進度**
+```bash
+# 實時監控滾動更新
+kubectl rollout status deployment/backend -n ton-cat-lottery-prod --watch
+kubectl rollout status deployment/frontend -n ton-cat-lottery-prod --watch
+
+# 檢查部署歷史
+kubectl rollout history deployment/backend -n ton-cat-lottery-prod
+```

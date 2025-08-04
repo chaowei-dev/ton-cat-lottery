@@ -519,80 +519,80 @@ docker compose up -d
 
 ##### **GitHub Actions CI/CD：**
 
-- [ ] **準備階段：**
-  - [ ] 建立 `.github/workflows/` 目錄結構
-  - [ ] 建立 `.github/` 相關的 `.gitignore` 規則
-  - [ ] 準備工作流程模板檔案
+###### **基礎流程 (必要)：基本 DevOps**
 
-- [ ] **CI 工作流程建立 (`ci.yml`)：**
-  - [ ] **代碼品質檢查：**
-    - [ ] 設定多 Node.js 版本矩陣測試 (18.x, 20.x, 22.x)
-    - [ ] 智能合約測試：`cd contracts && npm run test`
-    - [ ] 前端 Lint 檢查：`cd frontend && npm run lint`
-    - [ ] 前端建構測試：`cd frontend && npm run build`
-    - [ ] Go 後端測試：`cd backend && ./test.sh`
-    - [ ] Go 後端 Lint 檢查：`cd backend && golangci-lint run`
-  
-  - [ ] **安全性掃描：**
-    - [ ] 整合 Trivy 容器映像漏洞掃描
-    - [ ] 添加 npm audit 檢查 (frontend/contracts)
-    - [ ] 添加 Go 依賴安全掃描：`govulncheck`
-    - [ ] 設定安全掃描失敗閾值
-  
-  - [ ] **Docker 映像建構與測試：**
-    - [ ] 建構 backend Docker 映像 (多架構 linux/amd64)
-    - [ ] 建構 frontend Docker 映像 (多架構 linux/amd64)
-    - [ ] 映像安全掃描：`trivy image`
-    - [ ] 映像大小優化檢查
-    - [ ] **驗證映像功能性**：容器啟動測試
+- [x] **準備階段：**
+  - [x] 建立 `.github/workflows/` 目錄結構
+  - [x] 建立 `.github/` 相關的 `.gitignore` 規則
+  - [x] 準備工作流程模板檔案
 
-- [ ] **CD 工作流程建立 (`cd.yml`)：**
-  - [ ] **觸發條件設定：**
-    - [ ] `main` 分支推送自動部署到生產環境
-    - [ ] `develop` 分支推送自動部署到開發環境
-    - [ ] 手動觸發部署選項 (workflow_dispatch)
-    - [ ] 版本標籤 (git tag) 觸發穩定版部署
+- [x] **基礎 CI 工作流程 (`ci.yml`)：**
+  - [x] **核心代碼品質檢查：**
+    - [x] 智能合約測試：`cd contracts && npm run test`
+    - [x] 前端建構測試：`cd frontend && npm run build`
+    - [x] Go 後端測試：`cd backend && ./test.sh`
   
-  - [ ] **映像推送到 Artifact Registry：**
-    - [ ] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
-    - [ ] 配置 Docker 認證：`gcloud auth configure-docker asia-east1-docker.pkg.dev`
-    - [ ] 推送 backend 映像：標籤策略 (latest, git-sha, version)
-    - [ ] 推送 frontend 映像：標籤策略 (latest, git-sha, version)
-    - [ ] **驗證映像推送成功**：檢查 Artifact Registry
-  
-  - [ ] **GKE 部署自動化：**
-    - [ ] 取得 GKE 憑證：`gcloud container clusters get-credentials`
-    - [ ] 更新 K8s ConfigMap 配置 (環境變數)
-    - [ ] 更新 K8s Secret 配置 (敏感資訊)
-    - [ ] 執行滾動更新：`kubectl set image deployment/backend backend=NEW_IMAGE`
-    - [ ] 執行滾動更新：`kubectl set image deployment/frontend frontend=NEW_IMAGE`
-    - [ ] **等待部署完成**：`kubectl rollout status deployment/backend`
-  
-  - [ ] **部署後驗證：**
-    - [ ] 健康檢查：驗證所有 Pod 為 Running 狀態
-    - [ ] 服務連通性測試：內部服務通信檢查
-    - [ ] 外部訪問測試：通過 Ingress 訪問應用
-    - [ ] 煙霧測試：基礎功能驗證 (API 端點檢查)
-    - [ ] **部署失敗自動回滾**：`kubectl rollout undo deployment/SERVICE`
+  - [x] **基礎 Docker 建構：**
+    - [x] 建構 backend Docker 映像
+    - [x] 建構 frontend Docker 映像
+    - [x] 驗證映像建構成功
 
-- [ ] **GitHub Secrets 配置 Checklist：**
-  > 在 GitHub Repository → Settings → Secrets and variables → Actions 中添加
+- [x] **基礎 CD 工作流程 (`cd.yml`)：**
+  - [x] **簡單觸發條件：**
+    - [x] 手動觸發部署選項 (workflow_dispatch)
+    - [x] `main` 分支推送自動部署
   
-  - [ ] **GCP 認證相關：**
-    - [ ] `GCP_SA_KEY`：Terraform 服務帳戶的 JSON 金鑰 (base64 編碼)
-    - [ ] `GCP_PROJECT_ID`：GCP 專案 ID (`ton-cat-lottery-dev`)
-    - [ ] `GCP_REGISTRY_URL`：Artifact Registry URL (`asia-east1-docker.pkg.dev`)
+  - [x] **映像推送到 Artifact Registry：**
+    - [x] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
+    - [x] 配置 Docker 認證：`gcloud auth configure-docker`
+    - [x] 推送 backend 映像：基礎標籤策略 (latest, git-sha)
+    - [x] 推送 frontend 映像：基礎標籤策略 (latest, git-sha)
+    - [x] **驗證映像推送成功**：檢查 Artifact Registry
   
-  - [ ] **GKE 叢集相關：**
-    - [ ] `GKE_CLUSTER_NAME`：GKE 叢集名稱 (`ton-cat-lottery-cluster`)
-    - [ ] `GKE_CLUSTER_REGION`：GKE 叢集區域 (`asia-east1`)
-    - [ ] `GKE_NAMESPACE`：K8s 命名空間 (`ton-cat-lottery`)
+  - [x] **基礎 GKE 部署：**
+    - [x] 取得 GKE 憑證：`gcloud container clusters get-credentials`
+    - [x] 執行滾動更新：`kubectl set image deployment/backend`
+    - [x] 執行滾動更新：`kubectl set image deployment/frontend`
+    - [x] **等待部署完成**：`kubectl rollout status`
   
-  - [ ] **應用程式相關：**
-    - [ ] `LOTTERY_CONTRACT_ADDRESS`：智能合約地址
-    - [ ] `NFT_CONTRACT_ADDRESS`：NFT 合約地址
-    - [ ] `WALLET_PRIVATE_KEY`：後端錢包私鑰 (用於自動抽獎)
-    - [ ] `TON_NETWORK`：TON 網路環境 (`testnet` 或 `mainnet`)
+  - [x] **基礎部署驗證：**
+    - [x] 健康檢查：驗證所有 Pod 為 Running 狀態
+    - [x] 服務連通性測試：內部服務通信檢查
+
+- [x] **GitHub Secrets 配置：**
+  - [x] `GCP_SA_KEY`：Terraform 服務帳戶的 JSON 金鑰
+  - [x] `GCP_PROJECT_ID`：GCP 專案 ID
+  
+###### **進階流程 (可選)：企業級 DevOps 特性**
+
+- [ ] **進階 CI 功能：**
+  - [ ] 多 Node.js 版本矩陣測試 (18.x, 20.x, 22.x)
+  - [ ] 前端 Lint 檢查：`npm run lint`
+  - [ ] Go 後端 Lint 檢查：`golangci-lint run`
+  - [ ] 安全性掃描：Trivy 容器映像漏洞掃描
+  - [ ] 依賴安全掃描：npm audit, govulncheck
+  - [ ] 映像大小優化檢查
+  - [ ] 容器功能性測試
+
+- [ ] **進階 CD 功能：**
+  - [ ] 多環境部署策略 (develop→開發環境, main→生產環境)
+  - [ ] 版本標籤 (git tag) 觸發穩定版部署
+  - [ ] 動態環境配置 (ConfigMap/Secret 管理)
+  - [ ] 外部訪問測試：通過 Ingress 訪問應用
+  - [ ] 煙霧測試：基礎功能驗證 (API 端點檢查)
+  - [ ] **自動回滾機制**：`kubectl rollout undo deployment/SERVICE`
+
+- [ ] **企業級監控與通知：**
+  - [ ] GitHub Environment Protection (生產環境手動審批)
+  - [ ] 部署成功/失敗通知機制
+  - [ ] 集成執行時間監控
+  - [ ] 部署頻率和成功率統計
+
+- [ ] **額外應用程式 Secrets (按需設定)：**
+  - [ ] `LOTTERY_CONTRACT_ADDRESS`：智能合約地址
+  - [ ] `NFT_CONTRACT_ADDRESS`：NFT 合約地址
+  - [ ] `WALLET_PRIVATE_KEY`：後端錢包私鑰
+  - [ ] `TON_NETWORK`：TON 網路環境
 
 - [ ] **工作流程進階配置：**
   - [ ] **條件部署策略：**
