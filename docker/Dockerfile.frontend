@@ -62,11 +62,16 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # 複製 nginx 配置
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# 設置正確的權限
+# 設置正確的權限並創建必要的目錄
 RUN chown -R frontend:frontend /usr/share/nginx/html && \
+    mkdir -p /var/cache/nginx/client_temp /var/cache/nginx/proxy_temp \
+             /var/cache/nginx/fastcgi_temp /var/cache/nginx/uwsgi_temp \
+             /var/cache/nginx/scgi_temp && \
     chown -R frontend:frontend /var/cache/nginx && \
     chown -R frontend:frontend /var/run && \
-    chown -R frontend:frontend /var/log/nginx
+    chown -R frontend:frontend /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown frontend:frontend /var/run/nginx.pid
 
 # 暴露端口
 EXPOSE 80

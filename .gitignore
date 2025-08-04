@@ -138,3 +138,10 @@ crash.*.log
 # Terraform CLI configuration files
 .terraformrc
 terraform.rc
+
+# Kubernetes sensitive files and configurations
+k8s/config/*secrets*.yaml
+k8s/config/*secret*.yaml
+k8s/**/secrets/
+*.kubeconfig
+*-kubeconfig.yaml

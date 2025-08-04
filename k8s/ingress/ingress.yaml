@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ton-cat-lottery-ingress
+  namespace: ton-cat-lottery
+  labels:
+    app: ton-cat-lottery
+    component: ingress
+  annotations:
+    # 使用 GKE Ingress Controller
+    kubernetes.io/ingress.class: "gce"
+    # 自動配置 SSL 證書 (如果有域名)
+    # kubernetes.io/ingress.allow-http: "false"
+    # ingress.gcp.kubernetes.io/managed-certificates: "ton-cat-lottery-ssl-cert"
+    # 暫時移除靜態 IP 配置，讓 GKE 自動分配
+    # kubernetes.io/ingress.global-static-ip-name: "ton-cat-lottery-cluster-static-ip"
+    # 健康檢查配置
+    ingress.gcp.kubernetes.io/backend-config: '{"default": "frontend-backend-config"}'
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: frontend-backend-config
+  namespace: ton-cat-lottery
+spec:
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /
+    port: 80

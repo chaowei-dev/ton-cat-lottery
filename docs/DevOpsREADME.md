@@ -228,7 +228,191 @@ terraform providers
 ```
 
 
-## GKE (k8s on GCP) 
+## k8s (GKE)
+
+### 內容簡介
+
+TON Cat Lottery 使用 Google Kubernetes Engine (GKE) Autopilot 進行容器化部署，包含 backend 和 frontend 兩個主要服務。系統採用 ConfigMap/Secret 管理配置，支援自動擴縮容 (HPA)、網路策略隔離和 Ingress 外部訪問。
+
+**部署架構：**
+- **Backend**: Go 守護進程，監控 TON 區塊鏈並自動觸發抽獎
+- **Frontend**: React 應用，使用 nginx 提供靜態檔案服務
+- **Network**: NetworkPolicy 隔離，ClusterIP + Ingress 外部訪問
+- **Scaling**: HPA 根據 CPU/Memory 自動擴縮容
+
+### 檔案結構
+
+```
+k8s/
+├── config/
+│   ├── namespace.yaml          # 命名空間定義
+│   ├── backend-config.yaml     # Backend 環境變數 ConfigMap
+│   ├── backend-secrets.yaml    # Backend 敏感資訊 Secret (已加入 .gitignore)
+│   ├── frontend-config.yaml    # Frontend 環境變數 ConfigMap
+│   └── networkpolicy.yaml      # 網路安全策略
+├── backend/
+│   ├── deployment.yaml         # Backend 部署配置 (2-5 replicas)
+│   ├── service.yaml            # Backend ClusterIP 服務
+│   └── hpa.yaml                # Backend 自動擴縮容 (CPU/Memory)
+├── frontend/
+│   ├── deployment.yaml         # Frontend 部署配置 (2-10 replicas)
+│   ├── service.yaml            # Frontend ClusterIP 服務
+│   └── hpa.yaml                # Frontend 自動擴縮容 (CPU/Memory)
+└── ingress/
+    └── ingress.yaml            # GKE Ingress + BackendConfig
+```
+
+### 指令
+
+#### 基礎部署
+```bash
+# 取得 GKE 叢集憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+
+# 完整部署流程
+kubectl apply -f k8s/config/namespace.yaml
+kubectl apply -f k8s/config/
+kubectl apply -f k8s/backend/
+kubectl apply -f k8s/frontend/
+kubectl apply -f k8s/ingress/
+```
+
+#### 建構和推送映像 (重要: 支援 x86_64)
+```bash
+# 設定多架構建構支援
+docker buildx create --use --name multiarch
+
+# 建構 backend (x86_64) 並推送
+docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest --push .
+
+# 建構 frontend (x86_64) 並推送
+docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend --target production \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest --push .
+
+# 驗證映像架構
+docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest
+```
+
+#### 監控和管理
+```bash
+# 檢查應用狀態
+kubectl get pods -n ton-cat-lottery
+kubectl get svc -n ton-cat-lottery
+kubectl get ingress -n ton-cat-lottery
+
+# 檢查 HPA 狀態
+kubectl get hpa -n ton-cat-lottery
+
+# 查看日誌
+kubectl logs -n ton-cat-lottery -l app=backend --tail=50 -f
+kubectl logs -n ton-cat-lottery -l app=frontend --tail=50
+
+# 重新啟動部署
+kubectl rollout restart deployment/backend-deployment -n ton-cat-lottery
+kubectl rollout restart deployment/frontend-deployment -n ton-cat-lottery
+
+# 擴縮容測試
+kubectl scale deployment backend-deployment --replicas=3 -n ton-cat-lottery
+```
+
+### 故障排除
+
+#### 常見問題
+
+**1. Pod 處於 CrashLoopBackOff 狀態**
+```bash
+# 檢查 Pod 詳細狀態
+kubectl describe pod POD_NAME -n ton-cat-lottery
+kubectl logs POD_NAME -n ton-cat-lottery --previous
+
+# 常見原因與解決方法：
+# - 映像架構不匹配: 使用 docker buildx --platform linux/amd64
+# - nginx 權限問題: 移除 Pod securityContext 或修正檔案權限
+# - 環境變數配置錯誤: 檢查 ConfigMap 和 Secret 配置
+```
+
+**2. exec format error**
+```bash
+# 這是映像架構不匹配的典型錯誤
+# 解決方法：重新建構 x86_64 映像
+docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend --push ...
+
+# 驗證映像架構
+docker manifest inspect IMAGE_NAME | grep architecture
+```
+
+**3. Ingress 無法獲得外部 IP**
+```bash
+# 檢查 Ingress 詳細狀態
+kubectl describe ingress ton-cat-lottery-ingress -n ton-cat-lottery
+
+# 常見問題：
+# - 靜態 IP 名稱錯誤: 移除 global-static-ip-name annotation
+# - BackendConfig 健康檢查失敗: 檢查 frontend 服務是否正常
+# - 服務端口不匹配: 確認 Service targetPort 正確
+```
+
+**4. 內部服務連通性問題**
+```bash
+# 測試服務連通性
+kubectl exec -it frontend-pod -n ton-cat-lottery -- curl backend-service:8080
+kubectl exec -it frontend-pod -n ton-cat-lottery -- nslookup backend-service
+
+# 檢查 NetworkPolicy 配置
+kubectl get networkpolicy -n ton-cat-lottery -o yaml
+
+# Backend 是守護進程，沒有 HTTP API 是正常的
+```
+
+**5. 映像拉取問題**
+```bash
+# 檢查映像是否存在
+gcloud artifacts docker images list asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery
+
+# 檢查認證
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+# 手動拉取測試
+docker pull asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest
+```
+
+#### 除錯技巧
+
+**進入 Pod 進行除錯**
+```bash
+# 進入 frontend Pod
+kubectl exec -it $(kubectl get pods -n ton-cat-lottery -l app=frontend -o jsonpath='{.items[0].metadata.name}') -n ton-cat-lottery -- /bin/sh
+
+# 進入 backend Pod
+kubectl exec -it $(kubectl get pods -n ton-cat-lottery -l app=backend -o jsonpath='{.items[0].metadata.name}') -n ton-cat-lottery -- /bin/sh
+```
+
+**檢查資源使用量**
+```bash
+kubectl top pods -n ton-cat-lottery
+kubectl top nodes
+kubectl describe node NODE_NAME
+```
+
+**檢查事件和狀態**
+```bash
+kubectl get events -n ton-cat-lottery --sort-by='.lastTimestamp'
+kubectl get all -n ton-cat-lottery
+kubectl describe deployment backend-deployment -n ton-cat-lottery
+```
+
+**性能測試**
+```bash
+# 測試 Ingress 訪問
+curl -I http://INGRESS_IP/
+ab -n 100 -c 10 http://INGRESS_IP/
+
+# 觀察 HPA 行為
+kubectl get hpa -n ton-cat-lottery -w
+```
 
 
 ## GitHub Action (CI/CD)

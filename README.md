@@ -459,30 +459,63 @@ docker compose up -d
 
 ##### **K8s 應用部署準備（手動驗證一次）：**
 
+- [x] **準備階段：**
+  - [x] 確認 Terraform 基礎設施已部署完成
+  - [x] 驗證 GKE Autopilot 叢集狀態：`kubectl get nodes`
+  - [x] 確認 Artifact Registry 已創建並可訪問
+
 - [ ] **建構與推送容器映像：**
-  - [ ] 建構 backend Docker Image
-  - [ ] 建構 frontend Docker Image
-  - [ ] 推送 Images 到 Google Container Registry
-  - [ ] **驗證映像**：確認映像可以正常拉取
+  - [x] 配置 Docker 認證：`gcloud auth configure-docker asia-east1-docker.pkg.dev`
+  - [x] **重要**：設定 Docker buildx 多架構支援：`docker buildx create --use --name multiarch`
+  - [x] 建構 backend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest --push .`
+  - [x] 建構 frontend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend --target production -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest --push .`
+  - [x] **驗證映像**：確認映像架構正確：`docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest`
 
-- [ ] **建立 K8s 部署檔案：**
-  - [ ] 建立 `k8s/` 目錄結構
-  - [ ] 撰寫 backend Deployment YAML
-  - [ ] 撰寫 backend Service YAML
-  - [ ] 撰寫 frontend Deployment YAML
-  - [ ] 撰寫 frontend Service YAML
-  - [ ] 撰寫 LoadBalancer Service YAML
+- [x] **構建 K8s 部署檔案：**
+  - [x] 組織 `k8s/` 目錄結構（backend/, frontend/, ingress/）
+  - [x] 創建 ConfigMap 管理環境變數（backend-config.yaml, frontend-config.yaml）
+  - [x] 創建 Secret 管理敏感資訊（backend-secrets.yaml）
+  - [x] 優化 backend Deployment YAML（資源限制、健康檢查、標籤策略）
+  - [x] 優化 frontend Deployment YAML（資源限制、健康檢查、標籤策略）
+  - [x] 重寫 backend Service YAML（ClusterIP，因為不需要外部訪問）
+  - [x] 重寫 frontend Service YAML（ClusterIP）
+  - [x] 創建 Ingress YAML 替代 LoadBalancer（支援 HTTPS、域名）
+  - [x] 添加 NetworkPolicy YAML（網路安全隔離）
 
-- [ ] **手動測試一次完整部署流程：**
-  - [ ] 取得 GKE 叢集憑證：`gcloud container clusters get-credentials`
-  - [ ] 手動部署 backend：`kubectl apply -f k8s/backend/`
-  - [ ] 手動部署 frontend：`kubectl apply -f k8s/frontend/`
+- [x] **安全性和生產準備：**
+  - [x] 移除硬編碼的測試值，使用 Secret 和 ConfigMap
+  - [x] 配置適當的資源請求和限制
+  - [x] 添加 Pod Security Context（非 root 用戶）
+  - [x] 配置 Horizontal Pod Autoscaler (HPA)
+  - [x] 設定適當的 labels 和 annotations
 
-- [ ] **驗證應用：**
-  - [ ] Pod 狀態為 Running
-  - [ ] Service 正常工作
-  - [ ] LoadBalancer 取得外部 IP
-  - [ ] 應用可以透過 IP 訪問
+- [x] **手動測試一次完整部署流程：**
+  - [x] 取得 GKE 叢集憑證：`gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1`
+  - [x] 創建命名空間：`kubectl create namespace ton-cat-lottery`
+  - [x] 部署 ConfigMaps 和 Secrets：`kubectl apply -f k8s/config/`
+  - [x] 手動部署 backend：`kubectl apply -f k8s/backend/`
+  - [x] 手動部署 frontend：`kubectl apply -f k8s/frontend/`
+  - [x] 部署 Ingress：`kubectl apply -f k8s/ingress/`
+
+- [x] **驗證應用：**
+  - [x] 檢查所有 Pod 狀態為 Running：`kubectl get pods -n ton-cat-lottery`
+  - [x] 檢查 Service 正常工作：`kubectl get svc -n ton-cat-lottery`
+  - [x] 檢查 Ingress 取得外部 IP：`kubectl get ingress -n ton-cat-lottery`
+  - [x] 測試內部服務連通性：`kubectl exec -it POD_NAME -- curl backend-service`
+  - [x] 驗證應用可以透過 Ingress IP 訪問
+  - [x] 測試 HTTPS 證書自動配置
+  - [x] 檢查日誌和監控指標
+  - [x] 測試 Pod 自動重啟和擴縮容
+  - [x] 驗證網路策略生效（如有配置）
+
+- [x] **效能和監控驗證：**
+  - [x] 配置 Google Cloud Monitoring 集成
+  - [x] 設定日誌收集和查詢
+  - [x] 測試應用在負載下的表現
+  - [x] 驗證 HPA 自動擴縮容功能
+
+- [x] 更新 k8s 相關的內容到 `.gitignore`
+- [x] 整理內容到 `DevOpsREADME.md` 中
 
 ##### **GitHub Actions CI/CD：**
 
@@ -511,6 +544,9 @@ docker compose up -d
     - [ ] Image 自動建構並推送
     - [ ] 應用自動部署到 GKE
     - [ ] 部署完成後應用正常運行
+
+- [ ] 更新 CI/CD 相關的內容到 `.gitignore`
+- [ ] 整理內容到 `DevOpsREADME.md` 中
 
 ##### **域名與外部訪問設定：**
 
