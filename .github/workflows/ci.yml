@@ -28,7 +28,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
 
     - name: Setup Go
       uses: actions/setup-go@v5
@@ -175,7 +174,8 @@ jobs:
     - name: Build backend Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./backend
+        context: .
+        file: ./docker/Dockerfile.backend
         platforms: linux/amd64
         push: false
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
@@ -187,7 +187,8 @@ jobs:
     - name: Build frontend Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./frontend
+        context: .
+        file: ./docker/Dockerfile.frontend
         platforms: linux/amd64
         push: false
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}

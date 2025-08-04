@@ -145,3 +145,8 @@ k8s/config/*secret*.yaml
 k8s/**/secrets/
 *.kubeconfig
 *-kubeconfig.yaml
+
+# GitHub Actions and CI/CD
+.github/**/*.secret
+.github/**/*.key
+.github/workflows/secrets/
