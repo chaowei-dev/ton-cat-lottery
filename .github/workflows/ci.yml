@@ -30,6 +30,7 @@ jobs:
       run: |
         cd contracts
         npm ci
+        npm run build
         npm run test
 
     # Test frontend
