@@ -98,4 +98,22 @@ jobs:
 
     - name: Verify Docker images
       run: |
-        docker images | grep ton-cat-lottery
+        echo "=== All Docker Images ==="
+        docker images
+        echo ""
+        echo "=== TON Cat Lottery Images ==="
+        docker images | grep ton-cat-lottery || echo "No ton-cat-lottery images found"
+        echo ""
+        echo "=== Image verification ==="
+        if docker images | grep -q ton-cat-lottery-backend; then
+          echo "✅ Backend image built successfully"
+        else
+          echo "❌ Backend image not found"
+          exit 1
+        fi
+        if docker images | grep -q ton-cat-lottery-frontend; then
+          echo "✅ Frontend image built successfully"  
+        else
+          echo "❌ Frontend image not found"
+          exit 1
+        fi
