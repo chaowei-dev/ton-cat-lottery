@@ -63,16 +63,18 @@ ton-cat-lottery/
 ### 🎯 智能合約（CatLottery.tact）
 
 [NFT 合約文檔](docs/NFTREADME.md)
+
 [貓咪樂園抽獎故事](docs/NFTStory.md)
 
 
 ### 🧰 後端自動抽獎機器人（Go）
 
-[後端文檔](docs/BackREADME.md)
+（尚未完成）
+<!-- [後端文檔](docs/BackREADME.md) -->
 
 
 
-## ⚙️ DevOps 架構細節
+### ⚙️ DevOps 架構細節
 
 [DevOps文檔](docs/DevOpsREADME.md)
 
@@ -150,7 +152,7 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 > 定義好「抽獎怎麼運作」「怎麼發 NFT」「參與者怎麼加入」。
 
 #### 設計合約和 NFT 相關的邏輯
-- [ ] 抽獎合約如何定義
+- [x] 抽獎合約如何定義
 - [ ] NFT 合約如何定義
 - [ ] 檢查兩者的邏輯
 
@@ -161,15 +163,14 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 - [x] 實作 `join()` 方法（收款 + 儲存參與者）
 
 ##### NFT 合約
-- [ ] 撰寫單元測試腳本（測試參加、抽獎、轉移邏輯）
 - [ ] 實作 `drawWinner()` 方法（根據 block hash 隨機選取）
 - [ ] 實作 `sendNFT(address)`：觸發 NFT 合約轉移
 - [ ] 撰寫 NFT 合約（符合 TON NFT 規範，支援 metadata）
 - [ ] 鑄造並部署預設的 NFT（貓咪圖像）
 
 #### 測試
-- [ ] 撰寫抽獎測試腳本
-- [ ] 撰寫 NFT 測試腳本
+- [x] 撰寫**抽獎**測試腳本
+- [ ] 撰寫 **NFT** 測試腳本
 
 #### 部署
 - [x] 部署抽獎合約到 TON testnet
@@ -207,12 +208,12 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
   - [ ] 簡單錯誤處理與重試機制
 
 #### 測試
-- [x] 基礎測試
+- [ ] 基礎測試
 
-    - [x] 撰寫核心功能單元測試
-    - [x] 基礎集成測試（抽獎流程測試）
+    - [ ] 撰寫核心功能單元測試
+    - [ ] 基礎集成測試（抽獎流程測試）
 
-- [x] 實際測試
+- [ ] 實際測試
   - [ ] 鏈接到監控合約，並進行監控
   - [ ] 鏈接到抽獎合約，並進行抽獎
   - [ ] 鏈接到 NFT 合約，並進行 NFT 發送
@@ -268,11 +269,11 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 | 階段 | 內容                    | 技術                       | 目標       |
 | ---- | ----------------------- | -------------------------- | ---------- |
-|  1   |
-|  2   |
-|  3   |
-|  4   |
-|  5   |
+|  1   | 基礎容器化              | Docker + Docker Compose    | 建立容器化設定檔 |
+|  2   | GCP 帳號設定           | GCP Console + 手動設定      | 完成無法自動化的帳號層級設定 |
+|  3   | 基礎設施、微服務部署與 HTTPS 配置 | Terraform + GKE + cert-manager + Cloudflare DNS + HTTPS | 完成基礎設施，包含 GCP + GKE + SSL |
+|  4   | K8s 應用部署準備        | K8s + Artifact Registry | 手動驗證完整部署流程 |
+|  5   | 自動化部署              | GitHub Actions + GCP + OIDC | 自動化驗證和部署到 GCP |
 
 ---
 #### 階段 1：基礎容器化
@@ -591,8 +592,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 #### 階段 6：整理 Documentations
-- [ ] 整理 主目錄的 `README.md`
 - [ ] 整理 Contracts 的 `README.md`
 - [ ] 整理 Backend 的 `README.md`
 - [ ] 整理 Frontend 的 `README.md`
 - [ ] 整理 DevOps 的 `README.md`
+- [ ] 整理 主目錄的 `README.md`
