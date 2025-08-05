@@ -60,15 +60,16 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build and push backend image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./docker/Dockerfile.backend
-        push: true
-        tags: |
-          ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:latest
-          ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+    # TODO: Uncomment when backend is ready for deployment
+    # - name: Build and push backend image
+    #   uses: docker/build-push-action@v5
+    #   with:
+    #     context: .
+    #     file: ./docker/Dockerfile.backend
+    #     push: true
+    #     tags: |
+    #       ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:latest
+    #       ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
 
     - name: Build and push frontend image
       uses: docker/build-push-action@v5
@@ -92,11 +93,12 @@ jobs:
       run: |
         gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} --region=${{ env.GCP_REGION }} --project=${{ secrets.GCP_PROJECT_ID }}
 
-    - name: Deploy backend to GKE
-      run: |
-        kubectl set image deployment/backend \
-          backend=${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
-          -n ton-cat-lottery
+    # TODO: Uncomment when backend is ready for deployment
+    # - name: Deploy backend to GKE
+    #   run: |
+    #     kubectl set image deployment/backend \
+    #       backend=${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:${{ github.sha }} \
+    #       -n ton-cat-lottery
 
     - name: Deploy frontend to GKE
       run: |
@@ -104,9 +106,10 @@ jobs:
           frontend=${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.FRONTEND_IMAGE }}:${{ github.sha }} \
           -n ton-cat-lottery
 
-    - name: Wait for backend rollout
-      run: |
-        kubectl rollout status deployment/backend -n ton-cat-lottery --timeout=300s
+    # TODO: Uncomment when backend is ready for deployment
+    # - name: Wait for backend rollout
+    #   run: |
+    #     kubectl rollout status deployment/backend -n ton-cat-lottery --timeout=300s
 
     - name: Wait for frontend rollout
       run: |
@@ -124,5 +127,6 @@ jobs:
     - name: Health check
       run: |
         echo "Performing basic connectivity tests..."
-        kubectl get pods -l app=backend -n ton-cat-lottery -o wide
+        # TODO: Uncomment when backend is ready
+        # kubectl get pods -l app=backend -n ton-cat-lottery -o wide
         kubectl get pods -l app=frontend -n ton-cat-lottery -o wide
