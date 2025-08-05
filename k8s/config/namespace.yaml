@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ton-cat-lottery
-  labels:
-    name: ton-cat-lottery
-    environment: production
-    project: ton-cat-lottery
