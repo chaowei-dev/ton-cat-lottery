@@ -107,14 +107,14 @@ jobs:
     - name: Verify deployment
       run: |
         echo "=== Deployment Status ==="
-        kubectl get deployments
+        kubectl get deployments -n ton-cat-lottery
         echo "=== Pod Status ==="
-        kubectl get pods
+        kubectl get pods -n ton-cat-lottery
         echo "=== Service Status ==="
-        kubectl get services
+        kubectl get services -n ton-cat-lottery
 
     - name: Health check
       run: |
         echo "Performing basic connectivity tests..."
-        kubectl get pods -l app=backend -o wide
-        kubectl get pods -l app=frontend -o wide
+        kubectl get pods -l app=backend -n ton-cat-lottery -o wide
+        kubectl get pods -l app=frontend -n ton-cat-lottery -o wide
