@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: ton-cat-lottery
+  labels:
+    app: backend
+    project: ton-cat-lottery
+data:
+  ton_network: "testnet"
+  lottery_contract_address: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"  # Replace with actual address
+  nft_contract_address: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"     # Replace with actual address
+  auto_draw: "true"

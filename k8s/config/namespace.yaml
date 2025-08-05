@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ton-cat-lottery
+  labels:
+    name: ton-cat-lottery
+    project: ton-cat-lottery

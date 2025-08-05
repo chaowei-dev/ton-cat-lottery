@@ -1,0 +1,40 @@
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "asia-east1"
+zone       = "asia-east1-a"
+
+# Network Configuration
+network_name = "ton-cat-lottery-vpc"
+subnet_name  = "ton-cat-lottery-subnet"
+subnet_cidr  = "10.0.0.0/24"
+
+# GKE Configuration
+cluster_name = "ton-cat-lottery-cluster"
+namespace    = "ton-cat-lottery"
+
+# Container Registry
+registry_location = "asia-east1"
+repository_name   = "ton-cat-lottery"
+
+# DNS & SSL Configuration
+domain_name          = "lottery.yourdomain.com"
+cloudflare_email     = "your-email@example.com"
+cloudflare_api_token = "your-cloudflare-api-token"
+cloudflare_zone_id   = "your-cloudflare-zone-id"
+letsencrypt_email    = "your-email@example.com"
+
+# Service Account
+gke_service_account_name = "gke-service-account"
+
+# Static IP
+static_ip_name = "ton-cat-lottery-ip"
+
+# Environment
+environment = "dev"
+
+# Labels
+labels = {
+  project     = "ton-cat-lottery"
+  managed-by  = "terraform"
+  environment = "dev"
+}
