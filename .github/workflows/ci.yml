@@ -84,7 +84,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./backend
-        file: ./backend/Dockerfile
+        file: ./docker/Dockerfile.backend
         push: false
         tags: ton-cat-lottery-backend:ci
 
@@ -92,7 +92,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./frontend
-        file: ./frontend/Dockerfile
+        file: ./docker/Dockerfile.frontend
         push: false
         tags: ton-cat-lottery-frontend:ci
 

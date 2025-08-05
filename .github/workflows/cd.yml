@@ -60,7 +60,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./backend
-        file: ./backend/Dockerfile
+        file: ./docker/Dockerfile.backend
         push: true
         tags: |
           ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.BACKEND_IMAGE }}:latest
@@ -70,7 +70,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./frontend
-        file: ./frontend/Dockerfile
+        file: ./docker/Dockerfile.frontend
         push: true
         tags: |
           ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/${{ env.FRONTEND_IMAGE }}:latest
