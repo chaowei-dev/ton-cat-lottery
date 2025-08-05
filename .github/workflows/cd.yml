@@ -1,7 +1,9 @@
 name: CD
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [ main, feature/ssl ]
   workflow_dispatch:
     inputs:
@@ -27,6 +29,12 @@ jobs:
     environment: production
     
     steps:
+    - name: Check CI workflow result
+      if: github.event.workflow_run.conclusion != 'success'
+      run: |
+        echo "CI workflow failed or was cancelled. Skipping deployment."
+        exit 1
+
     - name: Checkout code
       uses: actions/checkout@v4
 
