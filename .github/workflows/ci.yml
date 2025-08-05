@@ -97,6 +97,7 @@ jobs:
       with:
         context: .
         file: ./docker/Dockerfile.frontend
+        target: production
         push: false
         load: true
         tags: ton-cat-lottery-frontend:ci
