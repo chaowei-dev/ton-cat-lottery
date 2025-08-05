@@ -5,10 +5,6 @@ on:
     workflows: ["CI"]
     types:
       - completed
-    branches:
-      - main
-      - feature/ssl
-  push:
     branches: [ main, feature/ssl ]
   workflow_dispatch:
     inputs:
@@ -32,8 +28,17 @@ jobs:
     name: Deploy to GKE
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      id-token: write
     
     steps:
+    - name: Check CI workflow result
+      if: ${{ github.event.workflow_run.conclusion != 'success' }}
+      run: |
+        echo "CI workflow did not succeed. Conclusion: ${{ github.event.workflow_run.conclusion }}"
+        exit 1
+        
     - name: Checkout code
       uses: actions/checkout@v4
 
