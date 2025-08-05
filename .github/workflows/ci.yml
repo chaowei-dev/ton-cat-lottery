@@ -19,12 +19,23 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
 
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
+
+    - name: Cache contracts node modules
+      uses: actions/cache@v3
+      with:
+        path: contracts/node_modules
+        key: ${{ runner.os }}-contracts-${{ hashFiles('contracts/package-lock.json') }}
+
+    - name: Cache frontend node modules
+      uses: actions/cache@v3
+      with:
+        path: frontend/node_modules
+        key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package-lock.json') }}
 
     - name: Install contract dependencies
       run: |
