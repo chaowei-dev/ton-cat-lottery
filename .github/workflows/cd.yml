@@ -19,8 +19,8 @@ on:
 env:
   GCP_REGION: asia-east1
   GKE_CLUSTER: ton-cat-lottery-cluster
-  BACKEND_IMAGE: ton-cat-lottery-backend
-  FRONTEND_IMAGE: ton-cat-lottery-frontend
+  BACKEND_IMAGE: backend
+  FRONTEND_IMAGE: frontend
 
 jobs:
   deploy:
