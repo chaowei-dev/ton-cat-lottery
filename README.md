@@ -524,25 +524,25 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 ##### **基礎流程 (必要)：基本 DevOps**
 
-- [ ] **1. 準備階段：**
-  - [ ] 建立 `.github/workflows/` 目錄結構
-  - [ ] 一次性 WIF 設定
+- [x] **1. 準備階段：**
+  - [x] 建立 `.github/workflows/` 目錄結構
+  - [x] 一次性 WIF 設定
     - 建立 Service Account gha-deploy 並授權所需角色
     - 建立 Workload Identity Pool & Provider（issuer: https://token.actions.githubusercontent.com）
     - 將 YOURORG/your-repo 與 gha-deploy 綁定 `roles/iam.workloadIdentityUser`
 
-- [ ] **2. 基礎 CI 工作流程 (`ci.yml`)：**
-  - [ ] **核心代碼品質檢查：**
-    - [ ] 智能合約測試：`cd contracts && npm run test`
-    - [ ] 前端建構測試：`cd frontend && npm run build`
-    - [ ] Go 後端測試：`cd backend && ./test.sh`
+- [x] **2. 基礎 CI 工作流程 (`ci.yml`)：**
+  - [x] **核心代碼品質檢查：**
+    - [x] 智能合約測試：`cd contracts && npm run test`
+    - [x] 前端建構測試：`cd frontend && npm run build`
+    - [x] Go 後端測試：`cd backend && ./test.sh`
   
-  - [ ] **基礎 Docker 建構：**
-    - [ ] 建構 backend Docker 映像
-    - [ ] 建構 frontend Docker 映像
-    - [ ] 驗證映像建構成功
+  - [x] **基礎 Docker 建構：**
+    - [x] 建構 backend Docker 映像
+    - [x] 建構 frontend Docker 映像
+    - [x] 驗證映像建構成功
   
-  - [ ] **登入 GCP（OIDC）：**
+  - [x] **登入 GCP（OIDC）：**
     ```yml
     - id: auth
       uses: google-github-actions/auth@v2
@@ -551,41 +551,43 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
         workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
         service_account: 'gha-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
     ```
-    - [ ] 安裝 gcloud、kubectl 等 CLI
+    - [x] 安裝 gcloud、kubectl 等 CLI
 
-- [ ] **3. 基礎 CD 工作流程 (`cd.yml`)：**
-  - [ ] **簡單觸發條件：**
-    - [ ] 手動觸發部署選項 (workflow_dispatch)
+- [x] **3. 基礎 CD 工作流程 (`cd.yml`)：**
+  - [x] **簡單觸發條件：**
+    - [x] 手動觸發部署選項 (workflow_dispatch)
     - [x] `main` 分支推送自動部署
   
-  - [ ] **映像推送到 Artifact Registry：**
-    - [ ] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
-    - [ ] 配置 Docker 認證：`gcloud auth configure-docker`
-    - [ ] 推送 backend 映像：基礎標籤策略 (latest, git-sha)
-    - [ ] 推送 frontend 映像：基礎標籤策略 (latest, git-sha)
-    - [ ] **驗證映像推送成功**：檢查 Artifact Registry
+  - [x] **映像推送到 Artifact Registry：**
+    - [x] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
+    - [x] 配置 Docker 認證：`gcloud auth configure-docker`
+    - [x] 推送 backend 映像：基礎標籤策略 (latest, git-sha)
+    - [x] 推送 frontend 映像：基礎標籤策略 (latest, git-sha)
+    - [x] **驗證映像推送成功**：檢查 Artifact Registry
   
-  - [ ] **GKE 部署：**
-    - [ ] 取得 GKE 憑證：gcloud container clusters get-credentials …
-    - [ ] 滾動更新：kubectl set image deployment/backend …、deployment/frontend …
-    - [ ] kubectl rollout status 等待完成
+  - [x] **GKE 部署：**
+    - [x] 取得 GKE 憑證：gcloud container clusters get-credentials …
+    - [x] 滾動更新：kubectl set image deployment/backend …、deployment/frontend …
+    - [x] kubectl rollout status 等待完成
   
-  - [ ] **部署驗證：**
-    - [ ] 確認所有 Pod Running
-    - [ ] 服務連通性測試
+  - [x] **部署驗證：**
+    - [x] 確認所有 Pod Running
+    - [x] 服務連通性測試
 
-- [ ] **4. GitHub Secrets 配置：**
-  - [ ] ~~`GCP_SA_KEY`：Terraform 服務帳戶的 JSON 金鑰~~
-  - [ ] `GCP_PROJECT_ID`：GCP 專案 ID
-  - [ ] `CLOUDFLARE_EMAIL`
-  - [ ] `CLOUDFLARE_API_TOKEN`
-  - [ ] `CLOUDFLARE_ZONE_ID`
-  - [ ] `LETSENCRYPT_EMAIL`
-  - [ ] `APP_DOMAIN`：應用程式域名（如 lottery.yourdomain.com）
+- [x] **4. GitHub Secrets 配置：**
+  - [x] **GCP OIDC 認證 (必要)**：
+    - [x] `GCP_PROJECT_ID`：`ton-cat-lottery-dev-2`
+    - [x] `GCP_WIF_PROVIDER`：Workload Identity Provider 路徑
+  - [x] **Cloudflare & Domain (選用)**：
+    - [x] `CLOUDFLARE_EMAIL`：`gba115566@gmail.com`
+    - [x] `CLOUDFLARE_API_TOKEN`：Cloudflare API Token
+    - [x] `CLOUDFLARE_ZONE_ID`：`c90d2fca6fa4b3cea3d8360f0649294a`
+    - [x] `LETSENCRYPT_EMAIL`：`gba115566@gmail.com`
+    - [x] `APP_DOMAIN`：`cat-lottery.chaowei-liu.com`
 
-- [ ] **5. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for ci/cd
+- [x] **5. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for ci/cd
   - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 #### 階段 6：整理 Documentations
