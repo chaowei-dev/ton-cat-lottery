@@ -5,18 +5,9 @@ metadata:
   namespace: ton-cat-lottery
   labels:
     app: backend
-    component: config
-spec:
+    project: ton-cat-lottery
 data:
-  PORT: "8080"
-  ENVIRONMENT: "production"
-  LOG_LEVEL: "info"
-  TON_API_ENDPOINT: "https://testnet.toncenter.com/api/v2/"
-  TON_NETWORK: "testnet"
-  DRAW_INTERVAL: "5m"
-  MAX_PARTICIPANTS: "3"
-  MIN_PARTICIPANTS: "1"
-  ENTRY_FEE_TON: "0.01"
-  AUTO_DRAW: "true"
-  RETRY_COUNT: "3"
-  RETRY_DELAY: "5s"
+  ton_network: "testnet"
+  lottery_contract_address: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"  # Replace with actual address
+  nft_contract_address: "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"     # Replace with actual address
+  auto_draw: "true"

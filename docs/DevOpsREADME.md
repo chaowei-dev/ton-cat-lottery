@@ -1,34 +1,76 @@
 # DevOps 相關說明
 
-## Docker 
+## 目錄
+- [Docker](#docker)
+- [GCP-設定](#gcp-設定)
+- [Terraform](#terraform)
+- [k8s GKE](#k8s-gke)
+- [GitHub Action (CI/CD)](#github-action-cicd)
 
-### 服務架構
+---
+## Docker
+### 架構
 - **backend**: Go 語言後端服務 (抽獎邏輯)
 - **frontend**: React + Vite 前端應用
 - **frontend-dev**: 前端開發服務 (可選)
 - **monitor**: Prometheus 監控服務 (可選)
 
-### 快速啟動
+### 簡介
+TON Cat Lottery 使用 Docker 容器化部署，提供一致的開發和生產環境。專案採用多服務架構，使用 Docker Compose 統一管理所有服務的啟動、網路和環境配置。
 
-#### 生產環境
+**主要特色：**
+- 多環境支援：生產、開發、監控環境
+- 熱重載：前端開發模式支援即時編輯
+- 網路隔離：所有服務運行在獨立的 Docker 網路中
+- 健康檢查：自動監控服務狀態
+- 環境變數管理：安全的配置管理
+
+### 檔案結構
+```
+ton-cat-lottery/
+├── docker/
+│   ├── Dockerfile.backend      # Go 後端服務容器配置
+│   └── Dockerfile.frontend     # React 前端應用容器配置
+├── docker-compose.yml          # 服務編排配置
+├── .env.example               # 環境變數範例
+└── .env                       # 實際環境變數 (需自行建立)
+```
+
+
+
+### 快速啟動
+**環境設定**
+在啟動services前，需要先設定環境變數：
+
 ```bash
+# 1. 複製環境變數範例檔案
+cp .env.example .env
+
+# 2. 編輯 .env 檔案，填入必要配置
+vim .env  # 或使用其他編輯器
+```
+
+**必填環境變數**
+- `LOTTERY_CONTRACT_ADDRESS`: 抽獎合約地址
+- `NFT_CONTRACT_ADDRESS`: NFT 合約地址  
+- `WALLET_PRIVATE_KEY`: 後端服務錢包私鑰
+
+**指令**
+```bash
+# 生產環境
 # 啟動後端和前端服務
 docker-compose up --build -d
-```
 
-#### 開發環境
-```bash
+# 開發環境
 # 啟動開發服務 (前端熱重載)
 docker-compose --profile development up --build -d
-```
 
-#### 包含監控
-```bash
+# 包含監控
 # 啟動所有服務包括 Prometheus 監控
 docker-compose --profile monitoring up --build -d
 ```
 
-### 服務訪問
+**服務訪問**
 - **前端應用**: http://localhost:3000
 - **前端開發**: http://localhost:5173 (開發模式)
 - **後端服務**: http://localhost:8080
@@ -62,592 +104,1411 @@ docker-compose up --build -d
 ```
 
 ### 故障排除
+
+#### 系統資源與埠檢查
 ```bash
-# 檢查端口使用情況
+# 檢查埠是否被佔用
 lsof -i :3000
 lsof -i :8080
 lsof -i :5173
 
-# 手動健康檢查
-curl -f http://localhost:3000/health
-curl -f http://localhost:5173/
-
-# 清理未使用的 Docker 資源
-docker system prune -a
+# 終止佔用進程
+sudo kill -9 <PID>
 
 # 查看資源使用情況
 docker stats
 ```
 
-## GCP 設定
-
-### 架構
-- **項目**: ton-cat-lottery-dev
-- **區域**: asia-east1 (台灣)
-- **服務**: GKE Autopilot、Artifact Registry、VPC 網路、靜態 IP
-
-### 內容簡介
-Google Cloud Platform 雲端基礎設施，使用 GKE Autopilot 叢集部署容器化應用，包含完整的網路設定和容器鏡像倉庫。
-
-### 指令
+#### 應用健康與可存取性檢查
 ```bash
-# 驗證 GCP 認證
+# 手動健康檢查
+curl -f http://localhost:3000/health
+curl -f http://localhost:5173/
+```
+
+#### 容器狀態與日誌排查
+```bash
+# 檢查容器狀態
+docker-compose ps -a
+
+# 查看容器啟動錯誤日誌
+docker-compose logs --tail=50 backend
+docker-compose logs --tail=50 frontend
+```
+
+#### 環境變數與設定檢查
+```bash
+# 檢查 .env 檔案內容
+cat .env
+
+# 檢查容器內環境變數
+docker-compose exec backend env | grep -E "(TON|LOTTERY|NFT|WALLET)"
+
+# 驗證環境變數是否正確載入
+docker-compose config
+```
+
+#### 容器間網路檢查
+```bash
+# 測試容器之間的連線
+docker-compose exec backend ping frontend
+docker-compose exec frontend ping backend
+```
+
+#### 清理與重建
+```bash
+# 清理未使用的 Docker 資源
+docker system prune -a
+
+# 重置整個環境
+docker-compose down -v --remove-orphans
+docker-compose up --build -d
+```
+
+---
+## GCP 設定
+### 簡介
+TON Cat Lottery 使用 Google Cloud Platform (GCP) 作為雲端基礎設施平台。本章節涵蓋 GCP 帳號設定、本地開發工具安裝，以及 Terraform 服務帳戶配置等必要的基礎設定。
+
+**主要特色：**
+- 完整的 GCP 開發環境設定
+- Terraform 自動化基礎設施管理
+- 服務帳戶權限最佳化配置
+- 預算控制與成本管理
+- 本地開發工具整合
+
+### 快速啟動
+#### 階段 1：GCP 帳號與專案設定
+```bash
+# 1. 註冊 GCP 帳號並建立專案
+# - 前往 https://console.cloud.google.com/
+# - 建立新專案，例如：ton-cat-lottery-dev-2
+# - 設定計費帳戶與預算告警 ($50/月開發限制)
+```
+
+#### 階段 2：本地開發工具安裝
+```bash
+# 1. 安裝 Google Cloud SDK
+brew install --cask google-cloud-cli
+
+# 2. 安裝 Terraform
+brew install terraform
+
+# 3. 安裝 kubectl
+gcloud components install kubectl
+
+# 4. 驗證安裝
+gcloud version
+terraform version
+kubectl version --client
+```
+
+#### 階段 3：GCP 認證與專案設定
+```bash
+# 1. 登入 GCP
+gcloud auth login
+
+# 2. 檢查可用專案
+gcloud projects list
+
+# 3. 設定預設專案
+gcloud config set project YOUR_PROJECT_ID
+
+# 4. 驗證當前設定
+gcloud config list
+```
+
+#### 階段 4：Terraform 服務帳戶設定
+```bash
+# 1. 建立服務帳戶 (透過 GCP Console)
+# - 前往 IAM & Admin > Service Accounts
+# - 建立服務帳戶：terraform-service-account
+# - 分配以下權限：
+#   * Project Editor
+#   * Kubernetes Engine Admin
+#   * Service Account Admin
+
+# 2. 下載服務帳戶金鑰
+# - 在服務帳戶詳情頁面建立新金鑰 (JSON 格式)
+# - 將金鑰檔案重新命名為 terraform-service-account-key.json
+# - 放置於專案根目錄
+
+# 3. 啟用服務帳戶認證
+gcloud auth activate-service-account --key-file=terraform-service-account-key.json
+
+# 4. 驗證服務帳戶權限
 gcloud auth list
-gcloud config list project
+gcloud projects get-iam-policy YOUR_PROJECT_ID
+```
 
-# 連接到 GKE 叢集
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1 --project ton-cat-lottery-dev-468008
+### 常用指令
+#### GCP 專案管理
+```bash
+# 檢查當前專案設定
+gcloud config list
 
-# 查看叢集狀態
-gcloud container clusters describe ton-cat-lottery-cluster --region asia-east1
+# 切換專案
+gcloud config set project NEW_PROJECT_ID
 
-# 推送容器鏡像到 Artifact Registry
-docker tag image-name asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery/image-name
-docker push asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery/image-name
+# 檢查專案資訊
+gcloud projects describe PROJECT_ID
 
-# 查看 Artifact Registry 倉庫
-gcloud artifacts repositories list
-gcloud artifacts docker images list asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery
+# 列出可用區域
+gcloud compute regions list
+
+# 檢查 API 啟用狀態
+gcloud services list --enabled
+```
+
+#### 認證管理
+```bash
+# 檢查認證狀態
+gcloud auth list
+
+# 重新登入 (使用者帳戶)
+gcloud auth login
+
+# 使用服務帳戶認證
+gcloud auth activate-service-account --key-file=PATH_TO_KEY_FILE
+
+# 撤銷認證
+gcloud auth revoke ACCOUNT_EMAIL
+
+# 清除所有認證
+gcloud auth revoke --all
+```
+
+#### 服務帳戶管理
+```bash
+# 列出服務帳戶
+gcloud iam service-accounts list
+
+# 檢查服務帳戶詳情
+gcloud iam service-accounts describe SERVICE_ACCOUNT_EMAIL
+
+# 列出服務帳戶權限
+gcloud projects get-iam-policy PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:SERVICE_ACCOUNT_EMAIL"
+
+# 建立新的服務帳戶金鑰
+gcloud iam service-accounts keys create KEY_FILE_NAME \
+  --iam-account=SERVICE_ACCOUNT_EMAIL
+```
+
+#### API 服務管理
+```bash
+# 啟用必要的 API 服務
+gcloud services enable container.googleapis.com
+gcloud services enable compute.googleapis.com
+gcloud services enable artifactregistry.googleapis.com
+gcloud services enable cloudbuild.googleapis.com
+
+# 檢查 API 服務狀態
+gcloud services list --enabled --filter="name:container.googleapis.com"
+
+# 停用 API 服務 (謹慎使用)
+gcloud services disable SERVICE_NAME
 ```
 
 ### 故障排除
+#### 認證問題
 ```bash
-# 檢查 GCP 權限
+# 問題：認證失效或過期
+# 解決方案：重新認證
+gcloud auth login
 gcloud auth application-default login
-gcloud projects get-iam-policy ton-cat-lottery-dev-468008
 
-# 檢查網路連接
-gcloud compute networks describe ton-cat-lottery-network
-gcloud compute addresses list --regions=asia-east1
+# 問題：服務帳戶權限不足
+# 檢查服務帳戶權限
+gcloud projects get-iam-policy PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:YOUR_SERVICE_ACCOUNT"
 
-# 重新設定 kubectl context
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
-kubectl config current-context
+# 問題：多個認證帳戶衝突
+# 查看所有認證帳戶
+gcloud auth list
 
-# 查看服務帳號權限
-gcloud iam service-accounts list
-gcloud projects get-iam-policy ton-cat-lottery-dev-468008 --filter="bindings.members:serviceAccount:gke-ton-cat-lottery-cluster-sa@ton-cat-lottery-dev-468008.iam.gserviceaccount.com"
+# 設定預設帳戶
+gcloud config set account ACCOUNT_EMAIL
 ```
 
+#### 專案設定問題
+```bash
+# 問題：無法存取專案
+# 檢查專案存在性
+gcloud projects list --filter="projectId:YOUR_PROJECT_ID"
+
+# 檢查當前使用者權限
+gcloud projects get-iam-policy PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:user:YOUR_EMAIL"
+
+# 問題：API 服務未啟用
+# 檢查必要 API 狀態
+gcloud services list --enabled --project=PROJECT_ID
+
+# 批次啟用所有必要 API
+gcloud services enable \
+  container.googleapis.com \
+  compute.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  iam.googleapis.com \
+  cloudresourcemanager.googleapis.com \
+  servicenetworking.googleapis.com
+```
+
+#### 服務帳戶問題
+```bash
+# 問題：服務帳戶金鑰無效
+# 驗證金鑰檔案格式
+cat terraform-service-account-key.json | jq '.'
+
+# 測試服務帳戶認證
+gcloud auth activate-service-account --key-file=terraform-service-account-key.json
+gcloud auth list
+
+# 問題：權限不足錯誤
+# 檢查所需的最小權限集合：
+# - Project Editor (或更細緻的權限)
+# - Kubernetes Engine Admin
+# - Service Account Admin
+# - Compute Network Admin (如果需要建立 VPC)
+
+# 透過 gcloud 添加權限 (需要 Project Owner 權限)
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="serviceAccount:SERVICE_ACCOUNT_EMAIL" \
+  --role="roles/editor"
+```
+
+#### 一般故障排除
+```bash
+# 檢查 gcloud 配置
+gcloud info
+
+# 重設 gcloud 配置
+gcloud config configurations create NEW_CONFIG_NAME
+gcloud config configurations activate NEW_CONFIG_NAME
+
+# 更新 gcloud SDK
+gcloud components update
+
+# 檢查網路連接
+gcloud compute networks list
+
+# 清除本地快取
+rm -rf ~/.config/gcloud/cache/
+gcloud auth login
+```
+
+
+---
 ## Terraform
+### 簡介
+TON Cat Lottery 使用 Terraform 作為基礎設施即代碼 (Infrastructure as Code) 工具，自動化管理 GCP 雲端資源。透過 Terraform 可以一鍵部署完整的 Kubernetes 集群、網路架構、SSL 憑證和 DNS 配置。
 
-### 架構
-- **提供者**: Google Cloud (hashicorp/google v5.45.2)
-- **資源數**: 24 個 (GKE、VPC、防火牆、IAM、Artifact Registry)
-- **狀態管理**: 本地 terraform.tfstate 檔案
+**主要特色：**
+- 完全自動化的基礎設施部署
+- GKE Autopilot 集群管理
+- Cloudflare DNS + Let's Encrypt SSL 自動配置
+- VPC 網路與防火牆規則
+- Artifact Registry 容器映像管理
+- cert-manager + nginx-ingress 整合
 
-### 內容簡介
-基礎設施即代碼 (IaC) 工具，自動化管理 GCP 資源的生命週期，包含 GKE Autopilot 叢集、網路設定、服務帳號和權限管理。
+**架構概覽：**
+```
+Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (ClusterIP)
+```
 
 ### 檔案結構
-> Terraform 配置採用模組化設計，將基礎設施定義分散到多個檔案中便於管理和維護。
+```
+terraform/
+├── main.tf                      # 主要 GCP 基礎設施資源
+├── providers.tf                 # Provider 配置 (GCP, K8s, Helm, Cloudflare)
+├── variables.tf                 # 變數定義
+├── outputs.tf                   # 輸出值 (IP, 集群資訊等)
+├── cert-manager.tf              # SSL 憑證管理與 Ingress Controller
+├── dns.tf                       # Cloudflare DNS 記錄與安全設定
+├── terraform.tfvars.example     # 環境變數範例
+├── terraform.tfvars             # 實際變數值 (不納入版控)
+├── terraform.tfstate            # Terraform 狀態檔案 (本地)
+└── terraform.tfstate.backup     # 狀態檔案備份
+```
 
-- **`main.tf`**: 主要資源定義檔案
-  - GKE Autopilot 叢集配置 (enable_autopilot = true)
-  - VPC 網路和子網路設定 (10.0.0.0/24, pods: 10.1.0.0/16, services: 10.2.0.0/16)
-  - 防火牆規則 (HTTP/HTTPS, SSH, 內部流量)
-  - Cloud Router 和 NAT Gateway (私有集群外網訪問)
-  - 靜態 IP 和 Artifact Registry 倉庫
-  - 服務帳號和 IAM 角色綁定
-  - Google Cloud APIs 啟用
-
-- **`variables.tf`**: 輸入變數定義
-  - 專案 ID、區域、叢集名稱等可配置參數
-  - 網路 CIDR 範圍和節點規格設定
-  - 預設值設定 (asia-east1, e2-standard-2)
-
-- **`outputs.tf`**: 輸出值定義
-  - 叢集連線資訊 (endpoint, CA certificate)
-  - Docker 倉庫 URL 和 kubectl 連線指令
-  - 網路和 IP 資源資訊
-
-- **`versions.tf`**: 提供者版本約束
-  - Terraform 版本要求 (>= 1.0)
-  - Google 提供者版本約束 (~> 5.0)
-  - 提供者配置 (專案、區域設定)
-
-- **`terraform.tfvars`**: 實際配置值
-  - 生產環境具體參數設定
-  - 專案 ID: ton-cat-lottery-dev-468008
-  - 叢集和網路命名約定
-
-- **`terraform.tfvars.example`**: 配置範例檔案
-  - 新環境部署的參考模板
-  - 敏感資訊的佔位符說明
-
-### 指令
+### 快速啟動
+#### 階段 1：環境準備
 ```bash
-# 初始化 Terraform
+# 1. 確保 GCP 服務帳戶已設定
+gcloud auth activate-service-account --key-file=terraform-service-account-key.json
+
+# 2. 複製並設定環境變數
+cd terraform/
+cp terraform.tfvars.example terraform.tfvars
+
+# 3. 編輯 terraform.tfvars，填入必要配置
+vim terraform.tfvars
+```
+
+**必填變數：**
+```hcl
+# GCP 配置
+project_id = "your-gcp-project-id"
+region     = "asia-east1"
+
+# DNS & SSL 配置
+domain_name          = "lottery.yourdomain.com"
+cloudflare_email     = "your-email@example.com"
+cloudflare_api_token = "your-cloudflare-api-token"
+cloudflare_zone_id   = "your-cloudflare-zone-id"
+letsencrypt_email    = "your-email@example.com"
+```
+
+#### 階段 2：初始化 Terraform
+```bash
+# 1. 初始化 Terraform
 terraform init
 
-# 檢查部署計畫
+# 2. 驗證配置檔案
+terraform validate
+
+# 3. 檢查部署計畫
+terraform plan
+```
+
+#### 階段 3：分階段部署
+```bash
+# 1. 部署 GCP 基礎設施
+terraform apply -target=google_project_service.enabled_apis
+terraform apply -target=google_compute_network.vpc
+terraform apply -target=google_compute_subnetwork.subnet
+terraform apply -target=google_container_cluster.primary
+
+# 2. 驗證 GKE 集群
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+kubectl get nodes
+
+# 3. 部署 SSL 和 Ingress
+terraform apply -target=helm_release.cert_manager
+terraform apply -target=helm_release.nginx_ingress
+terraform apply -target=kubernetes_manifest.letsencrypt_staging
+terraform apply -target=kubernetes_manifest.letsencrypt_prod
+
+# 4. 配置 DNS 記錄
+terraform apply -target=cloudflare_record.app_dns
+terraform apply -target=cloudflare_record.www_dns
+
+# 5. 完整部署
+terraform apply
+```
+
+#### 階段 4：部署驗證
+```bash
+# 1. 檢查所有資源狀態
+terraform show
+
+# 2. 驗證 Kubernetes 集群
+kubectl get nodes
+kubectl get namespaces
+
+# 3. 檢查 cert-manager
+kubectl get pods -n cert-manager
+
+# 4. 檢查 ingress controller
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
+
+# 5. 驗證 DNS 解析
+nslookup your-domain.com
+
+# 6. 測試 HTTPS 訪問
+curl -I https://your-domain.com
+```
+
+### 常用指令
+#### 基本 Terraform 操作
+```bash
+# 初始化工作目錄
+terraform init
+
+# 檢查配置語法
+terraform validate
+
+# 格式化配置檔案
+terraform fmt
+
+# 生成部署計畫
 terraform plan
 
 # 執行部署
 terraform apply
 
-# 查看部署狀態
-terraform show
-terraform output
+# 確認部署 (跳過互動確認)
+terraform apply -auto-approve
 
-# 查看特定輸出
-terraform output cluster_name
-terraform output static_ip_address
-terraform output kubectl_connection_command
-
-# 檢查資源變更
-terraform plan -detailed-exitcode
-
-# 銷毀所有資源 (謹慎使用)
+# 銷毀所有資源
 terraform destroy
 ```
 
-### 故障排除
+#### 針對性資源管理
 ```bash
-# 驗證 Terraform 配置
-terraform validate
-terraform fmt
+# 針對特定資源進行操作
+terraform plan -target=google_container_cluster.primary
+terraform apply -target=google_container_cluster.primary
 
-# 重新整理狀態
+# 刷新狀態檔案
 terraform refresh
 
-# 匯入現有資源 (如果狀態不同步)
-terraform import google_container_cluster.primary projects/ton-cat-lottery-dev-468008/locations/asia-east1/clusters/ton-cat-lottery-cluster
+# 匯入現有資源
+terraform import google_compute_network.vpc projects/PROJECT_ID/global/networks/NETWORK_NAME
 
-# 檢查 Terraform 版本
+# 顯示資源清單
+terraform state list
+
+# 顯示特定資源狀態
+terraform state show google_container_cluster.primary
+```
+
+#### 變數與輸出管理
+```bash
+# 檢查變數值
+terraform console
+> var.project_id
+> var.domain_name
+
+# 顯示所有輸出值
+terraform output
+
+# 顯示特定輸出值
+terraform output cluster_endpoint
+terraform output static_ip_address
+
+# 以 JSON 格式顯示輸出
+terraform output -json
+```
+
+#### 狀態檔案管理
+```bash
+# 備份狀態檔案
+cp terraform.tfstate terraform.tfstate.backup.$(date +%Y%m%d_%H%M%S)
+
+# 移動資源到新的狀態位置
+terraform state mv google_compute_network.old_vpc google_compute_network.new_vpc
+
+# 從狀態中移除資源 (不銷毀實際資源)
+terraform state rm google_compute_firewall.example
+
+# 解鎖狀態檔案 (如遇到鎖定問題)
+terraform force-unlock LOCK_ID
+```
+
+#### Kubernetes 整合操作
+```bash
+# 取得 GKE 憑證
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) \
+  --region $(terraform output -raw region)
+
+# 配置 Docker 認證
+$(terraform output -raw docker_auth_command)
+
+# 檢查集群狀態
+kubectl cluster-info
+kubectl get nodes -o wide
+
+# 檢查 cert-manager 狀態
+kubectl get clusterissuers
+kubectl get certificates --all-namespaces
+
+# 檢查 ingress controller
+kubectl get svc -n ingress-nginx
+kubectl get ingress --all-namespaces
+```
+
+### 故障排除
+#### 部署失敗排查
+```bash
+# 問題：terraform init 失敗
+# 解決方案：檢查 provider 版本與網路連接
 terraform version
+terraform providers
 
-# 除錯模式
-export TF_LOG=DEBUG
-terraform plan
+# 清除 .terraform 目錄重新初始化
+rm -rf .terraform .terraform.lock.hcl
+terraform init
 
-# 解決狀態鎖定問題
+# 問題：API 權限不足
+# 檢查服務帳戶權限
+gcloud projects get-iam-policy $(terraform output -raw project_id) \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:YOUR_SERVICE_ACCOUNT"
+
+# 檢查必要 API 是否啟用
+gcloud services list --enabled --project=$(terraform output -raw project_id)
+```
+
+#### 資源衝突解決
+```bash
+# 問題：資源已存在錯誤
+# 解決方案：匯入現有資源或修改資源名稱
+
+# 匯入現有 VPC 網路
+terraform import google_compute_network.vpc projects/PROJECT_ID/global/networks/NETWORK_NAME
+
+# 匯入現有子網路
+terraform import google_compute_subnetwork.subnet projects/PROJECT_ID/regions/REGION/subnetworks/SUBNET_NAME
+
+# 問題：IP 地址衝突
+# 檢查現有 IP 地址
+gcloud compute addresses list
+
+# 釋放未使用的 IP 地址
+gcloud compute addresses delete ADDRESS_NAME --region=REGION
+```
+
+#### GKE 集群問題
+```bash
+# 問題：無法連接到 GKE 集群
+# 重新取得憑證
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) \
+  --region $(terraform output -raw region) --project $(terraform output -raw project_id)
+
+# 檢查集群狀態
+gcloud container clusters describe $(terraform output -raw cluster_name) \
+  --region $(terraform output -raw region)
+
+# 問題：節點無法啟動
+# 檢查節點池狀態
+kubectl get nodes -o wide
+kubectl describe nodes
+
+# 檢查系統 Pod
+kubectl get pods --all-namespaces
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+#### SSL 憑證問題
+```bash
+# 問題：Let's Encrypt 憑證申請失敗
+# 檢查 cert-manager 日誌
+kubectl logs -n cert-manager deployment/cert-manager
+
+# 檢查 ClusterIssuer 狀態
+kubectl describe clusterissuer letsencrypt-prod
+
+# 檢查憑證申請狀態
+kubectl get certificaterequests --all-namespaces
+kubectl describe certificate YOUR_CERTIFICATE -n YOUR_NAMESPACE
+
+# 手動觸發憑證續期
+kubectl delete certificate YOUR_CERTIFICATE -n YOUR_NAMESPACE
+# 重新套用 ingress 設定
+```
+
+#### DNS 配置問題
+```bash
+# 問題：DNS 記錄未生效
+# 檢查 Cloudflare DNS 記錄
+dig @8.8.8.8 your-domain.com
+nslookup your-domain.com
+
+# 檢查 DNS 傳播狀態
+curl -s "https://dns.google/resolve?name=your-domain.com&type=A" | jq
+
+# 問題：SSL 證書無效
+# 檢查證書狀態
+curl -vI https://your-domain.com
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
+```
+
+#### 狀態檔案問題
+```bash
+# 問題：狀態檔案損壞
+# 從備份恢復
+cp terraform.tfstate.backup terraform.tfstate
+
+# 問題：狀態檔案鎖定
+# 查看鎖定資訊並強制解鎖
 terraform force-unlock LOCK_ID
 
-# 檢查提供者版本
-terraform providers
+# 問題：狀態檔案不同步
+# 重新整理狀態
+terraform refresh
+terraform plan -refresh-only
 ```
 
+#### 清理與重建
+```bash
+# 完全清理環境
+terraform destroy -auto-approve
 
-## k8s (GKE)
+# 清理 Terraform 檔案
+rm -rf .terraform .terraform.lock.hcl terraform.tfstate*
 
-### 內容簡介
+# 重新開始
+terraform init
+terraform plan
+terraform apply
 
-TON Cat Lottery 使用 Google Kubernetes Engine (GKE) Autopilot 進行容器化部署，包含 backend 和 frontend 兩個主要服務。系統採用 ConfigMap/Secret 管理配置，支援自動擴縮容 (HPA)、網路策略隔離和 Ingress 外部訪問。
+# 部分重建特定資源
+terraform taint google_container_cluster.primary
+terraform apply
+```
 
-**部署架構：**
-- **Backend**: Go 守護進程，監控 TON 區塊鏈並自動觸發抽獎
-- **Frontend**: React 應用，使用 nginx 提供靜態檔案服務
-- **Network**: NetworkPolicy 隔離，ClusterIP + Ingress 外部訪問
-- **Scaling**: HPA 根據 CPU/Memory 自動擴縮容
+---
+## k8s GKE
+### 簡介
+TON Cat Lottery 使用 Google Kubernetes Engine (GKE) Autopilot 作為容器編排平台，透過微服務架構部署前端和後端應用。系統採用 nginx-ingress + cert-manager 實現 HTTPS 自動化，並整合 Cloudflare DNS 提供完整的生產級別服務。
+
+**主要特色：**
+- GKE Autopilot 自動化節點管理和擴縮容
+- 微服務架構：前端 (React) + 後端 (Go) 分離部署
+- HTTPS 自動化：Let's Encrypt + cert-manager 自動續期
+- 安全最佳實踐：非 root 用戶、資源限制、網路隔離
+- ConfigMap/Secret 配置管理
+- 健康檢查和滾動更新
+
+**服務架構：**
+```
+Internet → Cloudflare DNS → Static IP → nginx-ingress → Services
+                                                      ├── frontend-service (React dApp)
+                                                      └── backend-service (Go API)
+```
 
 ### 檔案結構
-
 ```
 k8s/
-├── config/
-│   ├── namespace.yaml          # 命名空間定義
-│   ├── backend-config.yaml     # Backend 環境變數 ConfigMap
-│   ├── backend-secrets.yaml    # Backend 敏感資訊 Secret (已加入 .gitignore)
-│   ├── frontend-config.yaml    # Frontend 環境變數 ConfigMap
-│   └── networkpolicy.yaml      # 網路安全策略
-├── backend/
-│   ├── deployment.yaml         # Backend 部署配置 (2-5 replicas)
-│   ├── service.yaml            # Backend ClusterIP 服務
-│   └── hpa.yaml                # Backend 自動擴縮容 (CPU/Memory)
-├── frontend/
-│   ├── deployment.yaml         # Frontend 部署配置 (2-10 replicas)
-│   ├── service.yaml            # Frontend ClusterIP 服務
-│   └── hpa.yaml                # Frontend 自動擴縮容 (CPU/Memory)
-└── ingress/
-    └── ingress.yaml            # GKE Ingress + BackendConfig
+├── config/                          # 配置管理
+│   ├── namespace.yaml              # 命名空間定義
+│   ├── backend-config.yaml         # 後端環境變數 ConfigMap
+│   └── backend-secrets.yaml        # 後端敏感資訊 Secret
+├── backend/                        # 後端服務部署
+│   ├── deployment.yaml             # 後端 Deployment 配置
+│   └── service.yaml                # 後端 Service (ClusterIP)
+├── frontend/                       # 前端服務部署
+│   ├── deployment.yaml             # 前端 Deployment 配置
+│   └── service.yaml                # 前端 Service (ClusterIP)
+└── ingress/                        # 外部訪問
+    └── ingress.yaml                # Ingress 路由與 SSL 配置
 ```
 
-### 指令
-
-#### 基礎部署
+### 快速啟動
+#### 階段 1：準備工作
 ```bash
-# 取得 GKE 叢集憑證
+# 1. 確保 GKE 集群已通過 Terraform 部署
+kubectl get nodes
+
+# 2. 配置 Docker 認證 (推送映像用)
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+# 3. 設定 kubectl 上下文
 gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
 
-# 完整部署流程
+# 4. 驗證 cert-manager 和 ingress-nginx 已安裝
+kubectl get pods -n cert-manager
+kubectl get pods -n ingress-nginx
+```
+
+#### 階段 2：建構和推送容器映像
+```bash
+# 1. 設定多架構建構支援
+docker buildx create --use --name multiarch
+
+# 2. 建構並推送後端映像
+docker buildx build --platform linux/amd64 \
+  -f docker/Dockerfile.backend \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest \
+  --push .
+
+# 3. 建構並推送前端映像
+docker buildx build --platform linux/amd64 \
+  -f docker/Dockerfile.frontend --target production \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) \
+  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest \
+  --push .
+
+# 4. 驗證映像推送成功
+docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest
+docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest
+```
+
+#### 階段 3：部署應用到 Kubernetes
+```bash
+# 1. 創建命名空間
 kubectl apply -f k8s/config/namespace.yaml
+
+# 2. 部署配置 (ConfigMap 和 Secret)
+kubectl apply -f k8s/config/
+
+# 3. 部署後端服務
+kubectl apply -f k8s/backend/
+
+# 4. 部署前端服務
+kubectl apply -f k8s/frontend/
+
+# 5. 部署 Ingress (外部訪問)
+kubectl apply -f k8s/ingress/
+
+# 6. 檢查部署狀態
+kubectl get all -n ton-cat-lottery
+```
+
+#### 階段 4：驗證部署
+```bash
+# 1. 檢查所有 Pod 狀態
+kubectl get pods -n ton-cat-lottery
+
+# 2. 檢查服務狀態
+kubectl get svc -n ton-cat-lottery
+
+# 3. 檢查 Ingress 和 SSL 憑證
+kubectl get ingress -n ton-cat-lottery
+kubectl get certificate -n ton-cat-lottery
+
+# 4. 檢查應用日誌
+kubectl logs -n ton-cat-lottery deployment/backend
+kubectl logs -n ton-cat-lottery deployment/frontend
+
+# 5. 測試內部服務連接
+kubectl exec -n ton-cat-lottery deployment/frontend -- curl http://backend-service/health
+
+# 6. 測試外部 HTTPS 訪問
+curl -I https://your-domain.com
+```
+
+### 常用指令
+#### Pod 和 Deployment 管理
+```bash
+# 查看所有資源
+kubectl get all -n ton-cat-lottery
+
+# 查看 Pod 詳細資訊
+kubectl describe pod POD_NAME -n ton-cat-lottery
+
+# 查看 Pod 日誌
+kubectl logs -f deployment/backend -n ton-cat-lottery
+kubectl logs -f deployment/frontend -n ton-cat-lottery
+
+# 進入 Pod 容器
+kubectl exec -it deployment/backend -n ton-cat-lottery -- sh
+kubectl exec -it deployment/frontend -n ton-cat-lottery -- sh
+
+# 重啟 Deployment
+kubectl rollout restart deployment/backend -n ton-cat-lottery
+kubectl rollout restart deployment/frontend -n ton-cat-lottery
+
+# 查看滾動更新狀態
+kubectl rollout status deployment/backend -n ton-cat-lottery
+kubectl rollout history deployment/backend -n ton-cat-lottery
+```
+
+#### 服務和網路管理
+```bash
+# 查看服務詳情
+kubectl describe svc backend-service -n ton-cat-lottery
+kubectl describe svc frontend-service -n ton-cat-lottery
+
+# 查看 Ingress 詳情
+kubectl describe ingress ton-cat-lottery-ingress -n ton-cat-lottery
+
+# 查看端點 (Endpoints)
+kubectl get endpoints -n ton-cat-lottery
+
+# 測試服務連接
+kubectl exec -it deployment/frontend -n ton-cat-lottery -- curl http://backend-service
+
+# Port forwarding (本地測試)
+kubectl port-forward deployment/backend 8080:8080 -n ton-cat-lottery
+kubectl port-forward deployment/frontend 3000:80 -n ton-cat-lottery
+```
+
+#### 配置管理
+```bash
+# 查看 ConfigMap
+kubectl get configmap -n ton-cat-lottery
+kubectl describe configmap backend-config -n ton-cat-lottery
+
+# 查看 Secret
+kubectl get secret -n ton-cat-lottery
+kubectl describe secret backend-secrets -n ton-cat-lottery
+
+# 更新 ConfigMap
+kubectl create configmap backend-config \
+  --from-literal=ton_network=testnet \
+  --from-literal=auto_draw=true \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 重新載入配置 (重啟 Pod)
+kubectl rollout restart deployment/backend -n ton-cat-lottery
+```
+
+#### 自動擴縮容 (HPA)
+```bash
+# 創建 HPA
+kubectl autoscale deployment backend --cpu-percent=70 --min=2 --max=10 -n ton-cat-lottery
+kubectl autoscale deployment frontend --cpu-percent=70 --min=2 --max=10 -n ton-cat-lottery
+
+# 查看 HPA 狀態
+kubectl get hpa -n ton-cat-lottery
+kubectl describe hpa backend -n ton-cat-lottery
+
+# 查看資源使用情況
+kubectl top nodes
+kubectl top pods -n ton-cat-lottery
+
+# 刪除 HPA
+kubectl delete hpa backend -n ton-cat-lottery
+```
+
+#### SSL 憑證管理
+```bash
+# 查看憑證狀態
+kubectl get certificate -n ton-cat-lottery
+kubectl describe certificate ton-cat-lottery-tls -n ton-cat-lottery
+
+# 查看 ClusterIssuer
+kubectl get clusterissuer
+kubectl describe clusterissuer letsencrypt-prod
+
+# 查看憑證申請狀態
+kubectl get certificaterequests -n ton-cat-lottery
+kubectl describe certificaterequests -n ton-cat-lottery
+
+# 手動觸發憑證續期
+kubectl delete certificate ton-cat-lottery-tls -n ton-cat-lottery
+kubectl apply -f k8s/ingress/ingress.yaml
+```
+
+#### 容器映像更新
+```bash
+# 更新映像版本
+kubectl set image deployment/backend \
+  backend=asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:NEW_TAG \
+  -n ton-cat-lottery
+
+kubectl set image deployment/frontend \
+  frontend=asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:NEW_TAG \
+  -n ton-cat-lottery
+
+# 回滾到上一版本
+kubectl rollout undo deployment/backend -n ton-cat-lottery
+kubectl rollout undo deployment/frontend -n ton-cat-lottery
+
+# 回滾到特定版本
+kubectl rollout undo deployment/backend --to-revision=2 -n ton-cat-lottery
+```
+
+### 故障排除
+#### Pod 啟動問題
+```bash
+# 問題：Pod 無法正常啟動
+# 檢查 Pod 狀態和事件
+kubectl get pods -n ton-cat-lottery
+kubectl describe pod POD_NAME -n ton-cat-lottery
+
+# 檢查 Pod 日誌
+kubectl logs POD_NAME -n ton-cat-lottery
+kubectl logs POD_NAME -n ton-cat-lottery --previous
+
+# 問題：映像拉取失敗
+# 檢查映像地址和認證
+kubectl describe pod POD_NAME -n ton-cat-lottery | grep -A 5 "Events:"
+
+# 驗證映像存在
+gcloud container images list --repository=asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery
+
+# 檢查 GKE 節點的映像拉取權限
+kubectl describe nodes
+```
+
+#### 服務連接問題
+```bash
+# 問題：服務無法訪問
+# 檢查服務配置
+kubectl get svc -n ton-cat-lottery
+kubectl describe svc backend-service -n ton-cat-lottery
+
+# 檢查端點配置
+kubectl get endpoints backend-service -n ton-cat-lottery
+
+# 測試內部連接
+kubectl exec -it deployment/frontend -n ton-cat-lottery -- nslookup backend-service
+kubectl exec -it deployment/frontend -n ton-cat-lottery -- curl -v http://backend-service
+
+# 檢查網路策略
+kubectl get networkpolicies -n ton-cat-lottery
+```
+
+#### Ingress 和 SSL 問題
+```bash
+# 問題：Ingress 無法訪問
+# 檢查 Ingress 狀態
+kubectl get ingress -n ton-cat-lottery
+kubectl describe ingress ton-cat-lottery-ingress -n ton-cat-lottery
+
+# 檢查 nginx-ingress controller
+kubectl get pods -n ingress-nginx
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
+
+# 問題：SSL 憑證錯誤
+# 檢查憑證狀態
+kubectl get certificate -n ton-cat-lottery
+kubectl describe certificate ton-cat-lottery-tls -n ton-cat-lottery
+
+# 檢查 cert-manager 日誌
+kubectl logs -n cert-manager deployment/cert-manager
+
+# 檢查 DNS 解析
+nslookup your-domain.com
+dig your-domain.com
+
+# 手動測試 SSL
+curl -vI https://your-domain.com
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
+```
+
+#### 資源和效能問題
+```bash
+# 問題：資源不足或效能問題
+# 檢查資源使用情況
+kubectl top nodes
+kubectl top pods -n ton-cat-lottery
+
+# 檢查資源限制
+kubectl describe pod POD_NAME -n ton-cat-lottery | grep -A 10 "Limits:"
+
+# 檢查節點狀態
+kubectl describe nodes
+
+# 檢查事件
+kubectl get events -n ton-cat-lottery --sort-by=.metadata.creationTimestamp
+
+# 問題：HPA 不工作
+# 檢查 metrics-server
+kubectl get pods -n kube-system | grep metrics-server
+kubectl logs -n kube-system deployment/metrics-server
+```
+
+#### 配置問題
+```bash
+# 問題：環境變數錯誤
+# 檢查 ConfigMap 內容
+kubectl get configmap backend-config -n ton-cat-lottery -o yaml
+
+# 檢查 Pod 內的環境變數
+kubectl exec -it deployment/backend -n ton-cat-lottery -- env | grep -E "(TON|LOTTERY|NFT)"
+
+# 更新配置後重啟服務
+kubectl rollout restart deployment/backend -n ton-cat-lottery
+
+# 問題：Secret 無法讀取
+# 檢查 Secret 配置
+kubectl get secret backend-secrets -n ton-cat-lottery -o yaml
+
+# 檢查 Pod 權限
+kubectl describe pod POD_NAME -n ton-cat-lottery | grep -A 5 "Volumes:"
+```
+
+#### 清理和重建
+```bash
+# 重建特定服務
+kubectl delete deployment backend -n ton-cat-lottery
+kubectl apply -f k8s/backend/deployment.yaml
+
+# 完全清理命名空間
+kubectl delete namespace ton-cat-lottery
+
+# 重新部署所有資源
 kubectl apply -f k8s/config/
 kubectl apply -f k8s/backend/
 kubectl apply -f k8s/frontend/
 kubectl apply -f k8s/ingress/
+
+# 強制重建 Pod
+kubectl delete pod -l app=backend -n ton-cat-lottery
+kubectl delete pod -l app=frontend -n ton-cat-lottery
+
+# 清理失敗的資源
+kubectl get all -n ton-cat-lottery | grep -E "(Error|Failed|Pending)"
+kubectl delete pod POD_NAME -n ton-cat-lottery --force --grace-period=0
 ```
 
-#### 建構和推送映像 (重要: 支援 x86_64)
+#### 日誌和監控
 ```bash
-# 設定多架構建構支援
-docker buildx create --use --name multiarch
+# 查看詳細日誌
+kubectl logs -f deployment/backend -n ton-cat-lottery --tail=100
+kubectl logs -f deployment/frontend -n ton-cat-lottery --tail=100
 
-# 建構 backend (x86_64) 並推送
-docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend \
-  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) \
-  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest --push .
+# 查看多個 Pod 日誌
+kubectl logs -f -l app=backend -n ton-cat-lottery
 
-# 建構 frontend (x86_64) 並推送
-docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend --target production \
-  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) \
-  -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest --push .
+# 查看系統事件
+kubectl get events -n ton-cat-lottery --watch
 
-# 驗證映像架構
-docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest
+# 檢查集群整體狀態
+kubectl cluster-info
+kubectl get componentstatuses
+
+# 檢查 GKE 特定功能
+gcloud container clusters describe ton-cat-lottery-cluster --region asia-east1
 ```
 
-#### 監控和管理
-```bash
-# 檢查應用狀態
-kubectl get pods -n ton-cat-lottery
-kubectl get svc -n ton-cat-lottery
-kubectl get ingress -n ton-cat-lottery
+---
+## GitHub Action (CI/CD)
+### 簡介
+TON Cat Lottery 使用 GitHub Actions 實現完全自動化的 CI/CD 流程，採用 Workload Identity Federation (OIDC) 進行安全的 GCP 認證。系統支援程式碼品質檢查、自動化測試、Docker 映像建構與推送，以及 GKE 應用程式部署。
 
-# 檢查 HPA 狀態
-kubectl get hpa -n ton-cat-lottery
+**主要特色：**
+- 安全的 OIDC 認證：無需儲存 Service Account Key
+- 多環境支援：智能合約、前端、後端全端測試
+- 自動化部署：Docker 映像建構 + GKE 滾動更新
+- 工作流程依賴：CI 成功後自動觸發 CD
+- 完整的部署驗證與健康檢查
 
-# 查看日誌
-kubectl logs -n ton-cat-lottery -l app=backend --tail=50 -f
-kubectl logs -n ton-cat-lottery -l app=frontend --tail=50
-
-# 重新啟動部署
-kubectl rollout restart deployment/backend-deployment -n ton-cat-lottery
-kubectl rollout restart deployment/frontend-deployment -n ton-cat-lottery
-
-# 擴縮容測試
-kubectl scale deployment backend-deployment --replicas=3 -n ton-cat-lottery
+**工作流程架構：**
 ```
-
-### 故障排除
-
-#### 常見問題
-
-**1. Pod 處於 CrashLoopBackOff 狀態**
-```bash
-# 檢查 Pod 詳細狀態
-kubectl describe pod POD_NAME -n ton-cat-lottery
-kubectl logs POD_NAME -n ton-cat-lottery --previous
-
-# 常見原因與解決方法：
-# - 映像架構不匹配: 使用 docker buildx --platform linux/amd64
-# - nginx 權限問題: 移除 Pod securityContext 或修正檔案權限
-# - 環境變數配置錯誤: 檢查 ConfigMap 和 Secret 配置
+Code Push → CI Workflow (測試+建構) → CD Workflow (部署+驗證)
+           ├── 智能合約測試                 ├── 推送到 Artifact Registry
+           ├── 前端建構測試                 ├── GKE 部署更新
+           ├── 後端整合測試                 └── 部署狀態驗證
+           └── Docker 映像建構
 ```
-
-**2. exec format error**
-```bash
-# 這是映像架構不匹配的典型錯誤
-# 解決方法：重新建構 x86_64 映像
-docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend --push ...
-
-# 驗證映像架構
-docker manifest inspect IMAGE_NAME | grep architecture
-```
-
-**3. Ingress 無法獲得外部 IP**
-```bash
-# 檢查 Ingress 詳細狀態
-kubectl describe ingress ton-cat-lottery-ingress -n ton-cat-lottery
-
-# 常見問題：
-# - 靜態 IP 名稱錯誤: 移除 global-static-ip-name annotation
-# - BackendConfig 健康檢查失敗: 檢查 frontend 服務是否正常
-# - 服務端口不匹配: 確認 Service targetPort 正確
-```
-
-**4. 內部服務連通性問題**
-```bash
-# 測試服務連通性
-kubectl exec -it frontend-pod -n ton-cat-lottery -- curl backend-service:8080
-kubectl exec -it frontend-pod -n ton-cat-lottery -- nslookup backend-service
-
-# 檢查 NetworkPolicy 配置
-kubectl get networkpolicy -n ton-cat-lottery -o yaml
-
-# Backend 是守護進程，沒有 HTTP API 是正常的
-```
-
-**5. 映像拉取問題**
-```bash
-# 檢查映像是否存在
-gcloud artifacts docker images list asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery
-
-# 檢查認證
-gcloud auth configure-docker asia-east1-docker.pkg.dev
-
-# 手動拉取測試
-docker pull asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest
-```
-
-#### 除錯技巧
-
-**進入 Pod 進行除錯**
-```bash
-# 進入 frontend Pod
-kubectl exec -it $(kubectl get pods -n ton-cat-lottery -l app=frontend -o jsonpath='{.items[0].metadata.name}') -n ton-cat-lottery -- /bin/sh
-
-# 進入 backend Pod
-kubectl exec -it $(kubectl get pods -n ton-cat-lottery -l app=backend -o jsonpath='{.items[0].metadata.name}') -n ton-cat-lottery -- /bin/sh
-```
-
-**檢查資源使用量**
-```bash
-kubectl top pods -n ton-cat-lottery
-kubectl top nodes
-kubectl describe node NODE_NAME
-```
-
-**檢查事件和狀態**
-```bash
-kubectl get events -n ton-cat-lottery --sort-by='.lastTimestamp'
-kubectl get all -n ton-cat-lottery
-kubectl describe deployment backend-deployment -n ton-cat-lottery
-```
-
-**性能測試**
-```bash
-# 測試 Ingress 訪問
-curl -I http://INGRESS_IP/
-ab -n 100 -c 10 http://INGRESS_IP/
-
-# 觀察 HPA 行為
-kubectl get hpa -n ton-cat-lottery -w
-```
-
-
-## GitHub Actions (CI/CD)
-
-### 內容簡介
-
-TON Cat Lottery 使用 GitHub Actions 實現自動化 CI/CD 管線，提供基礎的持續整合和持續部署功能。CI 流程負責代碼品質檢查和 Docker 映像建構，CD 流程自動化部署到 GKE 叢集，實現完整的 DevOps 自動化工作流程。
-
-**架構設計：**
-- **CI 流程**: 代碼測試 → Docker 建構 → 安全驗證
-- **CD 流程**: 映像推送 → GKE 部署 → 健康檢查
-- **觸發條件**: 分支推送、Pull Request、手動觸發
-- **環境管理**: 支援多環境部署 (開發/生產)
 
 ### 檔案結構
-
 ```
 .github/workflows/
-├── ci.yml              # 持續整合工作流程
-└── cd.yml              # 持續部署工作流程
+├── ci.yml                           # CI 工作流程：測試與建構
+└── cd.yml                           # CD 工作流程：部署與驗證
 ```
 
-### CI 工作流程 (ci.yml)
-
-**功能特性：**
-- **代碼品質檢查**: 智能合約、前端、後端全面測試
-- **Docker 建構驗證**: 確保容器映像可正常建構
-- **並行執行**: 測試和建構任務同時進行，提高效率
-- **分支策略**: 支援 main、master、feature/devops 分支觸發
-
-**執行階段：**
-1. **測試階段** (`test` job):
-   - 智能合約測試: `cd contracts && npm run test`
-   - 前端建構測試: `cd frontend && npm run build`  
-   - Go 後端測試: `cd backend && ./test.sh`
-
-2. **Docker 建構階段** (`docker` job):
-   - 建構 backend Docker 映像
-   - 建構 frontend Docker 映像
-   - 使用 GitHub Actions 快取加速建構
-
-**觸發條件：**
-```yaml
-on:
-  push:
-    branches: [ main, master, feature/devops ]
-  pull_request:
-    branches: [ main, master ]
+**支援檔案：**
+```
+.
+├── setup-gcp-oidc.sh               # OIDC 設定自動化腳本
+└── docs/OIDC-SETUP.md              # OIDC 設定詳細指南
 ```
 
-### CD 工作流程 (cd.yml)
-
-**功能特性：**
-- **映像推送**: 自動推送到 GCP Artifact Registry
-- **GKE 部署**: 滾動更新部署到 Kubernetes 叢集
-- **健康檢查**: 驗證部署成功和服務可用性
-- **多環境支援**: 支援開發和生產環境部署
-
-**執行階段：**
-1. **認證和設定**:
-   - GCP 服務帳戶認證
-   - Docker Artifact Registry 認證
-   - GKE 叢集憑證取得
-
-2. **映像建構和推送**:
-   - 建構 backend/frontend 映像 (linux/amd64)
-   - 推送到 Artifact Registry (latest + git-sha 標籤)
-   - 驗證映像推送成功
-
-3. **Kubernetes 部署**:
-   - 自動取得 GKE 憑證
-   - 執行滾動更新 (`kubectl set image`)
-   - 等待部署完成 (`kubectl rollout status`)
-
-4. **部署驗證**:
-   - 檢查所有 Pod 為 Running 狀態
-   - 驗證服務內部連通性
-   - 輸出部署摘要信息
-
-**觸發條件：**
-```yaml
-on:
-  workflow_dispatch:    # 手動觸發
-    inputs:
-      environment: [ development, production ]
-  push:
-    branches: [ main, master ]    # 自動觸發
-```
-
-### 指令
-
-#### 手動觸發工作流程
+### 快速啟動
+#### 階段 1：OIDC 設定 (一次性設定)
 ```bash
-# 透過 GitHub CLI 手動觸發 CD
-gh workflow run cd.yml -f environment=development
+# 1. 執行自動化 OIDC 設定腳本
+gcloud config set project ton-cat-lottery-dev-2
+chmod +x setup-gcp-oidc.sh
+./setup-gcp-oidc.sh
 
-# 檢查工作流程狀態
-gh run list --workflow=ci.yml
-gh run list --workflow=cd.yml
+# 腳本將自動建立：
+# - Service Account: gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+# - Workload Identity Pool: github-pool
+# - Workload Identity Provider: github-provider
+# - IAM 角色綁定：container.developer, artifactregistry.writer 等
+```
 
-# 查看特定執行詳情
+#### 階段 2：GitHub Secrets 配置
+在 GitHub Repository → Settings → Secrets and variables → Actions 新增：
+
+**必要 Secrets (GCP OIDC)：**
+```
+GCP_PROJECT_ID
+ton-cat-lottery-dev-2
+
+GCP_WIF_PROVIDER
+projects/專案編號/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+```
+
+**選用 Secrets (Cloudflare DNS)：**
+```
+CLOUDFLARE_EMAIL
+your-cloudflare-email
+
+CLOUDFLARE_API_TOKEN
+your-cloudflare-api-token
+
+CLOUDFLARE_ZONE_ID
+c90d2fca6fa4b3cea3d8360f0649294a
+
+LETSENCRYPT_EMAIL
+your-email
+
+APP_DOMAIN
+your-cloudflare-domain
+```
+
+#### 階段 3：觸發 CI/CD 流程
+```bash
+# 方法 1：代碼推送觸發
+git add .
+git commit -m "feat: trigger CI/CD pipeline"
+git push origin feature/ssl  # 或 main
+
+# 方法 2：手動觸發 CD
+# GitHub Repository → Actions → CD → Run workflow
+
+# 方法 3：創建 Pull Request (僅觸發 CI)
+gh pr create --title "Test CI/CD" --body "Testing automated workflows"
+```
+
+#### 階段 4：監控執行狀態
+```bash
+# 1. 查看 GitHub Actions 執行狀態
+# 訪問：https://github.com/chaowei-dev/ton-cat-lottery/actions
+
+# 2. 驗證映像推送成功
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery \
+  --limit=5 --sort-by=~UPDATE_TIME
+
+# 3. 檢查 GKE 部署狀態
+kubectl get pods -n ton-cat-lottery
+kubectl get deployments -n ton-cat-lottery
+
+# 4. 驗證應用程式更新
+kubectl describe deployment frontend -n ton-cat-lottery | grep Image
+kubectl describe deployment backend -n ton-cat-lottery | grep Image
+```
+
+### 常用指令
+#### CI/CD 觸發與監控
+```bash
+# 查看最近的 workflow 執行
+gh run list --limit 10
+
+# 查看特定 workflow 的執行狀態
 gh run view RUN_ID
-gh run logs RUN_ID
+
+# 查看 workflow 執行日誌
+gh run view RUN_ID --log
+
+# 手動觸發 CD workflow
+gh workflow run cd.yml
+
+# 取消執行中的 workflow
+gh run cancel RUN_ID
 ```
 
-#### 本地測試 CI 步驟
+#### Docker 映像管理
 ```bash
-# 模擬 CI 測試流程
-cd contracts && npm ci && npm run build && npm run test
-cd ../frontend && npm ci && npm run build
-cd ../backend && chmod +x test.sh && ./test.sh
+# 查看最新推送的映像
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery \
+  --include-tags --sort-by=~UPDATE_TIME
 
-# 模擬 Docker 建構
-docker build -f docker/Dockerfile.backend -t backend:test .
-docker build -f docker/Dockerfile.frontend -t frontend:test .
+# 查看特定映像的詳細資訊
+gcloud artifacts docker images describe \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend:latest
+
+# 手動拉取最新映像 (測試用)
+docker pull asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend:latest
+
+# 清理舊映像 (保留最新 10 個版本)
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend \
+  --format="value(digest)" --limit=100 | tail -n +11 | \
+  xargs -I {} gcloud artifacts docker images delete \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend@{} --quiet
 ```
 
-#### GitHub Secrets 管理
+#### GKE 部署驗證
 ```bash
-# 使用 GitHub CLI 設定 Secrets
-gh secret set GCP_SA_KEY < service-account-key.json
-gh secret set GCP_PROJECT_ID --body "ton-cat-lottery-dev-468008"
+# 檢查最新部署狀態
+kubectl rollout status deployment/frontend -n ton-cat-lottery
+kubectl rollout status deployment/backend -n ton-cat-lottery
 
-# 查看已設定的 Secrets
-gh secret list
+# 查看部署歷史
+kubectl rollout history deployment/frontend -n ton-cat-lottery
+kubectl rollout history deployment/backend -n ton-cat-lottery
+
+# 手動觸發滾動更新
+kubectl rollout restart deployment/frontend -n ton-cat-lottery
+kubectl rollout restart deployment/backend -n ton-cat-lottery
+
+# 回滾到上一版本
+kubectl rollout undo deployment/frontend -n ton-cat-lottery
+kubectl rollout undo deployment/backend -n ton-cat-lottery
+
+# 檢查 Pod 使用的映像版本
+kubectl get pods -n ton-cat-lottery -o wide
+kubectl describe pod POD_NAME -n ton-cat-lottery | grep Image:
+```
+
+#### OIDC 認證管理
+```bash
+# 檢查 Service Account 狀態
+gcloud iam service-accounts describe \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+
+# 查看 Service Account 權限
+gcloud projects get-iam-policy ton-cat-lottery-dev-2 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com"
+
+# 檢查 Workload Identity Pool 狀態
+gcloud iam workload-identity-pools describe github-pool \
+  --location=global --project=ton-cat-lottery-dev-2
+
+# 查看 Provider 配置
+gcloud iam workload-identity-pools providers describe github-provider \
+  --location=global --workload-identity-pool=github-pool \
+  --project=ton-cat-lottery-dev-2
+```
+
+#### 本地測試與調試
+```bash
+# 本地執行類似 CI 的測試
+cd contracts && npm run build && npm run test
+cd frontend && npm run build
+cd backend && ./test.sh
+
+# 本地建構 Docker 映像 (測試用)
+docker build -f docker/Dockerfile.backend -t ton-cat-lottery-backend:local .
+docker build -f docker/Dockerfile.frontend -t ton-cat-lottery-frontend:local .
+
+# 測試映像功能
+docker run --rm -p 8080:8080 ton-cat-lottery-backend:local
+docker run --rm -p 3000:80 ton-cat-lottery-frontend:local
+
+# 驗證 GitHub Actions workflow 語法
+act --list  # 需要安裝 act 工具
+act -j test  # 本地執行 CI job
 ```
 
 ### 故障排除
-
-#### CI 常見問題
-
-**1. 智能合約測試失敗**
+#### CI Workflow 問題
 ```bash
-# 錯誤: Cannot find module '../build/CatLottery_CatLottery'
-# 原因: 合約未建構就直接測試
-# 解決: CI 已添加 `npm run build` 步驟
+# 問題：Node.js 依賴安裝失敗
+# 解決方案：檢查 package-lock.json 存在且版本一致
+cd contracts && npm ci
+cd frontend && npm ci
+
+# 問題：智能合約測試失敗
+# 檢查合約建構是否成功
+cd contracts
+npm run build
+ls -la build/  # 確認生成檔案
+
+# 問題：Go 後端測試失敗
+# 檢查測試腳本權限和依賴
+cd backend
+chmod +x test.sh
+./test.sh
+
+# 問題：Docker 建構失敗
+# 檢查 Dockerfile 語法和依賴
+docker build -f docker/Dockerfile.backend -t test-backend .
+docker build -f docker/Dockerfile.frontend -t test-frontend .
 ```
 
-**2. Go 後端測試超時**
+#### CD Workflow 問題
 ```bash
-# 錯誤: context canceled (超過 30s)
-# 原因: transaction 和 lottery 模組集成測試過複雜
-# 解決: 已排除問題模組，只測試核心模組
-```
-
-**3. Docker 建構失敗**
-```bash
-# 檢查本地建構
-docker build -f docker/Dockerfile.backend -t test .
-
-# 查看 GitHub Actions 日誌
-gh run logs --job "docker"
-```
-
-#### CD 常見問題
-
-**1. GCP 認證失敗**
-```bash
-# 檢查 Service Account Key 格式
-echo $GCP_SA_KEY | jq .
+# 問題：OIDC 認證失敗
+# 檢查 GitHub Secrets 配置
+# 確保 GCP_PROJECT_ID 和 GCP_WIF_PROVIDER 正確設定
 
 # 驗證 Service Account 權限
-gcloud iam service-accounts get-iam-policy SA_EMAIL
+gcloud projects get-iam-policy ton-cat-lottery-dev-2 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com"
+
+# 問題：Docker 映像推送失敗
+# 檢查 Artifact Registry 權限
+gcloud artifacts repositories get-iam-policy ton-cat-lottery \
+  --location=asia-east1 --project=ton-cat-lottery-dev-2
+
+# 手動測試推送
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+docker tag test-image asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/test:latest
+docker push asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/test:latest
 ```
 
-**2. Docker 推送失敗**
+#### GKE 部署問題
 ```bash
-# 錯誤: permission denied
-# 原因: Service Account 缺少 Artifact Registry 權限
-# 解決: 添加 Artifact Registry Writer 角色
+# 問題：kubectl 命令失敗
+# 檢查 GKE 集群狀態和權限
+gcloud container clusters describe ton-cat-lottery-cluster \
+  --region=asia-east1 --project=ton-cat-lottery-dev-2
 
-gcloud projects add-iam-policy-binding PROJECT_ID \
-    --member="serviceAccount:SA_EMAIL" \
-    --role="roles/artifactregistry.writer"
+# 重新取得集群憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster \
+  --region=asia-east1 --project=ton-cat-lottery-dev-2
+
+# 問題：Deployment 更新失敗
+# 檢查 namespace 是否存在
+kubectl get namespace ton-cat-lottery
+
+# 檢查 Deployment 狀態
+kubectl get deployment -n ton-cat-lottery
+kubectl describe deployment frontend -n ton-cat-lottery
+kubectl describe deployment backend -n ton-cat-lottery
+
+# 問題：Pod 啟動失敗
+# 查看 Pod 事件和日誌
+kubectl get pods -n ton-cat-lottery
+kubectl describe pod POD_NAME -n ton-cat-lottery
+kubectl logs POD_NAME -n ton-cat-lottery
 ```
 
-**3. GKE 部署失敗**
+#### 工作流程同步問題
 ```bash
-# 錯誤: deployment not found
-# 原因: Kubernetes 資源未部署或命名空間錯誤
-# 解決: 確保先手動部署一次 k8s 資源
+# 問題：CD 沒有在 CI 成功後觸發
+# 檢查 workflow_run 觸發條件
+# 確保 CI workflow 名稱正確匹配
 
-kubectl apply -f k8s/config/
-kubectl apply -f k8s/backend/
-kubectl apply -f k8s/frontend/
+# 查看 workflow 執行歷史
+gh run list --workflow=ci.yml --limit=5
+gh run list --workflow=cd.yml --limit=5
+
+# 問題：工作流程執行超時
+# 檢查是否有資源競爭或網路問題
+# 考慮調整 timeout 設定或分批執行
+
+# 問題：並行執行衝突
+# 使用 concurrency 控制避免並行衝突
+# 在 workflow 中加入：
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 ```
 
-**4. 滾動更新卡住**
+#### 權限和安全問題
 ```bash
-# 檢查部署狀態
-kubectl get deployment -n ton-cat-lottery-prod
-kubectl describe deployment backend -n ton-cat-lottery-prod
+# 問題：權限不足錯誤
+# 檢查 Service Account 所需的最小權限集合：
+# - roles/container.developer (GKE 部署)
+# - roles/artifactregistry.writer (映像推送)
+# - roles/compute.viewer (查看資源)
+# - roles/iam.serviceAccountUser (使用 Service Account)
 
-# 常見原因:
-# - 映像拉取失敗 (ImagePullError)
-# - 資源不足 (Insufficient resources)
-# - 健康檢查失敗 (Readiness probe failed)
+# 添加缺失權限
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-2 \
+  --member="serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com" \
+  --role="roles/container.developer"
+
+# 問題：Workload Identity 綁定失敗
+# 檢查 GitHub repository 路徑是否正確
+gcloud iam service-accounts get-iam-policy \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+
+# 重新綁定 repository
+gcloud iam service-accounts add-iam-policy-binding \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/chaowei-dev/ton-cat-lottery"
 ```
 
-#### 除錯技巧
-
-**查看工作流程執行歷史**
+#### 效能最佳化
 ```bash
-# 列出最近的執行
-gh run list --limit 10
+# 最佳化建構時間
+# 1. 使用 Node.js 和 Go 的快取機制
+# 2. 分層建構 Docker 映像
+# 3. 使用 buildx 快取
 
-# 查看失敗的執行詳情
-gh run view --log-failed
+# 最佳化部署時間
+# 1. 使用滾動更新策略
+# 2. 合理設定 readiness 和 liveness probe
+# 3. 預拉取映像
 
-# 重新執行失敗的工作流程
-gh run rerun RUN_ID
+# 監控工作流程執行時間
+gh run list --limit=20 --json createdAt,conclusion,databaseId,displayTitle,name,status,updatedAt
+
+# 分析瓶頸步驟
+gh run view RUN_ID --json jobs | jq '.jobs[] | {name: .name, conclusion: .conclusion, duration: (.completedAt // now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) - (.startedAt | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)}'
 ```
-
-**檢查部署後的應用狀態**
-```bash
-# 取得 GKE 憑證
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
-
-# 檢查 CD 部署的資源
-kubectl get pods -n ton-cat-lottery-prod
-kubectl get ingress -n ton-cat-lottery-prod
-
-# 查看最新部署的映像版本
-kubectl get deployment backend -n ton-cat-lottery-prod -o jsonpath='{.spec.template.spec.containers[0].image}'
-```
-
-**監控部署進度**
-```bash
-# 實時監控滾動更新
-kubectl rollout status deployment/backend -n ton-cat-lottery-prod --watch
-kubectl rollout status deployment/frontend -n ton-cat-lottery-prod --watch
-
-# 檢查部署歷史
-kubectl rollout history deployment/backend -n ton-cat-lottery-prod
-```
-
-## DNS 和 HTTPS 設定

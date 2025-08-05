@@ -1,54 +1,72 @@
-# Enable required APIs
-resource "google_project_service" "apis" {
+# Enable required GCP APIs
+resource "google_project_service" "enabled_apis" {
   for_each = toset([
     "container.googleapis.com",
     "compute.googleapis.com",
-    "containerregistry.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "iam.googleapis.com",
     "cloudresourcemanager.googleapis.com",
-    "servicenetworking.googleapis.com",
-    "dns.googleapis.com"
+    "servicenetworking.googleapis.com"
   ])
 
-  project = var.project_id
-  service = each.value
-
-  disable_dependent_services = true
-  disable_on_destroy         = false
+  service            = each.value
+  disable_on_destroy = false
 }
 
-# Create VPC network
+# VPC Network
 resource "google_compute_network" "vpc" {
   name                    = var.network_name
   auto_create_subnetworks = false
-  mtu                     = 1460
+  routing_mode            = "GLOBAL"
 
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.enabled_apis]
 }
 
-# Create subnet
+# Subnet
 resource "google_compute_subnetwork" "subnet" {
   name          = var.subnet_name
   ip_cidr_range = var.subnet_cidr
   region        = var.region
   network       = google_compute_network.vpc.id
 
+  # Enable private Google access for nodes to pull images
+  private_ip_google_access = true
+
+  # Secondary IP ranges for pods and services
   secondary_ip_range {
     range_name    = "pods"
-    ip_cidr_range = var.pods_cidr
+    ip_cidr_range = "10.1.0.0/16"
   }
 
   secondary_ip_range {
     range_name    = "services"
-    ip_cidr_range = var.services_cidr
+    ip_cidr_range = "10.2.0.0/16"
   }
-
-  depends_on = [google_project_service.apis]
 }
 
-# Create firewall rules
+# Cloud Router for NAT
+resource "google_compute_router" "router" {
+  name    = "${var.network_name}-router"
+  region  = var.region
+  network = google_compute_network.vpc.id
+}
+
+# NAT Gateway for private nodes to access internet
+resource "google_compute_router_nat" "nat" {
+  name                               = "${var.network_name}-nat"
+  router                             = google_compute_router.router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# Firewall rules
 resource "google_compute_firewall" "allow_internal" {
   name    = "${var.network_name}-allow-internal"
   network = google_compute_network.vpc.name
@@ -67,7 +85,8 @@ resource "google_compute_firewall" "allow_internal" {
     protocol = "icmp"
   }
 
-  source_ranges = [var.subnet_cidr, var.pods_cidr, var.services_cidr]
+  source_ranges = [var.subnet_cidr, "10.1.0.0/16", "10.2.0.0/16"]
+  target_tags   = ["gke-node"]
 }
 
 resource "google_compute_firewall" "allow_ssh" {
@@ -80,36 +99,30 @@ resource "google_compute_firewall" "allow_ssh" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["ssh"]
+  target_tags   = ["gke-node"]
 }
 
-resource "google_compute_firewall" "allow_http" {
-  name    = "${var.network_name}-allow-http"
-  network = google_compute_network.vpc.name
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "443"]
-  }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["http-server", "https-server"]
+# Static external IP for Ingress
+resource "google_compute_address" "static_ip" {
+  name         = var.static_ip_name
+  region       = var.region
+  address_type = "EXTERNAL"
 }
 
-# Create service account for GKE nodes
+# Service Account for GKE nodes
 resource "google_service_account" "gke_service_account" {
-  account_id   = "gke-${var.cluster_name}-sa"
-  display_name = "Service Account for GKE cluster ${var.cluster_name}"
+  account_id   = var.gke_service_account_name
+  display_name = "GKE Service Account"
+  description  = "Service account for GKE cluster nodes"
 }
 
-# Grant necessary IAM roles to the service account
+# IAM bindings for GKE service account
 resource "google_project_iam_member" "gke_service_account_roles" {
   for_each = toset([
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
     "roles/monitoring.viewer",
     "roles/stackdriver.resourceMetadata.writer",
-    "roles/storage.objectViewer",
     "roles/artifactregistry.reader"
   ])
 
@@ -118,38 +131,35 @@ resource "google_project_iam_member" "gke_service_account_roles" {
   member  = "serviceAccount:${google_service_account.gke_service_account.email}"
 }
 
-# Create static external IP for LoadBalancer
-resource "google_compute_address" "static_ip" {
-  name   = "${var.cluster_name}-static-ip"
-  region = var.region
-}
-
-# Create GKE Autopilot cluster
+# GKE Autopilot Cluster
 resource "google_container_cluster" "primary" {
   name     = var.cluster_name
   location = var.region
 
-  # Enable Autopilot
+  # Autopilot mode
   enable_autopilot = true
 
-  network    = google_compute_network.vpc.id
-  subnetwork = google_compute_subnetwork.subnet.id
+  network    = google_compute_network.vpc.name
+  subnetwork = google_compute_subnetwork.subnet.name
 
-  # IP allocation for secondary ranges
+  # IP allocation policy for secondary ranges
   ip_allocation_policy {
     cluster_secondary_range_name  = "pods"
     services_secondary_range_name = "services"
   }
 
-
   # Private cluster configuration
   private_cluster_config {
     enable_private_nodes    = true
     enable_private_endpoint = false
-    master_ipv4_cidr_block  = "172.16.0.0/28"
+    master_ipv4_cidr_block  = "10.3.0.0/28"
+
+    master_global_access_config {
+      enabled = true
+    }
   }
 
-  # Master authorized networks (allow all for now, restrict in production)
+  # Master authorized networks
   master_authorized_networks_config {
     cidr_blocks {
       cidr_block   = "0.0.0.0/0"
@@ -157,43 +167,25 @@ resource "google_container_cluster" "primary" {
     }
   }
 
-  # Release channel
-  release_channel {
-    channel = "REGULAR"
-  }
-
   # Workload Identity
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
 
-  # Maintenance policy
-  maintenance_policy {
-    daily_maintenance_window {
-      start_time = "02:00"
-    }
-  }
-
-  # Resource labels
-  resource_labels = {
-    environment = var.environment
-    project     = "ton-cat-lottery"
-  }
-
   depends_on = [
-    google_project_service.apis,
+    google_project_service.enabled_apis,
     google_compute_subnetwork.subnet,
     google_service_account.gke_service_account,
     google_project_iam_member.gke_service_account_roles
   ]
 }
 
-# Create Artifact Registry repository
-resource "google_artifact_registry_repository" "docker_repo" {
-  location      = var.region
-  repository_id = "ton-cat-lottery"
-  description   = "Docker repository for TON Cat Lottery"
+# Artifact Registry Repository
+resource "google_artifact_registry_repository" "repo" {
+  location      = var.registry_location
+  repository_id = var.repository_name
+  description   = "Docker repository for TON Cat Lottery application"
   format        = "DOCKER"
 
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.enabled_apis]
 }

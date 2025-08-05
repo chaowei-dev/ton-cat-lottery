@@ -1,19 +1,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend-deployment
+  name: backend
   namespace: ton-cat-lottery
   labels:
     app: backend
-    version: v1
-    component: api
+    project: ton-cat-lottery
 spec:
   replicas: 2
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-      maxSurge: 1
   selector:
     matchLabels:
       app: backend
@@ -21,135 +15,68 @@ spec:
     metadata:
       labels:
         app: backend
-        version: v1
-        component: api
-      annotations:
-        prometheus.io/scrape: "false"  # backend 沒有 metrics endpoint
+        project: ton-cat-lottery
     spec:
+      serviceAccountName: default
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
       containers:
       - name: backend
-        image: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-468008/ton-cat-lottery/backend:latest
+        image: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/backend:latest
         imagePullPolicy: Always
         ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
+        - containerPort: 8080
+          name: http
         env:
         - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: PORT
-        - name: ENVIRONMENT
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: ENVIRONMENT
-        - name: LOG_LEVEL
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: LOG_LEVEL
-        - name: TON_API_ENDPOINT
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: TON_API_ENDPOINT
+          value: "8080"
         - name: TON_NETWORK
           valueFrom:
             configMapKeyRef:
               name: backend-config
-              key: TON_NETWORK
-        - name: DRAW_INTERVAL
+              key: ton_network
+        - name: LOTTERY_CONTRACT_ADDRESS
           valueFrom:
             configMapKeyRef:
               name: backend-config
-              key: DRAW_INTERVAL
-        - name: MAX_PARTICIPANTS
+              key: lottery_contract_address
+        - name: NFT_CONTRACT_ADDRESS
           valueFrom:
             configMapKeyRef:
               name: backend-config
-              key: MAX_PARTICIPANTS
-        - name: MIN_PARTICIPANTS
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: MIN_PARTICIPANTS
-        - name: ENTRY_FEE_TON
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: ENTRY_FEE_TON
+              key: nft_contract_address
         - name: AUTO_DRAW
           valueFrom:
             configMapKeyRef:
               name: backend-config
-              key: AUTO_DRAW
-        - name: RETRY_COUNT
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: RETRY_COUNT
-        - name: RETRY_DELAY
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: RETRY_DELAY
-        - name: LOTTERY_CONTRACT_ADDRESS
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: LOTTERY_CONTRACT_ADDRESS
-        - name: NFT_CONTRACT_ADDRESS
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: NFT_CONTRACT_ADDRESS
+              key: auto_draw
         - name: WALLET_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: WALLET_PRIVATE_KEY
+          value: "demo-key-for-testing"
         resources:
           requests:
             memory: "128Mi"
             cpu: "100m"
-            ephemeral-storage: "512Mi"
           limits:
             memory: "256Mi"
             cpu: "200m"
-            ephemeral-storage: "1Gi"
+        # Temporarily disabled health checks due to wallet configuration issues
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: http
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /ready
+        #     port: http
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: false
           capabilities:
             drop:
             - ALL
-        # 由於 backend 是守護進程，暫時不設定健康檢查
-        # 可以考慮添加簡單的檔案檢查或進程檢查
-        # livenessProbe:
-        #   exec:
-        #     command:
-        #     - /bin/sh
-        #     - -c
-        #     - "ps aux | grep ton-cat-lottery-backend | grep -v grep"
-        #   initialDelaySeconds: 30
-        #   periodSeconds: 30
-        #   timeoutSeconds: 5
-        #   failureThreshold: 3
-        # readinessProbe:
-        #   exec:
-        #     command:
-        #     - /bin/sh
-        #     - -c
-        #     - "ps aux | grep ton-cat-lottery-backend | grep -v grep"
-        #   initialDelaySeconds: 5
-        #   periodSeconds: 10
-        #   timeoutSeconds: 5
-      terminationGracePeriodSeconds: 30
-      restartPolicy: Always

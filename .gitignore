@@ -112,7 +112,7 @@ CLAUDE.md
 *.drawio.bkp
 
 # Terraform files
-terraform-sa-key.json
+terraform*key.json
 
 # Terraform state files (contain sensitive information)
 *.tfstate
