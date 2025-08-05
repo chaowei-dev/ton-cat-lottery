@@ -47,6 +47,11 @@ jobs:
         cd frontend
         npm ci
 
+    - name: Build smart contracts
+      run: |
+        cd contracts
+        npm run build
+
     - name: Test smart contracts
       run: |
         cd contracts
