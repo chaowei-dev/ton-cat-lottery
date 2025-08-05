@@ -292,7 +292,7 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 - [x] **3. 內容整理：**
   - [x] 重新驗證這個階段的 todos
   - [x] 更新主目錄`.gitignore` for docker
-  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+  - [x] 整理內容到 `docs/DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 #### 階段 2：GCP 帳號設定
