@@ -86,6 +86,7 @@ jobs:
         context: .
         file: ./docker/Dockerfile.backend
         push: false
+        load: true
         tags: ton-cat-lottery-backend:ci
 
     - name: Build frontend Docker image
@@ -94,6 +95,7 @@ jobs:
         context: .
         file: ./docker/Dockerfile.frontend
         push: false
+        load: true
         tags: ton-cat-lottery-frontend:ci
 
     - name: Verify Docker images
