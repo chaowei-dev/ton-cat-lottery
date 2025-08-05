@@ -323,10 +323,10 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
   - [x] 下載服務帳戶金鑰 JSON 檔案
   - [x] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
 
-- [ ] **4. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for GCP
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+- [x] **4. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for GCP
+  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 #### 階段 3：基礎設施、微服務部署與 HTTPS 配置
@@ -341,7 +341,7 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 ```
 
 
-- [ ] **1. Terraform 基礎設施即代碼：**
+- [x] **1. Terraform 基礎設施即代碼：**
 
   - [x] 建立 `terraform/` 目錄結構
 
@@ -443,10 +443,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - **驗證**：確保所有資源正常運作且 HTTPS 可訪問
 
 
-- [ ] **4. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for terraform
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+- [x] **4. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for terraform
+  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 #### 階段4：K8s 應用部署準備（手動驗證一次）：
@@ -509,10 +509,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 測試應用在負載下的表現
   - 驗證 HPA 自動擴縮容功能
 
-- [ ] **8. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for k8s
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+- [x] **8. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for k8s
+  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 
@@ -587,3 +587,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] 重新驗證這個階段的 todos
   - [ ] 更新主目錄`.gitignore` for ci/cd
   - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+
+#### 階段 6：整理 Documentations
+- [ ] 整理 主目錄的 `README.md`
+- [ ] 整理 Contracts 的 `README.md`
+- [ ] 整理 Backend 的 `README.md`
+- [ ] 整理 Frontend 的 `README.md`
+- [ ] 整理 DevOps 的 `README.md`
