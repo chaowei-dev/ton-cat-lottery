@@ -1156,11 +1156,359 @@ gcloud container clusters describe ton-cat-lottery-cluster --region asia-east1
 ---
 ## GitHub Action (CI/CD)
 ### 簡介
+TON Cat Lottery 使用 GitHub Actions 實現完全自動化的 CI/CD 流程，採用 Workload Identity Federation (OIDC) 進行安全的 GCP 認證。系統支援程式碼品質檢查、自動化測試、Docker 映像建構與推送，以及 GKE 應用程式部署。
+
+**主要特色：**
+- 安全的 OIDC 認證：無需儲存 Service Account Key
+- 多環境支援：智能合約、前端、後端全端測試
+- 自動化部署：Docker 映像建構 + GKE 滾動更新
+- 工作流程依賴：CI 成功後自動觸發 CD
+- 完整的部署驗證與健康檢查
+
+**工作流程架構：**
+```
+Code Push → CI Workflow (測試+建構) → CD Workflow (部署+驗證)
+           ├── 智能合約測試                 ├── 推送到 Artifact Registry
+           ├── 前端建構測試                 ├── GKE 部署更新
+           ├── 後端整合測試                 └── 部署狀態驗證
+           └── Docker 映像建構
+```
 
 ### 檔案結構
+```
+.github/workflows/
+├── ci.yml                           # CI 工作流程：測試與建構
+└── cd.yml                           # CD 工作流程：部署與驗證
+```
+
+**支援檔案：**
+```
+.
+├── setup-gcp-oidc.sh               # OIDC 設定自動化腳本
+└── docs/OIDC-SETUP.md              # OIDC 設定詳細指南
+```
 
 ### 快速啟動
+#### 階段 1：OIDC 設定 (一次性設定)
+```bash
+# 1. 執行自動化 OIDC 設定腳本
+gcloud config set project ton-cat-lottery-dev-2
+chmod +x setup-gcp-oidc.sh
+./setup-gcp-oidc.sh
+
+# 腳本將自動建立：
+# - Service Account: gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+# - Workload Identity Pool: github-pool
+# - Workload Identity Provider: github-provider
+# - IAM 角色綁定：container.developer, artifactregistry.writer 等
+```
+
+#### 階段 2：GitHub Secrets 配置
+在 GitHub Repository → Settings → Secrets and variables → Actions 新增：
+
+**必要 Secrets (GCP OIDC)：**
+```
+GCP_PROJECT_ID
+ton-cat-lottery-dev-2
+
+GCP_WIF_PROVIDER
+projects/專案編號/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+```
+
+**選用 Secrets (Cloudflare DNS)：**
+```
+CLOUDFLARE_EMAIL
+your-cloudflare-email
+
+CLOUDFLARE_API_TOKEN
+your-cloudflare-api-token
+
+CLOUDFLARE_ZONE_ID
+c90d2fca6fa4b3cea3d8360f0649294a
+
+LETSENCRYPT_EMAIL
+your-email
+
+APP_DOMAIN
+your-cloudflare-domain
+```
+
+#### 階段 3：觸發 CI/CD 流程
+```bash
+# 方法 1：代碼推送觸發
+git add .
+git commit -m "feat: trigger CI/CD pipeline"
+git push origin feature/ssl  # 或 main
+
+# 方法 2：手動觸發 CD
+# GitHub Repository → Actions → CD → Run workflow
+
+# 方法 3：創建 Pull Request (僅觸發 CI)
+gh pr create --title "Test CI/CD" --body "Testing automated workflows"
+```
+
+#### 階段 4：監控執行狀態
+```bash
+# 1. 查看 GitHub Actions 執行狀態
+# 訪問：https://github.com/chaowei-dev/ton-cat-lottery/actions
+
+# 2. 驗證映像推送成功
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery \
+  --limit=5 --sort-by=~UPDATE_TIME
+
+# 3. 檢查 GKE 部署狀態
+kubectl get pods -n ton-cat-lottery
+kubectl get deployments -n ton-cat-lottery
+
+# 4. 驗證應用程式更新
+kubectl describe deployment frontend -n ton-cat-lottery | grep Image
+kubectl describe deployment backend -n ton-cat-lottery | grep Image
+```
 
 ### 常用指令
+#### CI/CD 觸發與監控
+```bash
+# 查看最近的 workflow 執行
+gh run list --limit 10
+
+# 查看特定 workflow 的執行狀態
+gh run view RUN_ID
+
+# 查看 workflow 執行日誌
+gh run view RUN_ID --log
+
+# 手動觸發 CD workflow
+gh workflow run cd.yml
+
+# 取消執行中的 workflow
+gh run cancel RUN_ID
+```
+
+#### Docker 映像管理
+```bash
+# 查看最新推送的映像
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery \
+  --include-tags --sort-by=~UPDATE_TIME
+
+# 查看特定映像的詳細資訊
+gcloud artifacts docker images describe \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend:latest
+
+# 手動拉取最新映像 (測試用)
+docker pull asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend:latest
+
+# 清理舊映像 (保留最新 10 個版本)
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend \
+  --format="value(digest)" --limit=100 | tail -n +11 | \
+  xargs -I {} gcloud artifacts docker images delete \
+  asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/frontend@{} --quiet
+```
+
+#### GKE 部署驗證
+```bash
+# 檢查最新部署狀態
+kubectl rollout status deployment/frontend -n ton-cat-lottery
+kubectl rollout status deployment/backend -n ton-cat-lottery
+
+# 查看部署歷史
+kubectl rollout history deployment/frontend -n ton-cat-lottery
+kubectl rollout history deployment/backend -n ton-cat-lottery
+
+# 手動觸發滾動更新
+kubectl rollout restart deployment/frontend -n ton-cat-lottery
+kubectl rollout restart deployment/backend -n ton-cat-lottery
+
+# 回滾到上一版本
+kubectl rollout undo deployment/frontend -n ton-cat-lottery
+kubectl rollout undo deployment/backend -n ton-cat-lottery
+
+# 檢查 Pod 使用的映像版本
+kubectl get pods -n ton-cat-lottery -o wide
+kubectl describe pod POD_NAME -n ton-cat-lottery | grep Image:
+```
+
+#### OIDC 認證管理
+```bash
+# 檢查 Service Account 狀態
+gcloud iam service-accounts describe \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+
+# 查看 Service Account 權限
+gcloud projects get-iam-policy ton-cat-lottery-dev-2 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com"
+
+# 檢查 Workload Identity Pool 狀態
+gcloud iam workload-identity-pools describe github-pool \
+  --location=global --project=ton-cat-lottery-dev-2
+
+# 查看 Provider 配置
+gcloud iam workload-identity-pools providers describe github-provider \
+  --location=global --workload-identity-pool=github-pool \
+  --project=ton-cat-lottery-dev-2
+```
+
+#### 本地測試與調試
+```bash
+# 本地執行類似 CI 的測試
+cd contracts && npm run build && npm run test
+cd frontend && npm run build
+cd backend && ./test.sh
+
+# 本地建構 Docker 映像 (測試用)
+docker build -f docker/Dockerfile.backend -t ton-cat-lottery-backend:local .
+docker build -f docker/Dockerfile.frontend -t ton-cat-lottery-frontend:local .
+
+# 測試映像功能
+docker run --rm -p 8080:8080 ton-cat-lottery-backend:local
+docker run --rm -p 3000:80 ton-cat-lottery-frontend:local
+
+# 驗證 GitHub Actions workflow 語法
+act --list  # 需要安裝 act 工具
+act -j test  # 本地執行 CI job
+```
 
 ### 故障排除
+#### CI Workflow 問題
+```bash
+# 問題：Node.js 依賴安裝失敗
+# 解決方案：檢查 package-lock.json 存在且版本一致
+cd contracts && npm ci
+cd frontend && npm ci
+
+# 問題：智能合約測試失敗
+# 檢查合約建構是否成功
+cd contracts
+npm run build
+ls -la build/  # 確認生成檔案
+
+# 問題：Go 後端測試失敗
+# 檢查測試腳本權限和依賴
+cd backend
+chmod +x test.sh
+./test.sh
+
+# 問題：Docker 建構失敗
+# 檢查 Dockerfile 語法和依賴
+docker build -f docker/Dockerfile.backend -t test-backend .
+docker build -f docker/Dockerfile.frontend -t test-frontend .
+```
+
+#### CD Workflow 問題
+```bash
+# 問題：OIDC 認證失敗
+# 檢查 GitHub Secrets 配置
+# 確保 GCP_PROJECT_ID 和 GCP_WIF_PROVIDER 正確設定
+
+# 驗證 Service Account 權限
+gcloud projects get-iam-policy ton-cat-lottery-dev-2 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com"
+
+# 問題：Docker 映像推送失敗
+# 檢查 Artifact Registry 權限
+gcloud artifacts repositories get-iam-policy ton-cat-lottery \
+  --location=asia-east1 --project=ton-cat-lottery-dev-2
+
+# 手動測試推送
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+docker tag test-image asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/test:latest
+docker push asia-east1-docker.pkg.dev/ton-cat-lottery-dev-2/ton-cat-lottery/test:latest
+```
+
+#### GKE 部署問題
+```bash
+# 問題：kubectl 命令失敗
+# 檢查 GKE 集群狀態和權限
+gcloud container clusters describe ton-cat-lottery-cluster \
+  --region=asia-east1 --project=ton-cat-lottery-dev-2
+
+# 重新取得集群憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster \
+  --region=asia-east1 --project=ton-cat-lottery-dev-2
+
+# 問題：Deployment 更新失敗
+# 檢查 namespace 是否存在
+kubectl get namespace ton-cat-lottery
+
+# 檢查 Deployment 狀態
+kubectl get deployment -n ton-cat-lottery
+kubectl describe deployment frontend -n ton-cat-lottery
+kubectl describe deployment backend -n ton-cat-lottery
+
+# 問題：Pod 啟動失敗
+# 查看 Pod 事件和日誌
+kubectl get pods -n ton-cat-lottery
+kubectl describe pod POD_NAME -n ton-cat-lottery
+kubectl logs POD_NAME -n ton-cat-lottery
+```
+
+#### 工作流程同步問題
+```bash
+# 問題：CD 沒有在 CI 成功後觸發
+# 檢查 workflow_run 觸發條件
+# 確保 CI workflow 名稱正確匹配
+
+# 查看 workflow 執行歷史
+gh run list --workflow=ci.yml --limit=5
+gh run list --workflow=cd.yml --limit=5
+
+# 問題：工作流程執行超時
+# 檢查是否有資源競爭或網路問題
+# 考慮調整 timeout 設定或分批執行
+
+# 問題：並行執行衝突
+# 使用 concurrency 控制避免並行衝突
+# 在 workflow 中加入：
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
+```
+
+#### 權限和安全問題
+```bash
+# 問題：權限不足錯誤
+# 檢查 Service Account 所需的最小權限集合：
+# - roles/container.developer (GKE 部署)
+# - roles/artifactregistry.writer (映像推送)
+# - roles/compute.viewer (查看資源)
+# - roles/iam.serviceAccountUser (使用 Service Account)
+
+# 添加缺失權限
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-2 \
+  --member="serviceAccount:gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com" \
+  --role="roles/container.developer"
+
+# 問題：Workload Identity 綁定失敗
+# 檢查 GitHub repository 路徑是否正確
+gcloud iam service-accounts get-iam-policy \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com
+
+# 重新綁定 repository
+gcloud iam service-accounts add-iam-policy-binding \
+  gha-deploy@ton-cat-lottery-dev-2.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/chaowei-dev/ton-cat-lottery"
+```
+
+#### 效能最佳化
+```bash
+# 最佳化建構時間
+# 1. 使用 Node.js 和 Go 的快取機制
+# 2. 分層建構 Docker 映像
+# 3. 使用 buildx 快取
+
+# 最佳化部署時間
+# 1. 使用滾動更新策略
+# 2. 合理設定 readiness 和 liveness probe
+# 3. 預拉取映像
+
+# 監控工作流程執行時間
+gh run list --limit=20 --json createdAt,conclusion,databaseId,displayTitle,name,status,updatedAt
+
+# 分析瓶頸步驟
+gh run view RUN_ID --json jobs | jq '.jobs[] | {name: .name, conclusion: .conclusion, duration: (.completedAt // now | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime) - (.startedAt | strptime("%Y-%m-%dT%H:%M:%SZ") | mktime)}'
+```
