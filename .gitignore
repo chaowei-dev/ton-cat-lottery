@@ -106,3 +106,47 @@ go.work
 
 # Go workspace file and vendor directory
 # vendor/
+
+# Claude code
+CLAUDE.md
+*.drawio.bkp
+
+# Terraform files
+terraform-sa-key.json
+
+# Terraform state files (contain sensitive information)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform provider plugins and modules
+.terraform/
+.terraform.lock.hcl
+
+# Terraform variables files (may contain sensitive data)
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform plan files (may contain sensitive information)
+*.tfplan
+*.tfplan.*
+
+# Terraform crash log files
+crash.log
+crash.*.log
+
+# Terraform CLI configuration files
+.terraformrc
+terraform.rc
+
+# Kubernetes sensitive files and configurations
+k8s/config/*secrets*.yaml
+k8s/config/*secret*.yaml
+k8s/**/secrets/
+*.kubeconfig
+*-kubeconfig.yaml
+
+# GitHub Actions and CI/CD
+.github/**/*.secret
+.github/**/*.key
+.github/workflows/secrets/

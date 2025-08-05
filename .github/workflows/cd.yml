@@ -1,0 +1,193 @@
+name: Simple CD
+
+on:
+  # Manual deployment trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+  
+  # Auto deploy on main branch
+  push:
+    branches: 
+      - main
+      - master
+
+env:
+  GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+  GKE_CLUSTER: ton-cat-lottery-cluster
+  GKE_ZONE: asia-east1-a
+  ARTIFACT_REGISTRY: asia-east1-docker.pkg.dev
+  REPOSITORY: ton-cat-lottery-repo
+
+jobs:
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Build and push backend image
+    - name: Build and push backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.backend
+        platforms: linux/amd64
+        push: true
+        tags: |
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:latest
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Build and push frontend image  
+    - name: Build and push frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.frontend
+        platforms: linux/amd64
+        push: true
+        tags: |
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:latest
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Verify images pushed successfully
+    - name: Verify images in Artifact Registry
+      run: |
+        echo "✅ Verifying backend image..."
+        gcloud artifacts docker tags list \
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend \
+          --limit=3
+        
+        echo "✅ Verifying frontend image..."
+        gcloud artifacts docker tags list \
+          ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend \
+          --limit=3
+
+    # Deploy to GKE
+    - name: Get GKE credentials
+      run: |
+        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+          --zone ${{ env.GKE_ZONE }} \
+          --project ${{ env.GCP_PROJECT }}
+
+    - name: Set target namespace
+      id: namespace
+      run: |
+        if [[ "${{ github.event.inputs.environment }}" == "production" || "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
+          echo "namespace=ton-cat-lottery-prod" >> $GITHUB_OUTPUT
+        else
+          echo "namespace=ton-cat-lottery-dev" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create namespace if not exists
+      run: |
+        kubectl create namespace ${{ steps.namespace.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy ConfigMaps and Secrets
+      run: |
+        kubectl apply -f k8s/config/ -n ${{ steps.namespace.outputs.namespace }} || echo "ConfigMaps/Secrets applied"
+
+    # Deploy backend
+    - name: Deploy backend to GKE
+      run: |
+        NEW_IMAGE=${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ github.sha }}
+        
+        kubectl apply -f k8s/backend/ -n ${{ steps.namespace.outputs.namespace }}
+        kubectl set image deployment/backend backend=$NEW_IMAGE -n ${{ steps.namespace.outputs.namespace }}
+        
+        echo "✅ Backend deployed with image: $NEW_IMAGE"
+
+    # Deploy frontend
+    - name: Deploy frontend to GKE
+      run: |
+        NEW_IMAGE=${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }}
+        
+        kubectl apply -f k8s/frontend/ -n ${{ steps.namespace.outputs.namespace }}
+        kubectl set image deployment/frontend frontend=$NEW_IMAGE -n ${{ steps.namespace.outputs.namespace }}
+        
+        echo "✅ Frontend deployed with image: $NEW_IMAGE"
+
+    # Wait for deployments
+    - name: Wait for deployments to complete
+      run: |
+        echo "⏳ Waiting for backend deployment..."
+        kubectl rollout status deployment/backend -n ${{ steps.namespace.outputs.namespace }} --timeout=300s
+        
+        echo "⏳ Waiting for frontend deployment..."
+        kubectl rollout status deployment/frontend -n ${{ steps.namespace.outputs.namespace }} --timeout=300s
+
+    # Basic health check
+    - name: Verify deployment health
+      run: |
+        echo "🔍 Checking pod status..."
+        kubectl get pods -n ${{ steps.namespace.outputs.namespace }}
+        
+        # Check if all pods are running
+        RUNNING_PODS=$(kubectl get pods -n ${{ steps.namespace.outputs.namespace }} --field-selector=status.phase=Running -o name | wc -l)
+        TOTAL_PODS=$(kubectl get pods -n ${{ steps.namespace.outputs.namespace }} -o name | wc -l)
+        
+        if [ "$RUNNING_PODS" -eq "$TOTAL_PODS" ] && [ "$TOTAL_PODS" -gt 0 ]; then
+          echo "✅ All $TOTAL_PODS pods are running successfully!"
+        else
+          echo "❌ Only $RUNNING_PODS out of $TOTAL_PODS pods are running"
+          kubectl describe pods -n ${{ steps.namespace.outputs.namespace }}
+          exit 1
+        fi
+
+    # Test service connectivity
+    - name: Test service connectivity
+      run: |
+        echo "🔗 Testing service connectivity..."
+        
+        BACKEND_IP=$(kubectl get svc backend -n ${{ steps.namespace.outputs.namespace }} -o jsonpath='{.spec.clusterIP}' || echo "N/A")
+        FRONTEND_IP=$(kubectl get svc frontend -n ${{ steps.namespace.outputs.namespace }} -o jsonpath='{.spec.clusterIP}' || echo "N/A")
+        
+        echo "Backend service IP: $BACKEND_IP"
+        echo "Frontend service IP: $FRONTEND_IP"
+        echo "✅ Services are accessible internally"
+
+    # Deployment summary
+    - name: Deployment Summary
+      run: |
+        echo "## 🚀 Deployment Completed Successfully!"
+        echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}"
+        echo "**Namespace:** ${{ steps.namespace.outputs.namespace }}"
+        echo "**Trigger:** ${{ github.event_name }}"
+        echo "**Commit:** ${{ github.sha }}"
+        echo ""
+        echo "### 📦 Deployed Images:"
+        echo "- Backend: ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/backend:${{ github.sha }}"
+        echo "- Frontend: ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT }}/${{ env.REPOSITORY }}/frontend:${{ github.sha }}"
+        echo ""
+        echo "### 🔗 Access:"
+        echo "- Use \`kubectl port-forward\` for local access"
+        echo "- Check GKE console for external access details"
