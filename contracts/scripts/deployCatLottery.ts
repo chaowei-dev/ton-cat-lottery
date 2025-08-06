@@ -22,7 +22,7 @@ export async function run(provider: NetworkProvider) {
   const uniqueEntryFee = ENTRY_FEE + BigInt(timestamp % 1000); // 添加小的隨機變化
 
   ui.write(`📦 部署者地址: ${deployerAddress}`);
-  ui.write(`🔗 測試網址：https://testnet.tonviewer.com/${deployerAddress}`);
+  ui.write(`🔗 部署者 tonviewer：https://testnet.tonviewer.com/${deployerAddress}`);
   ui.write(`💰 參與費用: ${Number(ENTRY_FEE) / 1e9} TON`);
   ui.write(`👥 最大參與人數: ${MAX_PARTICIPANTS}`);
 
@@ -35,7 +35,11 @@ export async function run(provider: NetworkProvider) {
     )
   );
 
+  ui.write(`\n`);
   ui.write(`📍 合約地址: ${catLottery.address}`);
+  ui.write(`🔗 合約 tonviewer: https://testnet.tonviewer.com/${catLottery.address}`);
+  ui.write(`🔨 請記得在 Tonkeeper （https://wallet.tonkeeper.com/coins）中確認交易！`);
+  ui.write(`\n`);
 
   // 檢查合約是否已部署
   if (await provider.isContractDeployed(catLottery.address)) {
@@ -61,7 +65,7 @@ export async function run(provider: NetworkProvider) {
   }
 
   // 部署合約
-  ui.write(`🔨 正在部署合約（請記得在 Tonkeeper 中確認交易）...`);
+  ui.write(`🔨 正在部署合約...`);
 
   await catLottery.send(
     provider.sender(),
