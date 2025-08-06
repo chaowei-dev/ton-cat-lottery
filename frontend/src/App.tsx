@@ -22,6 +22,7 @@ function App() {
       <header className="header">
         <h1>🐱 TON Cat Lottery 🎲</h1>
         <p>基於 TON 區塊鏈的貓咪 NFT 抽獎平台</p>
+        <p>Version: beta-0.1.0</p>
         {/* CI/CD Test Version: 2025-08-05-v1 */}
       </header>
       <main className="main-content">
