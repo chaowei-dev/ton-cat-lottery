@@ -9,7 +9,7 @@ import './styles/App.css';
 
 function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
-  const contractAddress = 'EQC0482t814YivoEaIea43khv6jo4Mp_sXtx0eOIgtzUsl13';
+  const contractAddress = 'EQCOfqSzzgHmoEg2K27kBx_iyLzkQETWiC9aPueccPWyvnEN';
   const toast = useToast();
 
   // 合約狀態更新回調函數
