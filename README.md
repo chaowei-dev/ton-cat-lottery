@@ -455,16 +455,22 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] GCS Bucket 建立與版本管理
     - `gsutil mb -p $PROJECT_ID -c standard -l asia-east1 gs://tfstate-ton-cat-lottery`
     - `gsutil versioning set on gs://tfstate-ton-cat-lottery`
+  - [ ] 環境分離的State管理策略
+    - [ ] staging state: `gs://tfstate-ton-cat-lottery/staging/terraform.tfstate`
+    - [ ] production state: `gs://tfstate-ton-cat-lottery/production/terraform.tfstate`  
+    - [ ] 部署時指定state路徑: `terraform init -backend-config="prefix=staging"`
   - [ ] Terraform 服務帳戶授權
     - 角色：`roles/storage.objectAdmin` ＋ `roles/storage.objectViewer`
 
 - [x] **3. 測試基礎 Terraform 流程（分階段部署）：**
   - [x] **3-1. 基礎設施**：
-    - [ ] 首次遷移 Remote State：`terraform init -migrate-state`
-    - [x] 檢查 GCP 基礎設施: `terraform plan -target=module.gcp_infrastructure`
-    - [x] 先部署 GCP 基礎設施: `terraform apply -target=module.gcp_infrastructure`
-    - [x] **驗證**：確保 GKE 叢集正常運作：`kubectl get nodes`
-    - [ ] **並行鎖測試**：兩台機器同時 `terraform plan`，其中一端應收到 state-lock 錯誤
+    - [ ] 環境部署順序: 先staging後production (降低風險)
+    - [ ] staging環境初始化: `terraform init -backend-config="prefix=staging"`
+    - [ ] staging部署: `terraform apply -var-file="terraform.tfvars.staging"`
+    - [ ] **驗證staging**: 確保 GKE 叢集正常運作：`kubectl get nodes`
+    - [ ] production環境初始化: `terraform init -backend-config="prefix=production"`  
+    - [ ] production部署: `terraform apply -var-file="terraform.tfvars.production"`
+    - [ ] **state隔離測試**: 兩環境可並行操作且互不影響
 
   - [x] **3-2. SSL 和 DNS**：
     - `terraform plan -target=helm_release.cert_manager` - 檢查 cert-manager 部署
@@ -516,6 +522,7 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 添加 NetworkPolicy YAML（網路安全隔離）
   - [ ] 擴展K8s配置支援多環境
     - [ ] 重組目錄: `k8s/staging/`, `k8s/production/`
+    - [ ] **namespace管理**: 每個環境目錄包含namespace.yaml定義
     - [ ] 環境特定ConfigMap (不同合約地址、配置參數)
     - [ ] 差異化資源配置 (staging較小limits, production適當requests)
     - [ ] Ingress多域名路由 (staging.xxx.com → staging namespace)
@@ -535,9 +542,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 手動部署 frontend：`kubectl apply -f k8s/frontend/`
   - 部署 Ingress：`kubectl apply -f k8s/ingress/`（等待 Ingress YAML 創建完成）
   - [ ] 擴展部署流程支援多環境
-    - [ ] 創建環境專用namespace: `ton-cat-lottery-staging`, `ton-cat-lottery-production`
-    - [ ] 測試staging部署: `kubectl apply -f k8s/staging/ -n ton-cat-lottery-staging`
-    - [ ] 測試production部署: `kubectl apply -f k8s/production/ -n ton-cat-lottery-production`
+    - [ ] **namespace自動創建**: `kubectl apply -f k8s/staging/namespace.yaml` (內含namespace定義)
+    - [ ] staging完整部署: `kubectl apply -f k8s/staging/` (包含namespace、config、apps)
+    - [ ] production完整部署: `kubectl apply -f k8s/production/` (包含namespace、config、apps)
+    - [ ] **部署順序**: namespace → configmap/secret → deployment → service → ingress
 
 - [x] **6. 驗證應用（待完整部署後進行）：**
   - 檢查所有 Pod 狀態為 Running：`kubectl get pods -n ton-cat-lottery`
@@ -584,8 +592,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 - [x] **2. 基礎 CI 工作流程 (`ci.yml`)：**
   - [x] **觸發條件**:
-    - [ ] 擴展PR驗證支援: `on: pull_request: branches: [dev, main, release/*]`
-    - [ ] 針對不同target分支執行相應驗證
+    - [ ] PR驗證支援完整GitFlow: `on: pull_request: branches: [dev, main, release/*]`
+    - [ ] 分支特定驗證: feature→dev, release→main 的不同驗證策略
   - [x] **核心代碼品質檢查：**
     - [x] 智能合約測試：`cd contracts && npm run test`
     - [x] 前端建構測試：`cd frontend && npm run build`
@@ -612,7 +620,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [x] 手動觸發部署選項 (workflow_dispatch)
     - [x] `main` 分支推送自動部署到 production
     - [ ] `dev` 分支推送自動部署到 staging
-    - [ ] 環境變數設定: 根據分支自動判斷部署目標
+    - [ ] `release/*` 分支不自動部署 (僅CI驗證，等待合併到main)
+    - [ ] 環境變數設定: `ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'staging' }}`
   
   - [x] **映像推送到 Artifact Registry：**
     - [x] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
@@ -621,8 +630,9 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [x] 推送 frontend 映像：基礎標籤策略 (latest, git-sha)
     - [x] **驗證映像推送成功**：檢查 Artifact Registry
     - [ ] 環境特定映像標籤策略
-      - [ ] dev分支標籤: `staging-{commit}`
-      - [ ] main分支標籤: `production-{commit}`
+      - [ ] dev分支: `staging-{commit}`
+      - [ ] main分支: `production-{commit}`
+      - [ ] release分支: `release-{version}-{commit}` (用於驗證，不部署)
   
   - [x] **GKE 部署：**
     - [x] 取得 GKE 憑證：gcloud container clusters get-credentials …
@@ -631,7 +641,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] 分支驅動的環境部署
       - [ ] dev分支: 部署到 staging namespace
       - [ ] main分支: 部署到 production namespace
-      - [ ] 使用環境特定K8s配置
+      - [ ] release分支: 跳過部署 (只進行CI驗證)
+      - [ ] 使用環境特定K8s配置: `k8s/$ENVIRONMENT/`
   
   - [x] **部署驗證：**
     - [x] 確認所有 Pod Running
