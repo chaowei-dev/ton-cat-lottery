@@ -152,6 +152,12 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 > 本清單依照功能模組拆解為可執行任務，便於開發與進度追蹤。
 
+- [ ] 智能合約模組: 需要環境特定的合約部署策略
+- [ ] 後端模組: 需要環境變數和配置管理
+- [ ] 前端模組: 需要環境特定的構建配置
+- [ ] DevOps模組: 需要重新設計Terraform和K8s配置
+- [ ] CI/CD模組: 需要多環境部署流程
+
 ---
 ### 智能合約模組（Tact）
 
@@ -293,9 +299,16 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
   - [x] 撰寫 `Dockerfile`（frontend）
   - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
   - [x] 撰寫 `.env` 檔案與 secret 管理
+  - [ ] 建立環境特定配置檔案
+    - [ ] `docker-compose.staging.yml` (較少資源限制，debug模式)
+    - [ ] `docker-compose.production.yml` (嚴格資源限制，優化模式)
+    - [ ] `.env.staging` 和 `.env.production` 環境變數檔案
 
 - [x] **2. 測試 Dockerfile**
   - [x] 本地 Docker 環境驗證與測試
+  - [ ] 測試環境特定配置
+    - [ ] 驗證 staging 環境: `docker-compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up`
+    - [ ] 驗證 production 環境: `docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production up`
 
 - [x] **3. 內容整理：**
   - [x] 重新驗證這個階段的 todos
@@ -409,6 +422,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 - [x] **2. 創建主要配置檔案：**
   - [x] `main.tf` - 主要資源定義（GCP 基礎設施）
+    - [ ] 資源命名策略與成本優化
+      - [ ] GKE集群: 採用單集群 + Namespace隔離（雙集群成本為兩倍）
+      - [ ] 集群名稱: `ton-cat-lottery-cluster`（環境通過namespace區分）
+      - [ ] 其他資源環境變數化: `${var.project_id}-${var.environment}`
   - [x] `variables.tf` - 變數定義
   - [x] `outputs.tf` - 輸出值（叢集端點、IP 等）
   - [x] `versions.tf` - Provider 版本鎖定
@@ -419,10 +436,21 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [x] `variables.tf` - 變數定義補齊
     - 基礎 GCP 變數
     - 新增域名相關變數 (domain_name, cloudflare_email, cloudflare_api_token, letsencrypt_email)
+    - [ ] 環境變數擴充
+      - [ ] `environment` 變數 (staging/production)
+      - [ ] 環境特定域名變數 (staging_domain, production_domain)
   - [x] `cert-manager.tf` - cert-manager Helm chart 和 Let's Encrypt ClusterIssuer
   - [x] `dns.tf` - Cloudflare DNS A 記錄自動配置
+    - [ ] 擴展DNS配置支援雙域名
+      - [ ] 主域名: `cat-lottery.chaowei-liu.com` (production)
+      - [ ] 子域名: `staging.cat-lottery.chaowei-liu.com` (staging)
+      - [ ] 兩套靜態IP分配對應不同環境
   - [x] `terraform.tfvars` - 實際變數值
     - `cp terraform.tfvars.example terraform.tfvars`
+    - [ ] 建立環境特定變數檔案
+      - [ ] `terraform.tfvars.staging` (測試環境配置)
+      - [ ] `terraform.tfvars.production` (正式環境配置)
+      - [ ] 環境部署: `terraform apply -var-file="terraform.tfvars.staging"`
   - [ ] `backend.tf` – Remote State 設定（GCS）
   - [ ] GCS Bucket 建立與版本管理
     - `gsutil mb -p $PROJECT_ID -c standard -l asia-east1 gs://tfstate-ton-cat-lottery`
@@ -457,7 +485,7 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
-#### 階段4：K8s 應用部署準備（手動驗證一次）
+#### 階段 4：K8s 應用部署準備（手動驗證一次）
 
 - [x] **1. 準備階段：**
   - [x] 確認 Terraform 基礎設施已部署完成
@@ -470,6 +498,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 建構 backend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest --push .`
   - 建構 frontend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend --target production -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest --push .`
   - **驗證映像**：確認映像架構正確：`docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest`
+  - [ ] 建立環境特定映像標籤
+    - [ ] staging標籤: `backend:staging-{commit}`, `frontend:staging-{commit}`
+    - [ ] production標籤: `backend:production-{commit}`, `frontend:production-{commit}`
+    - [ ] 分支驅動策略: dev分支→staging, main分支→production
 
 - [x] **3. 構建 K8s 部署檔案：**
   - 組織 `k8s/` 目錄結構（backend/, frontend/, config/）
@@ -482,6 +514,11 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 創建 `k8s/ingress/` 目錄
   - 創建 Ingress YAML（支援 HTTPS、域名、TLS 配置）
   - 添加 NetworkPolicy YAML（網路安全隔離）
+  - [ ] 擴展K8s配置支援多環境
+    - [ ] 重組目錄: `k8s/staging/`, `k8s/production/`
+    - [ ] 環境特定ConfigMap (不同合約地址、配置參數)
+    - [ ] 差異化資源配置 (staging較小limits, production適當requests)
+    - [ ] Ingress多域名路由 (staging.xxx.com → staging namespace)
 
 - [x] **4. 安全性和生產準備：**
   - 移除硬編碼的測試值，使用 Secret 和 ConfigMap
@@ -497,6 +534,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 手動部署 backend：`kubectl apply -f k8s/backend/`
   - 手動部署 frontend：`kubectl apply -f k8s/frontend/`
   - 部署 Ingress：`kubectl apply -f k8s/ingress/`（等待 Ingress YAML 創建完成）
+  - [ ] 擴展部署流程支援多環境
+    - [ ] 創建環境專用namespace: `ton-cat-lottery-staging`, `ton-cat-lottery-production`
+    - [ ] 測試staging部署: `kubectl apply -f k8s/staging/ -n ton-cat-lottery-staging`
+    - [ ] 測試production部署: `kubectl apply -f k8s/production/ -n ton-cat-lottery-production`
 
 - [x] **6. 驗證應用（待完整部署後進行）：**
   - 檢查所有 Pod 狀態為 Running：`kubectl get pods -n ton-cat-lottery`
@@ -510,6 +551,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 檢查日誌和監控指標
   - 測試 Pod 自動重啟和擴縮容
   - 驗證網路策略生效（如有配置）
+  - [ ] 擴展驗證流程支援多環境
+    - [ ] staging環境檢查: `kubectl get pods -n ton-cat-lottery-staging`
+    - [ ] production環境檢查: `kubectl get pods -n ton-cat-lottery-production`
+    - [ ] 域名路由驗證: staging和production域名分別可正常訪問
 
 - [ ] **7. 效能和監控驗證：**
   - 配置 Google Cloud Monitoring 集成
@@ -530,8 +575,6 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 **目標： 自動化驗證和部署到 GCP（採用 Workload Identity Federation）**
 
-##### **基礎流程 (必要)：基本 DevOps**
-
 - [x] **1. 準備階段：**
   - [x] 建立 `.github/workflows/` 目錄結構
   - [x] 一次性 WIF 設定
@@ -540,6 +583,9 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - 將 YOURORG/your-repo 與 gha-deploy 綁定 `roles/iam.workloadIdentityUser`
 
 - [x] **2. 基礎 CI 工作流程 (`ci.yml`)：**
+  - [x] **觸發條件**:
+    - [ ] 擴展PR驗證支援: `on: pull_request: branches: [dev, main, release/*]`
+    - [ ] 針對不同target分支執行相應驗證
   - [x] **核心代碼品質檢查：**
     - [x] 智能合約測試：`cd contracts && npm run test`
     - [x] 前端建構測試：`cd frontend && npm run build`
@@ -562,9 +608,11 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [x] 安裝 gcloud、kubectl 等 CLI
 
 - [x] **3. 基礎 CD 工作流程 (`cd.yml`)：**
-  - [x] **簡單觸發條件：**
+  - [x] **分支觸發條件（符合DevFlow）：**
     - [x] 手動觸發部署選項 (workflow_dispatch)
-    - [x] `main` 分支推送自動部署
+    - [x] `main` 分支推送自動部署到 production
+    - [ ] `dev` 分支推送自動部署到 staging
+    - [ ] 環境變數設定: 根據分支自動判斷部署目標
   
   - [x] **映像推送到 Artifact Registry：**
     - [x] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
@@ -572,15 +620,25 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [x] 推送 backend 映像：基礎標籤策略 (latest, git-sha)
     - [x] 推送 frontend 映像：基礎標籤策略 (latest, git-sha)
     - [x] **驗證映像推送成功**：檢查 Artifact Registry
+    - [ ] 環境特定映像標籤策略
+      - [ ] dev分支標籤: `staging-{commit}`
+      - [ ] main分支標籤: `production-{commit}`
   
   - [x] **GKE 部署：**
     - [x] 取得 GKE 憑證：gcloud container clusters get-credentials …
     - [x] 滾動更新：kubectl set image deployment/backend …、deployment/frontend …
     - [x] kubectl rollout status 等待完成
+    - [ ] 分支驅動的環境部署
+      - [ ] dev分支: 部署到 staging namespace
+      - [ ] main分支: 部署到 production namespace
+      - [ ] 使用環境特定K8s配置
   
   - [x] **部署驗證：**
     - [x] 確認所有 Pod Running
     - [x] 服務連通性測試
+    - [ ] 環境特定部署驗證
+      - [ ] 驗證目標namespace的Pod狀態
+      - [ ] 驗證對應環境域名可正常訪問
 
 - [x] **4. GitHub Secrets 配置：**
   - [x] **GCP OIDC 認證 (必要)**：
@@ -610,12 +668,20 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] 配置 Prometheus 短期數據保留（3-7天，節省存儲成本）
   - [ ] 設置 Grafana 基礎認證（admin/password）
   - [ ] **驗證**：確認 Prometheus 和 Grafana 正常啟動
+  - [ ] 監控架構支援多環境
+    - [ ] 單一Prometheus收集兩環境數據（成本效益）
+    - [ ] 環境標籤策略: `environment=staging/production`
+    - [ ] 部署到獨立monitoring namespace
 
 - [ ] **2. 應用健康檢查和基礎指標：**
   - [ ] 在 K8s Deployment 中添加 `livenessProbe` 和 `readinessProbe`
   - [ ] 後端實作 `/health` 和 `/metrics` endpoint（基礎 Prometheus 指標）
   - [ ] 配置 Prometheus 收集 GKE 集群基本指標
   - [ ] **驗證**：確認健康檢查和指標收集正常
+  - [ ] metrics環境標籤配置
+    - [ ] 自動為metrics添加環境標籤
+    - [ ] ServiceMonitor分別監控不同namespace
+    - [ ] Pod labels包含環境識別資訊
 
 - [ ] **3. 簡化的 Grafana 儀表板：**
   - [ ] 建立單一綜合儀表板，包含：
@@ -623,18 +689,30 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] 資源使用率（CPU、記憶體）
     - [ ] 業務指標（抽獎狀態、合約餘額）
   - [ ] **驗證**：確認儀表板顯示正確數據
+  - [ ] 儀表板多環境設計
+    - [ ] 環境過濾器: 下拉選單切換staging/production/all
+    - [ ] 環境比較視圖: 並排顯示不同環境數據
+    - [ ] 差異化閾值: staging寬鬆, production嚴格
 
 - [ ] **4. 成本控制監控：**
   - [ ] 設置 GCP 預算告警（月度成本超過閾值）
   - [ ] 配置資源使用告警（避免超額費用）
   - [ ] 設置基礎 Prometheus 告警規則（服務宕機、高資源使用）
   - [ ] **驗證**：測試成本和資源告警通知
+  - [ ] 差異化告警策略
+    - [ ] staging: 寬鬆閾值，僅記錄
+    - [ ] production: 嚴格閾值，立即通知
+    - [ ] 環境標籤路由告警分發
 
 - [ ] **5. 基本日誌管理：**
   - [ ] 確保應用日誌輸出到 stdout/stderr
   - [ ] 使用 `kubectl logs` 查看日誌（不部署 Loki，降低複雜度）
   - [ ] 配置 GCP Cloud Logging 基礎日誌保留
   - [ ] **驗證**：確認能正常查看應用日誌
+  - [ ] 日誌環境區分配置
+    - [ ] 自動標記環境標籤
+    - [ ] GCP Cloud Logging環境過濾
+    - [ ] namespace特定查詢指令
 
 - [ ] **6. 告警通知：**
   - [ ] 配置 Grafana 告警通知（Email）
