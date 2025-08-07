@@ -31,7 +31,12 @@
   - **cert-manager**：https://cert-manager.io/docs/
   - **GitHub Action**：https://docs.github.com/en/actions/get-started/understand-github-actions
 - 開發過程透過 **cursor** 和 **Claude Code** 來協助開發
+---
 - 開發流程：
+  ![DevFlow](figures/DevFlow.png)
+
+---
+- 部署流程：
   ![DevOpsArch](figures/DevOpsArch.png)
 
 
@@ -139,6 +144,7 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 | 前端     | React                          |
 | 部署     | Docker, GitHub Actions, k8s    |
 | 基礎設施 | Terraform, GCP                 |
+| 監控觀測 | Prometheus, Grafana, Alertmanager |
 
 ---
 
@@ -274,6 +280,7 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 |  3   | 基礎設施、微服務部署與 HTTPS 配置 | Terraform + GKE + cert-manager + Cloudflare DNS + HTTPS | 完成基礎設施，包含 GCP + GKE + SSL |
 |  4   | K8s 應用部署準備        | K8s + Artifact Registry | 手動驗證完整部署流程 |
 |  5   | 自動化部署              | GitHub Actions + GCP + OIDC | 自動化驗證和部署到 GCP |
+|  6   | 監控觀測體系            | Grafana + Prometheus + Alertmanager | 建立完整監控觀測體系 |
 
 ---
 #### 階段 1：基礎容器化
@@ -450,7 +457,7 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
-#### 階段4：K8s 應用部署準備（手動驗證一次）：
+#### 階段4：K8s 應用部署準備（手動驗證一次）
 
 - [x] **1. 準備階段：**
   - [x] 確認 Terraform 基礎設施已部署完成
@@ -517,7 +524,7 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 ---
 
-#### 階段 5：自動化部署（GitHub Actions CI/CD）：
+#### 階段 5：自動化部署（GitHub Actions CI/CD）
 
 >技術：GitHub Actions + GCP
 
@@ -591,7 +598,106 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [x] 更新主目錄`.gitignore` for ci/cd
   - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
-#### 階段 6：整理 Documentations
+### 階段 6：Monitoring
+
+> 技術：Grafana + Prometheus + Alertmanager + Loki + GCP Monitoring
+
+**目標：建立完整的監控觀測體系，涵蓋應用層、基礎設施層和業務指標監控**
+
+- [ ] **1. Terraform 監控基礎設施：**
+  - [ ] 建立 `monitoring.tf` - Prometheus Operator + Grafana + Alertmanager + Loki 部署
+  - [ ] 新增必要的 GCP API：`monitoring.googleapis.com`、`logging.googleapis.com`
+  - [ ] 配置 GKE Workload Identity 用於監控服務帳戶
+  - [ ] 設定 Prometheus 和 Loki 資料持久化儲存（GCP Persistent Disk）
+  - [ ] 配置監控服務 RBAC 和安全訪問控制
+  - [ ] 配置 Grafana 外部訪問 Ingress 與 SSL 憑證
+
+- [ ] **2. 監控堆疊部署與配置：**
+  - [ ] 部署 kube-prometheus-stack 和 Loki Helm chart 到 GKE
+  - [ ] 配置 Prometheus 數據保留策略和儲存容量
+  - [ ] 配置 Loki 日誌聚合和保留策略
+  - [ ] 設定 Grafana 管理認證（OAuth 或基礎認證）
+  - [ ] 配置 Alertmanager 路由和通知渠道（Slack webhook、Email SMTP 詳細配置）
+  - [ ] 部署 Prometheus Pushgateway 用於前端指標推送
+  - [ ] **驗證**：確認所有監控組件 Pod 正常運行
+
+- [ ] **3. 後端服務監控整合：**
+  - [ ] Go 後端整合 Prometheus client library
+  - [ ] 實作業務指標收集：
+    - [ ] 抽獎狀態指標（參與人數、抽獎成功率、輪次統計）
+    - [ ] TON 區塊鏈交互指標（RPC 調用次數、交易確認時間）
+    - [ ] 錯誤率和響應時間指標
+  - [ ] 配置 `/metrics` endpoint 和服務發現
+  - [ ] **驗證**：確認後端指標正確暴露並被 Prometheus 收集
+
+- [ ] **4. 前端應用監控整合：**
+  - [ ] React 前端整合客戶端監控（web-vitals 或自定義指標）
+  - [ ] 實作用戶行為追蹤：
+    - [ ] TonConnect 錢包連接成功率
+    - [ ] 抽獎參與轉換率和用戶互動指標
+    - [ ] 頁面載入時間和錯誤率
+  - [ ] 設定前端指標上報機制（推送到 Prometheus Pushgateway）
+  - [ ] **驗證**：確認前端指標能正確收集和顯示
+
+- [ ] **5. 智能合約和區塊鏈監控：**
+  - [ ] 實作合約狀態監控：
+    - [ ] 抽獎合約餘額、參與者數量、當前輪次
+    - [ ] NFT 合約發行統計和轉移記錄
+  - [ ] TON 區塊鏈網路狀態監控：
+    - [ ] TON API 節點可用性和響應時間監控
+    - [ ] 交易確認時間和 TON 交易費用變化
+    - [ ] TON 網路分片狀態和工作鏈監控
+  - [ ] 實作 TON 區塊鏈事件監控和警報
+  - [ ] **驗證**：確認區塊鏈指標正確更新
+
+- [ ] **6. 日誌管理和基礎設施監控：**
+  - [ ] 配置 Promtail 收集應用日誌到 Loki
+  - [ ] 設定日誌結構化和標籤策略
+  - [ ] 配置 Node Exporter 收集 GKE 節點系統指標
+  - [ ] 整合 GCP Monitoring（GKE 集群、Pod、服務狀態）
+  - [ ] 配置網路和存儲性能監控
+  - [ ] 設定資源使用率告警（CPU、Memory、磁碟空間）
+  - [ ] 配置 GCP 成本監控和資源優化告警
+  - [ ] **驗證**：確認基礎設施指標和日誌完整收集
+
+- [ ] **7. Grafana 儀表板設計：**
+  - [ ] 業務概覽儀表板：
+    - [ ] 抽獎統計（總參與數、中獎率、NFT 發行量）
+    - [ ] 用戶活動分析（活躍用戶、錢包連接統計）
+  - [ ] 技術監控儀表板：
+    - [ ] 服務健康度（可用性、響應時間、錯誤率）
+    - [ ] 基礎設施狀態（Pod 狀態、資源使用率）
+  - [ ] 區塊鏈監控儀表板：
+    - [ ] 合約狀態和交易分析
+    - [ ] TON 網路狀態和性能指標
+  - [ ] 日誌分析儀表板：
+    - [ ] 應用錯誤日誌聚合和分析
+    - [ ] 系統日誌和安全事件監控
+  - [ ] **驗證**：確認所有儀表板數據正確顯示
+
+- [ ] **8. 告警規則和通知設定：**
+  - [ ] 配置服務可用性告警（Pod 重啟、服務不可用）
+  - [ ] 設定業務告警（抽獎失敗率、交易異常、TON 節點連接問題）
+  - [ ] 配置資源告警（CPU/Memory 使用率超閾值、GCP 成本異常）
+  - [ ] 配置安全告警（異常訪問、權限變更）
+  - [ ] 整合通知渠道（Slack webhook、Email SMTP 完整配置）
+  - [ ] **驗證**：測試告警觸發和通知發送
+
+- [ ] **9. 測試與驗證完整流程：**
+  - [ ] 端到端監控功能測試（指標收集、日誌聚合、告警觸發）
+  - [ ] TON 區塊鏈特定場景測試（節點切換、網路延遲）
+  - [ ] 告警規則觸發測試（手動製造異常場景）
+  - [ ] 災難恢復場景測試（Pod 重啟、網路中斷）
+  - [ ] 監控數據準確性和安全性驗證
+  - [ ] **驗證**：確認監控系統在各種場景下正常工作
+
+- [ ] **10. 文檔整理和部署自動化：**
+  - [ ] 監控配置納入 Terraform 和 GitHub Actions 版本控制
+  - [ ] 整理監控內容到 `DevOpsREADME.md`：架構圖 + 快速部署 + 故障排除 + TON 特定監控說明
+  - [ ] 建立監控運維手冊（告警處理流程、常見問題排查）
+  - [ ] **驗證**：確認文檔完整性和部署自動化流程
+
+### 整理 Documentations
 - [ ] 整理 Contracts 的 `README.md`
 - [ ] 整理 Backend 的 `README.md`
 - [ ] 整理 Frontend 的 `README.md`
