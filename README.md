@@ -300,17 +300,27 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
   - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
   - [x] 撰寫 `.env` 檔案與 secret 管理
   - [ ] 建立環境特定配置檔案
-    - [ ] `docker-compose.staging.yml` (較少資源限制，debug模式)
-    - [ ] `docker-compose.production.yml` (嚴格資源限制，優化模式)
-    - [ ] `.env.staging` 和 `.env.production` 環境變數檔案
+    - [ ] `docker-compose.staging.yml` (較少資源限制，debug模式，開啟詳細日誌)
+    - [ ] `docker-compose.production.yml` (嚴格資源限制，優化模式，安全配置)
+    - [ ] `.env.staging` 環境變數檔案 (testnet 合約地址，debug參數)
+    - [ ] `.env.production` 環境變數檔案 (mainnet 合約地址，生產參數)
+    - [ ] 配置檔案模板化：提取共同配置，避免重複
 
 - [x] **2. 測試 Dockerfile**
   - [x] 本地 Docker 環境驗證與測試
   - [ ] 測試環境特定配置
     - [ ] 驗證 staging 環境: `docker-compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up`
     - [ ] 驗證 production 環境: `docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production up`
+    - [ ] 環境切換測試：確保不同環境可並行運行且互不干擾
+    - [ ] 資源配置驗證：staging 使用較少資源，production 使用完整資源配置
 
-- [x] **3. 內容整理：**
+- [ ] **3. 映像優化與安全配置：**
+  - [ ] 多階段建構優化：減少最終映像大小
+  - [ ] 非 root 用戶配置：增強容器安全性
+  - [ ] 健康檢查配置：實現容器自我監測
+  - [ ] .dockerignore 優化：排除不必要檔案，加速建構
+
+- [x] **4. 內容整理：**
   - [x] 重新驗證這個階段的 todos
   - [x] 更新主目錄`.gitignore` for docker
   - [x] 整理內容到 `docs/DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
@@ -326,6 +336,10 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
   - [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
   - [x] 建立專案 `ton-cat-lottery-dev-2`
   - [x] 設定計費帳戶與預算告警（$50/月 開發限制）
+  - [ ] **預算管理優化：**
+    - [ ] 設定多層級預算告警：25%、50%、75%、90% 閾值
+    - [ ] 環境別預算分配：staging($15/月), production($30/月), monitoring($5/月)
+    - [ ] 自動關機政策：staging 環境非工作時間自動停機
   
 - [x] **2. 本地開發工具安裝：**
   - [x] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
@@ -343,6 +357,10 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
     - Service Account Admin
   - [x] 下載服務帳戶金鑰 JSON 檔案
   - [x] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
+  - [ ] **安全性最佳實踐優化：**
+    - [ ] 服務帳戶最小權限原則：檢視並精簡權限，移除不必要的 Project Editor
+    - [ ] 金鑰輪替計畫：設置定期輪替提醒（建議每90天）
+    - [ ] 金鑰安全存儲：確保本機金鑰檔案權限設為 600
 
 - [x] **4. 內容整理：**
   - [x] 重新驗證這個階段的 todos
@@ -426,6 +444,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
       - [ ] GKE集群: 採用單集群 + Namespace隔離（雙集群成本為兩倍）
       - [ ] 集群名稱: `ton-cat-lottery-cluster`（環境通過namespace區分）
       - [ ] 其他資源環境變數化: `${var.project_id}-${var.environment}`
+      - [ ] **資源標籤策略**：統一標籤 (environment, project, cost-center) 便於成本追蹤
+      - [ ] **Autopilot 配置**：確保使用 GKE Autopilot 降低管理成本
   - [x] `variables.tf` - 變數定義
   - [x] `outputs.tf` - 輸出值（叢集端點、IP 等）
   - [x] `versions.tf` - Provider 版本鎖定
@@ -439,6 +459,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] 環境變數擴充
       - [ ] `environment` 變數 (staging/production)
       - [ ] 環境特定域名變數 (staging_domain, production_domain)
+      - [ ] **變數驗證**：加入 variable validation 確保環境值正確
+      - [ ] **敏感變數標記**：API tokens 等敏感變數設為 sensitive = true
   - [x] `cert-manager.tf` - cert-manager Helm chart 和 Let's Encrypt ClusterIssuer
   - [x] `dns.tf` - Cloudflare DNS A 記錄自動配置
     - [ ] 擴展DNS配置支援雙域名
@@ -455,12 +477,16 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] GCS Bucket 建立與版本管理
     - `gsutil mb -p $PROJECT_ID -c standard -l asia-east1 gs://tfstate-ton-cat-lottery`
     - `gsutil versioning set on gs://tfstate-ton-cat-lottery`
-  - [ ] 環境分離的State管理策略
+    - [ ] **生命週期管理**：設定舊版本自動清理（保留30個版本）
+    - [ ] **存取控制**：限制只有 Terraform SA 可存取
+  - [ ] 環境分離的State管理策略 ⭐ **高優先級**
     - [ ] staging state: `gs://tfstate-ton-cat-lottery/staging/terraform.tfstate`
     - [ ] production state: `gs://tfstate-ton-cat-lottery/production/terraform.tfstate`  
     - [ ] 部署時指定state路徑: `terraform init -backend-config="prefix=staging"`
-  - [ ] Terraform 服務帳戶授權
+    - [ ] **State 鎖定機制**：啟用 state locking 防止並發修改
+  - [ ] Terraform 服務帳戶授權 ⭐ **高優先級**
     - 角色：`roles/storage.objectAdmin` ＋ `roles/storage.objectViewer`
+    - [ ] **最小權限驗證**：確認SA只有必要的GCS和GCP資源權限
 
 - [x] **3. 測試基礎 Terraform 流程（分階段部署）：**
   - [x] **3-1. 基礎設施**：
@@ -471,6 +497,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] production環境初始化: `terraform init -backend-config="prefix=production"`  
     - [ ] production部署: `terraform apply -var-file="terraform.tfvars.production"`
     - [ ] **state隔離測試**: 兩環境可並行操作且互不影響
+    - [ ] **災難恢復驗證**: 測試從備份恢復 state 和資源
+    - [ ] **回滾機制測試**: 確保可以安全回退到前一個穩定狀態
 
   - [x] **3-2. SSL 和 DNS**：
     - `terraform plan -target=helm_release.cert_manager` - 檢查 cert-manager 部署
@@ -508,6 +536,9 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] staging標籤: `backend:staging-{commit}`, `frontend:staging-{commit}`
     - [ ] production標籤: `backend:production-{commit}`, `frontend:production-{commit}`
     - [ ] 分支驅動策略: dev分支→staging, main分支→production
+    - [ ] **映像安全掃描**: 每次建構後自動掃描漏洞
+    - [ ] **映像簽名驗證**: 使用 Cosign 對映像進行數位簽名
+    - [ ] **建構快取優化**: 利用多階段建構和層級快取減少建構時間
 
 - [x] **3. 構建 K8s 部署檔案：**
   - 組織 `k8s/` 目錄結構（backend/, frontend/, config/）
@@ -526,13 +557,24 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] 環境特定ConfigMap (不同合約地址、配置參數)
     - [ ] 差異化資源配置 (staging較小limits, production適當requests)
     - [ ] Ingress多域名路由 (staging.xxx.com → staging namespace)
+    - [ ] **資源配額管理**: 每個namespace設置ResourceQuota防止資源濫用
+    - [ ] **網路策略隔離**: 確保不同環境間網路完全隔離
 
-- [x] **4. 安全性和生產準備：**
-  - 移除硬編碼的測試值，使用 Secret 和 ConfigMap
-  - 配置適當的資源請求和限制
-  - 添加 Pod Security Context（非 root 用戶）
-  - 配置 Horizontal Pod Autoscaler (HPA)
-  - 設定適當的 labels 和 annotations
+- [ ] **4. 安全性和生產準備（生產部署前必須完成）：**
+  - [x] 移除硬編碼的測試值，使用 Secret 和 ConfigMap
+  - [x] 配置適當的資源請求和限制
+  - [x] 添加 Pod Security Context（非 root 用戶）
+  - [x] 配置 Horizontal Pod Autoscaler (HPA)
+  - [x] 設定適當的 labels 和 annotations
+  - [ ] **進階安全配置**：
+    - [ ] Pod Security Standards (PSS) 實施：restricted 模式
+    - [ ] Service Account 最小權限：為每個服務創建專用SA
+    - [ ] Secret 加密：啟用 etcd 加密和外部 Secret 管理
+    - [ ] 映像掃描：集成容器映像安全掃描
+  - [ ] **生產就緒配置**：
+    - [ ] 健康檢查端點：liveness/readiness/startup probes
+    - [ ] 優雅關機：正確的 terminationGracePeriodSeconds
+    - [ ] 資源監控：requests/limits 基於實際使用量調整
 
 - [x] **5. 手動測試一次完整部署流程（待 SSL 和 DNS 配置完成後）：**
   - 取得 GKE 叢集憑證：`gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1`
@@ -546,6 +588,9 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] staging完整部署: `kubectl apply -f k8s/staging/` (包含namespace、config、apps)
     - [ ] production完整部署: `kubectl apply -f k8s/production/` (包含namespace、config、apps)
     - [ ] **部署順序**: namespace → configmap/secret → deployment → service → ingress
+    - [ ] **部署驗證腳本**: 自動化檢查部署是否成功的腳本
+    - [ ] **藍綠部署策略**: production 環境使用藍綠部署降低風險
+    - [ ] **回滾機制**: 快速回滾到前一個穩定版本的能力
 
 - [x] **6. 驗證應用（待完整部署後進行）：**
   - 檢查所有 Pod 狀態為 Running：`kubectl get pods -n ton-cat-lottery`
@@ -591,9 +636,11 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - 將 YOURORG/your-repo 與 gha-deploy 綁定 `roles/iam.workloadIdentityUser`
 
 - [x] **2. 基礎 CI 工作流程 (`ci.yml`)：**
-  - [x] **觸發條件**:
+  - [x] **觸發條件**: 
     - [ ] PR驗證支援完整GitFlow: `on: pull_request: branches: [dev, main, release/*]`
     - [ ] 分支特定驗證: feature→dev, release→main 的不同驗證策略
+    - [ ] **安全檢查增強**: 依賴漏洞掃描、代碼靜態分析
+    - [ ] **測試覆蓋率**: 確保測試覆蓋率達標準（>80%）
   - [x] **核心代碼品質檢查：**
     - [x] 智能合約測試：`cd contracts && npm run test`
     - [x] 前端建構測試：`cd frontend && npm run build`
@@ -622,6 +669,9 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] `dev` 分支推送自動部署到 staging
     - [ ] `release/*` 分支不自動部署 (僅CI驗證，等待合併到main)
     - [ ] 環境變數設定: `ENVIRONMENT=${{ github.ref_name == 'main' && 'production' || 'staging' }}`
+    - [ ] **部署前置檢查**: 確保CI通過、測試覆蓋率達標
+    - [ ] **生產部署保護**: main分支部署需要手動批准流程
+    - [ ] **部署時間視窗**: 限制生產部署在維護時間內執行
   
   - [x] **映像推送到 Artifact Registry：**
     - [x] 配置 GCP 認證：使用 `google-github-actions/auth@v2`
@@ -633,6 +683,8 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
       - [ ] dev分支: `staging-{commit}`
       - [ ] main分支: `production-{commit}`
       - [ ] release分支: `release-{version}-{commit}` (用於驗證，不部署)
+      - [ ] **映像不可變性**: 同一標籤絕不覆蓋，確保部署可追溯性
+      - [ ] **映像清理策略**: 自動清理舊版映像，保留最近20個版本
   
   - [x] **GKE 部署：**
     - [x] 取得 GKE 憑證：gcloud container clusters get-credentials …
@@ -640,9 +692,12 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [x] kubectl rollout status 等待完成
     - [ ] 分支驅動的環境部署
       - [ ] dev分支: 部署到 staging namespace
-      - [ ] main分支: 部署到 production namespace
+      - [ ] main分支: 部署到 production namespace  
       - [ ] release分支: 跳過部署 (只進行CI驗證)
       - [ ] 使用環境特定K8s配置: `k8s/$ENVIRONMENT/`
+      - [ ] **藍綠部署實施**: production環境使用藍綠部署策略
+      - [ ] **部署健康檢查**: 自動驗證部署後服務健康狀態
+      - [ ] **自動回滾**: 部署失敗時自動回滾到前一版本
   
   - [x] **部署驗證：**
     - [x] 確認所有 Pod Running
@@ -650,17 +705,20 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - [ ] 環境特定部署驗證
       - [ ] 驗證目標namespace的Pod狀態
       - [ ] 驗證對應環境域名可正常訪問
+      - [ ] **煙霧測試**: 部署後執行關鍵功能測試
+      - [ ] **效能基準驗證**: 確保新部署不影響效能
+      - [ ] **安全配置驗證**: 檢查Pod安全策略和網路策略
 
 - [x] **4. GitHub Secrets 配置：**
-  - [x] **GCP OIDC 認證 (必要)**：
-    - [x] `GCP_PROJECT_ID`：`ton-cat-lottery-dev-2`
+  - [x] **GCP OIDC 認證**：
+    - [x] `GCP_PROJECT_ID`
     - [x] `GCP_WIF_PROVIDER`：Workload Identity Provider 路徑
-  - [x] **Cloudflare & Domain (選用)**：
-    - [x] `CLOUDFLARE_EMAIL`：`gba115566@gmail.com`
-    - [x] `CLOUDFLARE_API_TOKEN`：Cloudflare API Token
-    - [x] `CLOUDFLARE_ZONE_ID`：`c90d2fca6fa4b3cea3d8360f0649294a`
-    - [x] `LETSENCRYPT_EMAIL`：`gba115566@gmail.com`
-    - [x] `APP_DOMAIN`：`cat-lottery.chaowei-liu.com`
+  - [x] **Cloudflare & Domain**：
+    - [x] `CLOUDFLARE_EMAIL`
+    - [x] `CLOUDFLARE_API_TOKEN`
+    - [x] `CLOUDFLARE_ZONE_ID`
+    - [x] `LETSENCRYPT_EMAIL`
+    - [x] `APP_DOMAIN`
 
 - [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos
