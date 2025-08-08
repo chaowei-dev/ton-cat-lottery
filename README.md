@@ -163,6 +163,8 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 > 定義好「抽獎怎麼運作」「怎麼發 NFT」「參與者怎麼加入」。
 
+**🎯 推薦實作順序：NFT合約 → 抽獎合約整合 → 基礎測試 → 部署整合**
+
 #### 設計合約和 NFT 相關的邏輯
 - [x] 抽獎合約如何定義
 - [x] NFT 合約如何定義
@@ -173,42 +175,50 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 - [x] 初始化 `CatLottery.tact` 合約結構（定義 join/drawWinner/sendNFT）
 - [x] 設計儲存參加者資料的 Cell 結構（儲存地址列表）
 - [x] 實作 `join()` 方法（收款 + 儲存參與者）
-- [x] 實作 `drawWinner()` 方法（隨機選取中獎者並自動發送 NFT）
-- [x] 實作 `sendNFT()` 方法（內建 NFT 發送邏輯）
-- [x] 設計事件系統（ParticipantJoined, LotteryFull, WinnerDrawn, NFTSent）
+- [x] 實作 `drawWinner()` 方法（隨機選取中獎者，待整合自動發送 NFT）
+- [ ] 實作 `sendNFT()` 方法（內建 NFT 發送邏輯，需NFT合約支持）
+- [x] 設計事件系統（ParticipantJoined, LotteryFull, WinnerDrawn, NFTSent，需完整整合測試）
+- [ ] 實作合約狀態管理（lotteryActive、participantCount、currentRound）
+- [ ] 實作 `startNewRound()` 方法（重置狀態並開始新輪次）
+- [ ] 實作合約自動重置機制（drawWinner 後自動清理狀態）
 
 ##### NFT 合約
 - [ ] 撰寫 `CatNFT.tact` 合約（符合 TON NFT 規範）
 - [ ] 實作 `MintTo(address)` 方法（接收來自 CatLottery 的鑄造請求）
 - [ ] 設計 4 種稀有度貓咪 NFT（Common, Rare, Epic, Legendary）
-- [ ] 實作 NFT metadata 和貓咪屬性系統
-- [ ] 設定 NFT 圖像和描述資料
+- [ ] 實作 NFT metadata 和貓咪屬性系統  
+- [ ] 設定 NFT 合約與抽獎合約的授權機制
+
 
 #### 測試
 - [x] 撰寫**抽獎**測試腳本
 - [ ] 撰寫 **NFT** 測試腳本
-- [ ] 整合測試
+- [ ] 基礎整合測試
   - [ ] 抽獎 + NFT 合約互動測試
   - [ ] 端到端抽獎流程測試（join → drawWinner → 自動 NFT 發送）
   - [ ] 事件監聽測試（驗證 WinnerDrawn 和 NFTSent 事件）
-- [ ] 邊界條件測試
+- [ ] 基礎邊界條件測試  
   - [ ] 餘額不足測試
   - [ ] 重複參與測試
   - [ ] 合約狀態異常測試
+
 
 #### 部署
 - [x] 部署抽獎合約到 TON testnet
 - [ ] 部署 NFT 合約到 TON testnet
 - [ ] 設定合約間整合（CatLottery 指向 CatNFT 地址）
-- [ ] 部署後驗證
+- [ ] 基礎部署後驗證
   - [ ] 合約地址記錄和備份
   - [ ] 合約功能驗證測試（完整抽獎流程）
   - [ ] 更新環境配置檔案
 
+
 ---
 ### 後端服務模組（Go）
 
-> 精簡版後端，專注於核心抽獎功能，減少實作複雜度但保持專案完整性。
+> 基於 Go 的智能抽獎守護進程，專注於自動化監聽和管理 TON 區塊鏈上的貓咪 NFT 抽獎系統。後端作為獨立的守護進程服務，24/7 持續運行，不提供對外 API，專職監聽合約狀態並執行自動化任務。
+
+**🎯 推薦實作順序：基礎設施 → 合約互動 → 事件監聽 → 自動化流程 → 基礎測試**
 
 #### 設計模組
 - [x] 守護進程架構設計（監聽合約狀態並自動執行抽獎）
@@ -217,69 +227,66 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 #### 撰寫邏輯代碼
 - [ ] 基礎設施
-
   - [ ] 初始化 Go 專案與模組設定（go.mod, 目錄結構）
   - [ ] 基礎配置管理（環境變數、合約地址、私鑰）
-  - [ ] 基礎日志記錄（可用標準 log 套件）
+  - [ ] 基礎日志記錄（標準 log 套件）
 
 - [ ] 智能合約互動
-
   - [ ] 撰寫 TonCenter API 客戶端（基礎查詢功能）
-  - [ ] 實作錢包管理與交易簽名
+  - [ ] 實作錢包管理與交易簽名  
   - [ ] 核心抽獎功能：
     - [ ] `GetContractInfo()` - 查詢抽獎狀態
     - [ ] `SendDrawWinner()` - 執行抽獎
     - [ ] `SendStartNewRound()` - 開始新輪次
   - [ ] 基礎交易監控（檢查交易是否成功）
+  - [ ] 簡單重試機制（固定間隔重試，最多3次）
 
 - [ ] 事件監聽系統
-
   - [ ] 實作 WebSocket 事件監聽器（監聽 LotteryFull 事件）
   - [ ] 實作定時輪詢檢查器（每 30 秒檢查合約狀態）
   - [ ] 雙重監聽策略整合（事件 + 輪詢保底）
 
 - [ ] 自動化流程控制
-
   - [ ] 自動抽獎觸發器（監聽到 LotteryFull 事件自動執行 drawWinner）
   - [ ] 自動輪次管理器（監聽到 WinnerDrawn 事件自動執行 startNewRound）
-  - [ ] 交易狀態監控與重試機制
+  - [ ] 基礎交易狀態監控與重試
+
 
 #### 測試
 - [ ] 基礎測試
-    - [ ] 撰寫核心功能 unit test
-    - [ ] Mock 測試
-      - [ ] 使用 Mock TON 客戶端進行離線測試
-      - [ ] 模擬區塊鏈異常情況（網路中斷、交易失敗）
+  - [ ] 撰寫核心功能 unit test
+  - [ ] 基礎 Mock 測試
+    - [ ] 使用 Mock TON 客戶端進行離線測試
+    - [ ] 模擬基礎異常情況（網路中斷、交易失敗）
 
 - [ ] 容器化與測試
   - [ ] 完善 `Dockerfile.backend`
   - [ ] 測試 Dockerfile
 
-- [ ] 實際測試
+- [ ] 基礎功能測試
   - [ ] 合約監聽測試（驗證事件監聽和輪詢檢查功能）
   - [ ] 自動抽獎測試（驗證 drawWinner 自動觸發）
   - [ ] 自動輪次管理測試（驗證 startNewRound 自動執行）
 
-- [ ] 端到端集成測試
+- [ ] 基礎集成測試
   - [ ] 完整生命週期測試（join → LotteryFull 事件 → 自動 drawWinner → WinnerDrawn 事件 → 自動 startNewRound）
-  - [ ] 容器環境下的集成測試
-  - [ ] 多輪次連續運行測試（驗證自動循環機制）
+
 
 #### 部署
-- [ ] 環境配置
+- [ ] 基礎環境配置
   - [ ] 配置測試網環境變數（合約地址、私鑰、API 端點）
-  - [ ] 配置監聽參數（事件監聽間隔、重試次數、超時設定）
+  - [ ] 配置基礎監聽參數（事件監聽間隔、重試次數、超時設定）
   - [ ] 配置日誌記錄級別和輸出格式
 
-- [ ] 部署後端服務
+- [ ] 基礎部署
   - [ ] Docker 容器化部署
-  - [ ] 健康檢查和監控設置
   - [ ] 與智能合約連接驗證
 
-- [ ] 運行驗證
+- [ ] 基礎運行驗證
   - [ ] 服務啟動和狀態檢查
   - [ ] 事件監聽功能驗證
   - [ ] 完整自動化流程端到端測試
+
 
 ---
 ### 前端 dApp（React + TonConnect）
