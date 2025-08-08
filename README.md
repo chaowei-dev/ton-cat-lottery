@@ -221,8 +221,8 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 ##### 單元測試
 - [ ] **CatLottery 合約單元測試**
-  - [ ] `join()` 方法測試 - 參與驗證、費用檢查、參與者記錄
-  - [ ] `drawWinner()` 方法測試 - 隨機數生成、中獎者選擇、NFT ID 生成
+  - [x] `join()` 方法測試 - 參與驗證、費用檢查、參與者記錄
+  - [x] `drawWinner()` 方法測試 - 隨機數生成、中獎者選擇、NFT ID 生成
   - [ ] `sendNFT()` 方法測試 - NFT 發送邏輯、Gas 費用處理
   - [ ] `startNewRound()` 方法測試 - 狀態重置、輪次遞增
   - [ ] `withdraw()` 方法測試 - 餘額提取、權限驗證
