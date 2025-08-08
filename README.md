@@ -163,8 +163,6 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 > 定義好「抽獎怎麼運作」「怎麼發 NFT」「參與者怎麼加入」。
 
-**🎯 推薦實作順序：NFT合約 → 抽獎合約整合 → 基礎測試 → 部署整合**
-
 #### 設計合約和 NFT 相關的邏輯
 - [x] 抽獎合約如何定義
 - [x] NFT 合約如何定義
@@ -176,41 +174,137 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 - [x] 設計儲存參加者資料的 Cell 結構（儲存地址列表）
 - [x] 實作 `join()` 方法（收款 + 儲存參與者）
 - [x] 實作 `drawWinner()` 方法（隨機選取中獎者，待整合自動發送 NFT）
-- [ ] 實作 `sendNFT()` 方法（內建 NFT 發送邏輯，需NFT合約支持）
+- [x] 實作 `sendNFT()` 方法（內建 NFT 發送邏輯，需NFT合約支持）
+- [x] 實作 `withdraw()` 方法（提取合約餘額，僅擁有者可調用）
+- [x] 實作 `SetNFTContract` 消息處理（設定 NFT 合約地址）
+- [x] 實作 `getCatNameByTemplate()` 輔助方法（根據模板 ID 獲取貓咪名稱）
 - [x] 設計事件系統（ParticipantJoined, LotteryFull, WinnerDrawn, NFTSent，需完整整合測試）
-- [ ] 實作合約狀態管理（lotteryActive、participantCount、currentRound）
-- [ ] 實作 `startNewRound()` 方法（重置狀態並開始新輪次）
-- [ ] 實作合約自動重置機制（drawWinner 後自動清理狀態）
+- [x] 新增 NewRoundStarted 事件（提供更好的狀態監控）
+- [x] 實作合約狀態管理（lotteryActive、participantCount、currentRound）
+- [x] 實作 `startNewRound()` 方法（重置狀態並開始新輪次）
+- [x] 實作合約自動重置機制（drawWinner 後自動清理狀態）
+- [x] 實作查詢方法（getContractInfo, getParticipant, getWinner, getBalance）
 
 ##### NFT 合約
-- [ ] 撰寫 `CatNFT.tact` 合約（符合 TON NFT 規範）
-- [ ] 實作 `MintTo(address)` 方法（接收來自 CatLottery 的鑄造請求）
-- [ ] 設計 4 種稀有度貓咪 NFT（Common, Rare, Epic, Legendary）
-- [ ] 實作 NFT metadata 和貓咪屬性系統  
-- [ ] 設定 NFT 合約與抽獎合約的授權機制
+- [x] 撰寫 `CatNFT.tact` 合約（符合 TON NFT 規範）
+- [x] 實作 `MintTo(address)` 方法（接收來自 CatLottery 的鑄造請求）
+- [x] 實作 `NFTTransfer()` 方法（完整的 NFT 轉移功能）
+- [x] 實作 `SetAuthorizedMinter()` 方法（設定授權鑄造者）
+- [x] 設計 4 種稀有度貓咪 NFT（Common, Rare, Epic, Legendary）
+- [x] 實作 NFT metadata 和貓咪屬性系統  
+- [x] 實作 `determineRarity()` 機率系統（Common 60%, Rare 25%, Epic 10%, Legendary 5%）
+- [x] 實作 `initializeCatTemplates()` 方法（初始化 4 種貓咪模板）
+- [x] 設定 NFT 合約與抽獎合約的授權機制
+- [x] 實作查詢方法（getNFT, balanceOf, getCatTemplate, getContractInfo, getAllCatTemplates）
+- [x] 實作 NFT 事件系統（NFTMinted, NFTTransferred）
 
+##### 部署和測試腳本
+- [x] 撰寫 `deployCatLottery.ts` 部署腳本（包含合約驗證和資訊記錄）
+- [x] 撰寫 `deployCatNFT.ts` 部署腳本（包含貓咪模板驗證）
+- [x] 撰寫 `integrationTest.ts` 整合測試腳本（完整抽獎流程自動化測試）
+- [x] 撰寫 `testNFTContract.ts` NFT 合約邏輯驗證腳本
+
+##### 配置文件
+- [x] 更新 `tact.config.json` 支援雙合約編譯
+- [x] 確保合約編譯配置正確（debug 模式、external 設定）
+
+##### 文檔更新
+- [x] 完整更新 `docs/ContractREADME.md` 
+  - [x] 添加完整檔案結構和函數列表
+  - [x] 更新項目概覽包含所有已實作功能
+  - [x] 添加 NFT 稀有度系統詳細說明
+  - [x] 添加技術特色（安全特性、高可用性、Gas 優化）
+  - [x] 添加快速開始指南和部署資訊
+  - [x] 添加故障排除指南
 
 #### 測試
-- [x] 撰寫**抽獎**測試腳本
-- [ ] 撰寫 **NFT** 測試腳本
-- [ ] 基礎整合測試
-  - [ ] 抽獎 + NFT 合約互動測試
+
+##### 單元測試
+- [ ] **CatLottery 合約單元測試**
+  - [ ] `join()` 方法測試 - 參與驗證、費用檢查、參與者記錄
+  - [ ] `drawWinner()` 方法測試 - 隨機數生成、中獎者選擇、NFT ID 生成
+  - [ ] `sendNFT()` 方法測試 - NFT 發送邏輯、Gas 費用處理
+  - [ ] `startNewRound()` 方法測試 - 狀態重置、輪次遞增
+  - [ ] `withdraw()` 方法測試 - 餘額提取、權限驗證
+  - [ ] 查詢函數測試 - getContractInfo, getParticipant, getWinner, getBalance
+
+- [ ] **CatNFT 合約單元測試**
+  - [ ] `MintTo()` 方法測試 - NFT 鑄造、授權驗證、metadata 生成
+  - [ ] `NFTTransfer()` 方法測試 - 所有權轉移、ownership tracking
+  - [ ] `determineRarity()` 方法測試 - 稀有度機率分佈驗證
+  - [ ] `initializeCatTemplates()` 方法測試 - 4 種貓咪模板初始化
+  - [ ] 查詢函數測試 - getNFT, balanceOf, getCatTemplate, getContractInfo
+
+##### 整合測試
+- [ ] **合約間互動測試**
+  - [ ] 抽獎 + NFT 合約授權機制測試
   - [ ] 端到端抽獎流程測試（join → drawWinner → 自動 NFT 發送）
-  - [ ] 事件監聽測試（驗證 WinnerDrawn 和 NFTSent 事件）
-- [ ] 基礎邊界條件測試  
-  - [ ] 餘額不足測試
-  - [ ] 重複參與測試
-  - [ ] 合約狀態異常測試
+  - [ ] SetNFTContract 和 SetAuthorizedMinter 配置測試
+
+##### 事件系統測試
+- [ ] **事件發送與監聽測試**
+  - [ ] ParticipantJoined 事件測試
+  - [ ] LotteryFull 事件測試
+  - [ ] WinnerDrawn 事件測試
+  - [ ] NFTSent 事件測試
+  - [ ] NewRoundStarted 事件測試
+  - [ ] NFTMinted 事件測試
+  - [ ] NFTTransferred 事件測試
+
+##### 邊界條件與錯誤處理測試
+- [ ] **輸入驗證測試**
+  - [ ] 餘額不足測試（參與費用不夠）
+  - [ ] 重複參與測試（同一地址重複 join）
+  - [ ] 達到最大參與人數測試
+  - [ ] 無參與者狀態下抽獎測試
+
+- [ ] **狀態管理測試**
+  - [ ] 抽獎非活躍狀態下參與測試
+  - [ ] 輪次狀態正確性測試
+  - [ ] 參與者計數準確性測試
+  - [ ] 狀態重置完整性測試
+
+##### 安全性測試
+- [ ] **權限控制測試**
+  - [ ] 非擁有者調用 drawWinner 測試
+  - [ ] 非擁有者調用 startNewRound 測試
+  - [ ] 非擁有者調用 withdraw 測試
+  - [ ] 非授權地址調用 MintTo 測試
+
+- [ ] **重入攻擊防護測試**
+  - [ ] sendNFT 重入攻擊測試
+  - [ ] NFT 鑄造重入攻擊測試
+
+##### Gas 優化與效能測試
+- [ ] **Gas 消耗測試**
+  - [ ] join 方法 Gas 消耗測試
+  - [ ] drawWinner 方法 Gas 消耗測試
+  - [ ] NFT 鑄造 Gas 消耗測試
+  - [ ] 大批量操作效能測試
+
+##### 稀有度系統測試
+- [ ] **NFT 稀有度分佈測試**
+  - [ ] Common (60%) 機率驗證測試
+  - [ ] Rare (25%) 機率驗證測試  
+  - [ ] Epic (10%) 機率驗證測試
+  - [ ] Legendary (5%) 機率驗證測試
+  - [ ] 大樣本稀有度分佈統計測試
+
+##### 壓力與負載測試
+- [ ] **系統極限測試**
+  - [ ] 連續多輪抽獎測試
+  - [ ] 大量參與者壓力測試
+  - [ ] 長期運行穩定性測試
 
 
 #### 部署
 - [x] 部署抽獎合約到 TON testnet
-- [ ] 部署 NFT 合約到 TON testnet
+- [x] 部署 NFT 合約到 TON testnet（地址：kQAGSpk8Heq1xkTAL3q1DfxuSFGopYm6xXgNPN9Yexe0JTK7）
 - [ ] 設定合約間整合（CatLottery 指向 CatNFT 地址）
-- [ ] 基礎部署後驗證
-  - [ ] 合約地址記錄和備份
+- [x] 基礎部署後驗證
+  - [x] 合約地址記錄和備份（已記錄在 docs/ContractREADME.md）
   - [ ] 合約功能驗證測試（完整抽獎流程）
-  - [ ] 更新環境配置檔案
+  - [x] 更新環境配置檔案（deployments/ 目錄自動生成部署資訊）
 
 
 ---

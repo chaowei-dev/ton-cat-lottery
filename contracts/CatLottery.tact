@@ -150,7 +150,7 @@ contract CatLottery with Deployable {
         // 1. 檢查 NFT 合約地址
         require(self.nftContract != null, "NFT contract not set");
 
-        // 2. 準備 MintTo 訊息給簡化 NFT 合約
+        // 2. 準備 MintTo 訊息給 CatNFT 合約
         let mintMsg: MintTo = MintTo {
             to: winner,
         };
@@ -158,7 +158,7 @@ contract CatLottery with Deployable {
         // 3. 發送 MintTo 請求到 NFT 合約
         send(SendParameters {
             to: self.nftContract!!,
-            value: ton("0.05"), // 支付 NFT 鑄造的 gas 費用
+            value: ton("0.1"), // 增加 gas 費用以支付 NFT 鑄造和通知
             mode: SendPayGasSeparately,
             bounce: true,
             body: mintMsg.toCell(),
@@ -199,9 +199,22 @@ contract CatLottery with Deployable {
         require(sender() == self.owner, "Only owner can start new round");
         require(!self.lotteryActive, "Current lottery is still active");
 
+        // 確保參與者列表已清空（雙重保護）
+        let i: Int = 0;
+        while (i < self.maxParticipants) {
+            self.participants.set(i, null);
+            i = i + 1;
+        }
+
         self.lotteryActive = true;
         self.participantCount = 0;
         self.currentRound = self.currentRound + 1;
+
+        // 發送新輪次開始事件
+        emit(NewRoundStarted {
+            round: self.currentRound,
+            timestamp: now(),
+        }.toCell());
     }
 
     // 提取合約餘額
@@ -300,6 +313,12 @@ message NFTSent {
     recipient: Address;
     nftId: Int;
     nftContract: Address;
+    timestamp: Int;
+}
+
+// 新輪次開始事件
+message NewRoundStarted {
+    round: Int;
     timestamp: Int;
 }
 

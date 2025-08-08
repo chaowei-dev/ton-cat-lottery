@@ -11,6 +11,18 @@
                     "inline": true
                 }
             }
+        },
+        {
+            "name": "CatNFT",
+            "path": "./CatNFT.tact",
+            "output": "./build",
+            "options": {
+                "debug": true,
+                "external": true,
+                "experimental": {
+                    "inline": true
+                }
+            }
         }
     ]
 } 
