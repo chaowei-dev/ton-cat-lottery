@@ -729,66 +729,39 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 > 技術：Grafana + Prometheus + GCP Cloud Monitoring
 
-**目標：輕量化監控，使用最小資源配置的 Grafana + Prometheus，專注核心指標**
+**目標：輕量化監控，適合 Side Project 的最小可用配置**
 
-- [ ] **1. 輕量化 Prometheus + Grafana 設置：**
-  - [ ] 建立 `monitoring.tf` - 最小化 Prometheus + Grafana 部署（單節點、小資源）
-  - [ ] 啟用 GCP Cloud Monitoring API
-  - [ ] 配置 Prometheus 短期數據保留（3-7天，節省存儲成本）
-  - [ ] 設置 Grafana 基礎認證（admin/password）
-  - [ ] **驗證**：確認 Prometheus 和 Grafana 正常啟動
-  - [ ] 監控架構支援多環境
-    - [ ] 單一Prometheus收集兩環境數據（成本效益）
-    - [ ] 環境標籤策略: `environment=staging/production`
-    - [ ] 部署到獨立monitoring namespace
+- [ ] **1. 最簡監控設置：** ⭐ **必要項目**
+  - [ ] 使用 GCP Cloud Monitoring（免費額度內）+ 簡單 Grafana
+  - [ ] 或考慮直接使用 GCP 內建監控儀表板（更簡單）
+  - [ ] **驗證**：確認能看到基本的 Pod 和服務狀態
 
-- [ ] **2. 應用健康檢查和基礎指標：**
+- [ ] **2. 基本健康檢查：** ⭐ **必要項目**  
   - [ ] 在 K8s Deployment 中添加 `livenessProbe` 和 `readinessProbe`
-  - [ ] 後端實作 `/health` 和 `/metrics` endpoint（基礎 Prometheus 指標）
-  - [ ] 配置 Prometheus 收集 GKE 集群基本指標
-  - [ ] **驗證**：確認健康檢查和指標收集正常
-  - [ ] metrics環境標籤配置
-    - [ ] 自動為metrics添加環境標籤
-    - [ ] ServiceMonitor分別監控不同namespace
-    - [ ] Pod labels包含環境識別資訊
+  - [ ] 後端實作 `/health` endpoint（簡單的 200 OK 即可）
+  - [ ] **驗證**：確認 Pod 能正常重啟和恢復
 
-- [ ] **3. 簡化的 Grafana 儀表板：**
-  - [ ] 建立單一綜合儀表板，包含：
-    - [ ] 服務健康狀態（Pod 狀態、服務可用性）
-    - [ ] 資源使用率（CPU、記憶體）
-    - [ ] 業務指標（抽獎狀態、合約餘額）
-  - [ ] **驗證**：確認儀表板顯示正確數據
-  - [ ] 儀表板多環境設計
-    - [ ] 環境過濾器: 下拉選單切換staging/production/all
-    - [ ] 環境比較視圖: 並排顯示不同環境數據
-    - [ ] 差異化閾值: staging寬鬆, production嚴格
-
-- [ ] **4. 成本控制監控：**
+- [ ] **3. 基本成本監控：**
   - [ ] 設置 GCP 預算告警（月度成本超過閾值）
-  - [ ] 配置資源使用告警（避免超額費用）
-  - [ ] 設置基礎 Prometheus 告警規則（服務宕機、高資源使用）
-  - [ ] **驗證**：測試成本和資源告警通知
-  - [ ] 差異化告警策略
-    - [ ] staging: 寬鬆閾值，僅記錄
-    - [ ] production: 嚴格閾值，立即通知
-    - [ ] 環境標籤路由告警分發
+  - [ ] 檢查 GKE Autopilot 資源使用是否合理
+  - [ ] **選用**: 如果成本超標，設置簡單的 Slack 通知
 
-- [ ] **5. 基本日誌管理：**
-  - [ ] 確保應用日誌輸出到 stdout/stderr
-  - [ ] 使用 `kubectl logs` 查看日誌（不部署 Loki，降低複雜度）
-  - [ ] 配置 GCP Cloud Logging 基礎日誌保留
-  - [ ] **驗證**：確認能正常查看應用日誌
-  - [ ] 日誌環境區分配置
-    - [ ] 自動標記環境標籤
-    - [ ] GCP Cloud Logging環境過濾
-    - [ ] namespace特定查詢指令
+- [ ] **4. 簡單日誌查看：**
+  - [ ] 確保應用日誌輸出到 stdout/stderr  
+  - [ ] 使用 `kubectl logs` 查看日誌（最簡單）
+  - [ ] **選用**: 如果需要保存日誌，依賴 GCP Cloud Logging（有免費額度）
 
-- [ ] **6. 告警通知：**
-  - [ ] 配置 Grafana 告警通知（Email）
-  - [ ] 設置關鍵告警：服務宕機、資源耗盡、業務異常
-  - [ ] **驗證**：測試告警通知發送
+- [ ] **5. 最簡告警：**
+  - [ ] **必要**: Email 通知當服務完全掛掉時
+  - [ ] **選用**: 成本超標時的 Email 告警  
+  - [ ] **驗證**: 手動測試一次告警是否能收到
 
-- [ ] **7. 內容整理：**
+**💡 推薦 Side Project 監控策略：**
+- **第一優先**: 健康檢查 + GCP 預算告警
+- **第二優先**: 基本的 GCP Console 查看資源使用
+- **第三優先**: 如果真的有問題再考慮加入 Grafana
+
+- [ ] **5. 內容整理：**
   - [ ] 重新驗證這個階段的 todos
   - [ ] 更新主目錄`.gitignore` for monitoring
   - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
