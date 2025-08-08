@@ -183,10 +183,21 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 #### 測試
 - [x] 撰寫**抽獎**測試腳本
 - [ ] 撰寫 **NFT** 測試腳本
+- [ ] 整合測試
+  - [ ] 抽獎 + NFT 合約互動測試
+  - [ ] 端到端抽獎流程測試（join → draw → sendNFT）
+- [ ] 邊界條件測試
+  - [ ] 餘額不足測試
+  - [ ] 重複參與測試
+  - [ ] 合約狀態異常測試
 
 #### 部署
 - [x] 部署抽獎合約到 TON testnet
 - [ ] 部署 NFT 合約到 TON testnet
+- [ ] 部署後驗證
+  - [ ] 合約地址記錄和備份
+  - [ ] 合約功能驗證測試
+  - [ ] 更新環境配置檔案
 
 ---
 ### 後端服務模組（Go）
@@ -221,18 +232,23 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 #### 測試
 - [ ] 基礎測試
+    - [ ] 撰寫核心功能 unit test
+    - [ ] Mock 測試
+      - [ ] 使用 Mock TON 客戶端進行離線測試
+      - [ ] 模擬區塊鏈異常情況（網路中斷、交易失敗）
 
-    - [ ] 撰寫核心功能單元測試
-    - [ ] 基礎集成測試（抽獎流程測試）
+- [ ] 容器化與測試
+  - [ ] 完善 `Dockerfile.backend`
+  - [ ] 測試 Dockerfile
 
 - [ ] 實際測試
   - [ ] 鏈接到監控合約，並進行監控
   - [ ] 鏈接到抽獎合約，並進行抽獎
   - [ ] 鏈接到 NFT 合約，並進行 NFT 發送
 
-#### 部署
-- 本地端透過 docker
-- 雲端透過 docker + k8s + GitHub Action
+- [ ] 集成測試
+  - [ ] 基礎集成測試（完整抽獎流程測試）
+  - [ ] 容器環境下的集成測試
 
 ---
 ### 前端 dApp（React + TonConnect）
@@ -268,11 +284,24 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
 
 #### 測試
-- [ ] 撰寫 unit test
+- [ ] 基礎測試
+  - [ ] 撰寫 unit test (Component 測試)
+  - [ ] ESLint 和 TypeScript 檢查
+  - [ ] Mock 測試
+    - [ ] Mock TonConnect 錢包互動
+    - [ ] Mock 合約 API 回應
 
-#### 部署
-- 本地端透過 docker
-- 雲端透過 docker + k8s + GitHub Action
+- [ ] 容器化與測試
+  - [ ] 完善 `Dockerfile.frontend`
+  - [ ] 測試 Dockerfile
+
+- [ ] 整合測試
+  - [ ] 與 testnet 合約的整合測試
+  - [ ] 端到端 (E2E) 測試 (錢包連接 → 參與抽獎流程)
+
+- [ ] 建構測試
+  - [ ] 產品建構測試 (npm run build)
+  - [ ] 不同環境建構驗證 (staging/production)
 
 ---
 ### DevOps / 雲端自動化部署
@@ -638,6 +667,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - 建立 Service Account gha-deploy 並授權所需角色
     - 建立 Workload Identity Pool & Provider（issuer: https://token.actions.githubusercontent.com）
     - 將 YOURORG/your-repo 與 gha-deploy 綁定 `roles/iam.workloadIdentityUser`
+  - [ ] 在 repo 的頁面中，設定 Rulesets
+    - Restrict deletions
+    - Require a pull request before merging
+    - Block force pushes
 
 - [ ] **2. 基礎 CI 工作流程 (`ci.yml`)：**
   - [ ] **觸發條件**: 
