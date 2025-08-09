@@ -150,3 +150,5 @@ k8s/**/secrets/
 .github/**/*.secret
 .github/**/*.key
 .github/workflows/secrets/
+
+.claude/*
