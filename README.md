@@ -336,13 +336,13 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 
 
 #### 部署
-- [x] 部署抽獎合約到 TON testnet
-- [x] 部署 NFT 合約到 TON testnet（地址：kQAGSpk8Heq1xkTAL3q1DfxuSFGopYm6xXgNPN9Yexe0JTK7）
+- [ ] 部署抽獎合約到 TON testnet
+- [ ] 部署 NFT 合約到 TON testnet
 - [ ] 設定合約間整合（CatLottery 指向 CatNFT 地址）
-- [x] 基礎部署後驗證
-  - [x] 合約地址記錄和備份（已記錄在 docs/ContractREADME.md）
+- [ ] 基礎部署後驗證
+  - [ ] 合約地址記錄和備份（已記錄在 docs/ContractREADME.md）
   - [ ] 合約功能驗證測試（完整抽獎流程）
-  - [x] 更新環境配置檔案（deployments/ 目錄自動生成部署資訊）
+  - [ ] 更新環境配置檔案（deployments/ 目錄自動生成部署資訊）
 
 
 ---

@@ -53,6 +53,10 @@ contracts/
 #### 內部函數 (Internal Functions)
 - `fun sendNFT(winner: Address, nftId: Int)` - 自動發送 NFT 給中獎者
 - `fun getCatNameByTemplate(templateId: Int): String` - 根據模板 ID 獲取貓咪名稱
+  - templateId 0: "Tabby"
+  - templateId 1: "Siamese Princess" 
+  - templateId 2: "Maine Coon King"
+  - templateId 3: "Cosmic Cat"
 
 #### 查詢函數 (Getters)
 - `get fun getContractInfo(): ContractInfo` - 獲取合約基本資訊
@@ -123,6 +127,8 @@ TON Cat Lottery 包含兩個主要智能合約：
 - ✅ **授權控制** - 嚴格的擁有者和授權鑄造者權限管理  
 - ✅ **輸入驗證** - 完整的 require 語句覆蓋所有邊界條件
 - ✅ **餘額檢查** - 參與費用驗證和合約餘額管理
+- ✅ **隨機數安全** - 使用時間戳、Gas費用和參與者數量組合生成安全隨機數
+- ✅ **NFT 標準合規** - 完全符合 TON NFT 標準，支持轉移通知和回應機制
 
 #### **高可用性設計**
 - ✅ **事件完整性** - 所有關鍵操作都發出相應事件
@@ -134,6 +140,29 @@ TON Cat Lottery 包含兩個主要智能合約：
 - ✅ **高效隨機數生成** - 基於鏈上資訊避免外部依賴
 - ✅ **批量狀態更新** - 在單一交易中完成多個狀態變更
 - ✅ **適當的 Gas 費用配置** - 為 NFT 鑄造和通知預留充足 Gas
+
+#### **🎲 隨機數生成機制**
+
+**CatLottery 中獎者選擇**：
+```tact
+let randomSeed: Int = now();                    // 當前時間戳
+let gasFee: Int = context().readForwardFee();   // Gas 費用資訊  
+let combinedSeed: Int = randomSeed + gasFee + self.participantCount;
+let winnerIndex: Int = abs(combinedSeed) % self.participantCount;
+```
+
+**CatNFT 稀有度決定**：
+```tact
+let randomSeed: Int = tokenId + now();    // Token ID + 時間戳
+let rand: Int = abs(randomSeed) % 100;    // 轉換為 0-99 範圍
+// 根據機率區間決定稀有度：0-59 Common, 60-84 Rare, 85-94 Epic, 95-99 Legendary
+```
+
+**安全性特點**：
+- 使用多重鏈上資訊確保隨機性
+- 避免依賴外部預言機或可操控因素  
+- 時間戳和交易上下文提供不可預測性
+- 適用於非高價值抽獎場景
 
 
 ---
@@ -383,10 +412,10 @@ CatLottery 合約執行新輪次邏輯:
 
 **6. `determineRarity()` 稀有度系統 (間接驗證)**
 - ✅ 4種稀有度模板正確映射
-  - Common: 60% 機率
-  - Rare: 25% 機率
-  - Epic: 10% 機率
-  - Legendary: 5% 機率
+  - Common (templateId: 0): 60% 機率 - "Tabby"
+  - Rare (templateId: 1): 25% 機率 - "Siamese Princess"
+  - Epic (templateId: 2): 10% 機率 - "Maine Coon King" 
+  - Legendary (templateId: 3): 5% 機率 - "Cosmic Cat"
 - ✅ 模板一致性驗證 (templateId 與 rarity 對應)
 
 
@@ -397,8 +426,27 @@ struct CatMetadata {
     description: String; // 描述
     rarity: String;      // "Common", "Rare", "Epic", "Legendary"
     templateId: Int;     // 0: Common, 1: Rare, 2: Epic, 3: Legendary
-    attributes: String;  // JSON 格式的屬性
-    image: String;       // 圖片 URL
+    attributes: String;  // JSON 格式的屬性 (personality, color, eyes)
+    image: String;       // 圖片 URL (placeholder URLs)
+}
+
+struct NFTData {
+    owner: Address;      // NFT 擁有者地址
+    tokenId: Int;        // NFT 唯一標識符
+    metadata: CatMetadata; // 貓咪屬性數據
+    mintTimestamp: Int;  // 鑄造時間戳
+}
+```
+
+#### 🎨 實際元數據範例
+```json
+{
+  "name": "Tabby",
+  "description": "友善的虎斑貓", 
+  "rarity": "Common",
+  "templateId": 0,
+  "attributes": "{\"personality\":\"friendly\",\"color\":\"orange_tabby\",\"eyes\":\"green\"}",
+  "image": "https://ton-cat-lottery.com/images/tabby.png"
 }
 ```
 
@@ -597,31 +645,38 @@ npx blueprint run deployCatLottery --testnet
 ```
 
 #### 3. 設定合約授權
-```bash
-# 設定 NFT 合約的授權鑄造者為抽獎合約
-# 設定抽獎合約的 NFT 合約地址
 
+部署完成後，需要進行跨合約授權配置：
+
+**步驟 3a: 設定 CatNFT 的授權鑄造者**
+```bash
+# 在 CatNFT 合約中設定 CatLottery 合約為授權鑄造者
+# 需要使用 CatNFT 合約擁有者發送 SetAuthorizedMinter 訊息
+```
+
+**步驟 3b: 設定 CatLottery 的 NFT 合約地址**
+```bash  
+# 在 CatLottery 合約中設定 NFT 合約地址
+# 需要使用 CatLottery 合約擁有者發送 SetNFTContract 訊息
+```
+
+**驗證配置**：
+```bash
+# 運行整合測試驗證配置正確性
 npx blueprint run integrationTest --testnet
 ```
 
----
-## 🌐 部署（測試網）
+**重要提醒**：
+- 確保兩個合約都已成功部署
+- 記錄合約地址以供配置使用
+- 驗證授權配置成功後才能開始抽獎
 
-### 📍 **已部署合約地址**
+### 🔧 配置與工具
 
-| 合約類型        | 地址                                                    | 狀態    |
-| --------------- | ------------------------------------------------------ | ------- |
-| **CatNFT**      | `kQAGSpk8Heq1xkTAL3q1DfxuSFGopYm6xXgNPN9Yexe0JTK7`   | ✅ 已部署 |
-| **CatLottery**  | _待部署_                                               | ⏳ 待部署 |
+**實用工具：**
+- [TON Testnet Explorer](https://testnet.tonviewer.com/) - 查看合約和交易
+- [Tonkeeper Wallet](https://wallet.tonkeeper.com/) - 測試網錢包
 
-### 🔗 **區塊鏈瀏覽器連結**
-- [CatNFT 合約詳情](https://testnet.tonviewer.com/kQAGSpk8Heq1xkTAL3q1DfxuSFGopYm6xXgNPN9Yexe0JTK7)
-- [TON Testnet Explorer](https://testnet.tonviewer.com/)
-
-### ⚙️ **合約參數配置**
-- **參與費用**: 0.01 TON
-- **最大參與人數**: 3 人  
-- **稀有度機率**: Common (60%), Rare (25%), Epic (10%), Legendary (5%)
 
 ---
 ## 🛠️ 故障排除

@@ -176,7 +176,7 @@ contract CatLottery with Deployable {
     // 根據模板 ID 獲取貓咪名稱
     fun getCatNameByTemplate(templateId: Int): String {
         if (templateId == 0) {
-            return "Orange Tabby";
+            return "Tabby";
         } else if (templateId == 1) {
             return "Siamese Princess";
         } else if (templateId == 2) {
