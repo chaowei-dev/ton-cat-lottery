@@ -22,14 +22,23 @@
 ```
 contracts/
 ├── CatLottery.tact          # 主抽獎合約
-├── CatNFT.tact             # 貓咪 NFT 合約
+├── CatNFT.tact              # 貓咪 NFT 合約
 ├── scripts/
 │   ├── deployCatLottery.ts  # 抽獎合約部署腳本
-│   ├── deployCatNFT.ts     # NFT 合約部署腳本
-│   ├── integrationTest.ts   # 合約整合測試腳本
-│   └── testNFTContract.ts   # NFT 合約邏輯測試
-├── build/                  # 編譯後的合約檔案
-└── tact.config.json        # Tact 編譯配置
+│   └── deployCatNFT.ts      # NFT 合約部署腳本
+├── tests/
+│   ├── Advanced.test.ts     # 進階功能測試
+│   ├── CatLottery.test.ts   # 抽獎合約單元測試
+│   ├── CatNFT.test.ts       # NFT 合約單元測試
+│   ├── Integration.test.ts  # 合約整合測試
+│   └── setup.ts             # 測試設定檔
+├── build/                   # 編譯後的合約檔案
+├── coverage/                # 測試覆蓋率報告
+├── package.json             # Node.js 依賴配置
+├── jest.config.js           # Jest 測試框架配置
+├── tsconfig.json            # TypeScript 編譯配置
+├── blueprint.config.ts      # Blueprint 框架配置
+└── tact.config.json         # Tact 編譯配置
 ```
 
 ### 🎯 **CatLottery.tact** - 主要功能函數
@@ -56,6 +65,7 @@ contracts/
 #### 接收器 (Receivers)
 - `receive(msg: MintTo)` - 鑄造 NFT（僅授權鑄造者）
 - `receive(msg: SetAuthorizedMinter)` - 設定授權鑄造者（僅擁有者）
+- `receive(msg: NFTTransfer)` - NFT 轉移處理（符合 TON NFT 標準）
 
 #### 內部函數 (Internal Functions)
 - `fun initializeCatTemplates()` - 初始化 4 種貓咪模板
@@ -67,7 +77,6 @@ contracts/
 - `get fun getCatTemplate(templateId: Int): CatMetadata?` - 獲取貓咪模板
 - `get fun getContractInfo(): NFTContractInfo` - 獲取 NFT 合約資訊
 - `get fun getAllCatTemplates(): map<Int, CatMetadata>` - 獲取所有貓咪模板
-
 
 
 ---
