@@ -1,91 +1,130 @@
 import { toNano } from '@ton/core';
 import { CatLottery } from '../build/CatLottery_CatLottery';
-import { compile, NetworkProvider } from '@ton/blueprint';
+import { NetworkProvider } from '@ton/blueprint';
+import { 
+  DeploymentValidator, 
+  ContractChecker, 
+  DeploymentLogger, 
+  SafeDeployment 
+} from './deploymentUtils';
 
 export async function run(provider: NetworkProvider) {
   const ui = provider.ui();
 
   ui.write('🚀 正在部署 CatLottery 合約...');
 
-  // 合約初始化參數
-  const ENTRY_FEE = toNano('0.01'); // 0.01 TON 參與費用 (降低費用)
-  const MAX_PARTICIPANTS = 3; // 最大參與人數 (降低門檻便於測試)
+  // 載入配置
+  const config = DeploymentLogger.loadConfig();
+  
+  // 合約初始化參數 (固定參數，不再動態變化)
+  const ENTRY_FEE = toNano(config.catLottery.entryFee);
+  const MAX_PARTICIPANTS = config.catLottery.maxParticipants;
+  const DEPLOYMENT_FEE = toNano(config.catLottery.deploymentFee);
 
-  // 獲取部署者地址
-  const deployerAddress = provider.sender().address;
-  if (!deployerAddress) {
-    throw new Error('無法獲取部署者地址');
-  }
+  // 安全驗證
+  await DeploymentValidator.validateNetwork(provider, config.network);
+  await DeploymentValidator.validateBalance(provider, config.minBalance);
 
-  // 使用時間戳作為隨機因子來生成不同的合約地址
-  const timestamp = Date.now();
-  const uniqueEntryFee = ENTRY_FEE + BigInt(timestamp % 1000); // 添加小的隨機變化
+  // 獲取並驗證部署者地址
+  const deployerAddress = DeploymentValidator.validateDeployerAddress(provider.sender().address);
 
   ui.write(`📦 部署者地址: ${deployerAddress}`);
   ui.write(`🔗 部署者 tonviewer：https://testnet.tonviewer.com/${deployerAddress}`);
   ui.write(`💰 參與費用: ${Number(ENTRY_FEE) / 1e9} TON`);
   ui.write(`👥 最大參與人數: ${MAX_PARTICIPANTS}`);
 
-  // 創建合約實例
-  const catLottery = provider.open(
+  // 創建合約實例，保持參數固定
+  let catLottery = provider.open(
     await CatLottery.fromInit(
       deployerAddress,
-      uniqueEntryFee,
+      ENTRY_FEE,  // 固定參與費用
       BigInt(MAX_PARTICIPANTS)
     )
   );
 
   ui.write(`\n`);
-  ui.write(`📍 合約地址: ${catLottery.address}`);
+  ui.write(`📍 預計合約地址: ${catLottery.address}`);
   ui.write(`🔗 合約 tonviewer: https://testnet.tonviewer.com/${catLottery.address}`);
   ui.write(`🔨 請記得在 Tonkeeper （https://wallet.tonkeeper.com/coins）中確認交易！`);
   ui.write(`\n`);
 
-  // 檢查合約是否已部署
-  if (await provider.isContractDeployed(catLottery.address)) {
-    ui.write(`✅ 合約已部署在: ${catLottery.address}`);
-
-    // 顯示合約信息
-    try {
-      const contractInfo = await catLottery.getGetContractInfo();
-      ui.write(`\n📊 合約狀態:`);
-      ui.write(`   - 擁有者: ${contractInfo.owner}`);
-      ui.write(`   - 參與費用: ${contractInfo.entryFee} nanoTON`);
-      ui.write(`   - 最大參與人數: ${contractInfo.maxParticipants}`);
-      ui.write(`   - 當前輪次: ${contractInfo.currentRound}`);
-      ui.write(
-        `   - 抽獎狀態: ${contractInfo.lotteryActive ? '活躍' : '非活躍'}`
-      );
-      ui.write(`   - 參與者數量: ${contractInfo.participantCount}`);
-    } catch (error) {
-      ui.write(`⚠️ 無法獲取合約狀態: ${error}`);
+  // 檢查現有合約並獲取用戶選擇
+  const choice = await ContractChecker.checkExistingContract(
+    provider,
+    catLottery.address,
+    'CatLottery',
+    async () => {
+      const info = await catLottery.getGetContractInfo();
+      return {
+        '擁有者': info.owner,
+        '參與費用': `${info.entryFee} nanoTON`,
+        '最大參與人數': info.maxParticipants,
+        '當前輪次': info.currentRound,
+        '抽獎狀態': info.lotteryActive ? '活躍' : '非活躍',
+        '參與者數量': info.participantCount
+      };
     }
+  );
 
+  if (choice === 'use_existing') {
+    ui.write(`\n💡 使用現有 CatLottery 合約: ${catLottery.address}`);
+    return;
+  } else if (choice === 'exit') {
     return;
   }
 
-  // 部署合約
-  ui.write(`🔨 正在部署合約...`);
+  // 需要部署新合約時，生成不同的參數組合
+  if (choice === 'deploy_new') {
+    ui.write(`🔄 生成新合約實例...`);
+    ui.write(`⚠️ 注意：相同參數會產生相同地址，請修改參數或使用不同部署者地址`);
+    
+    catLottery = provider.open(
+      await CatLottery.fromInit(
+        deployerAddress,
+        ENTRY_FEE,
+        BigInt(MAX_PARTICIPANTS)
+      )
+    );
+    
+    ui.write(`📍 新合約地址: ${catLottery.address}`);
+  }
 
-  await catLottery.send(
+  // 部署合約
+  ui.write(`💸 發送部署交易...`);
+  ui.write(`💰 部署費用: ${Number(DEPLOYMENT_FEE) / 1e9} TON`);
+  ui.write(`📱 請在錢包中確認交易...`);
+  
+  // 直接發送交易，不等待回應
+  catLottery.send(
     provider.sender(),
     {
-      value: toNano('0.2'), // 部署費用
+      value: DEPLOYMENT_FEE,
     },
     {
       $$type: 'Deploy',
-      queryId: 0n,
+      queryId: BigInt(0),
     }
   );
-
-  // 等待部署完成
-  await provider.waitForDeploy(catLottery.address);
-
-  ui.write(`🎉 部署成功！`);
+  
+  ui.write(`\n✅ 部署交易已發送！`);
   ui.write(`📍 合約地址: ${catLottery.address}`);
-  ui.write(
-    `🔗 TON Explorer: https://testnet.tonviewer.com/${catLottery.address}`
-  );
+  ui.write(`🔗 TON Explorer: https://testnet.tonviewer.com/${catLottery.address}`);
+  ui.write(`📝 注意：交易已發送到區塊鏈，請稍等幾分鐘讓交易確認`);
+  ui.write(`\n⏳ 請在錢包中確認交易，然後等待幾分鐘讓交易確認...`);
+  
+  // 手動確認部署狀態
+  ui.write(`\n❓ 請確認部署狀態:`);
+  ui.write(`   1. 部署成功 - 繼續驗證合約`);
+  ui.write(`   2. 部署失敗 - 退出腳本`);
+
+  const deployChoice = await ui.choose('部署狀態', ['部署成功', '部署失敗'], (c) => c);
+
+  if (deployChoice === '部署失敗') {
+    ui.write(`👋 腳本已退出`);
+    return;
+  }
+
+  ui.write(`🎉 繼續驗證合約狀態...`);
 
   // 驗證合約狀態
   ui.write(`🔍 驗證合約狀態...`);
@@ -104,20 +143,12 @@ export async function run(provider: NetworkProvider) {
     ui.write(`⚠️ 無法驗證合約狀態: ${error}`);
   }
 
-  // 提供後續操作建議
-  ui.write(`\n📋 後續操作建議:`);
-  ui.write(`1. 更新前端合約地址:`);
-  ui.write(`   CONTRACT_ADDRESS = '${catLottery.address}'`);
-  ui.write(`2. 設定 NFT 合約地址 (如果有):`);
-  ui.write(`   使用 SetNFTContract 消息`);
-  ui.write(`3. 開始接受參與者:`);
-  ui.write(`   用戶可發送 "join" 消息並支付 ${Number(ENTRY_FEE) / 1e9} TON`);
-  ui.write(`4. 進行抽獎:`);
-  ui.write(`   部署者可發送 "drawWinner" 消息`);
+  ui.write(`\n✅ CatLottery 合約部署完成！`);
+  ui.write(`📍 合約地址: ${catLottery.address}`);
 
   // 保存部署資訊到文件
   const deploymentInfo = {
-    network: 'testnet',
+    network: config.network,
     contractAddress: catLottery.address.toString(),
     deployerAddress: deployerAddress.toString(),
     entryFee: ENTRY_FEE.toString(),
@@ -126,21 +157,5 @@ export async function run(provider: NetworkProvider) {
     explorerUrl: `https://testnet.tonviewer.com/${catLottery.address}`,
   };
 
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const deploymentsDir = path.join(__dirname, '../deployments');
-
-    if (!fs.existsSync(deploymentsDir)) {
-      fs.mkdirSync(deploymentsDir, { recursive: true });
-    }
-
-    const filename = `catLottery-${Date.now()}.json`;
-    const filepath = path.join(deploymentsDir, filename);
-
-    fs.writeFileSync(filepath, JSON.stringify(deploymentInfo, null, 2));
-    ui.write(`💾 部署資訊已保存至: ${filename}`);
-  } catch (error) {
-    ui.write(`⚠️ 保存部署資訊失敗: ${error}`);
-  }
+  await DeploymentLogger.saveDeploymentInfo('catLottery', deploymentInfo);
 }

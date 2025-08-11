@@ -1,0 +1,13 @@
+{
+  "network": "testnet",
+  "minBalance": "0.5",
+  "catLottery": {
+    "entryFee": "0.01",
+    "maxParticipants": 3,
+    "deploymentFee": "0.2"
+  },
+  "catNFT": {
+    "deploymentFee": "0.3",
+    "defaultSalt": 1
+  }
+}

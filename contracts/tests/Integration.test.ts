@@ -23,20 +23,20 @@ describe('Integration Tests - Contract Interactions', () => {
         
         // Deploy CatNFT contract
         catNFT = context.blockchain.openContract(
-            await CatNFT.fromInit(context.deployer.address)
+            await CatNFT.fromInit(context.deployer.address, BigInt(1))
         );
         
         // Deploy both contracts
         const lotteryDeployResult = await catLottery.send(
             context.deployer.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'Deploy', queryId: 0n }
+            { $$type: 'Deploy', queryId: BigInt(0) }
         );
         
         const nftDeployResult = await catNFT.send(
             context.deployer.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'Deploy', queryId: 0n }
+            { $$type: 'Deploy', queryId: BigInt(0) }
         );
         
         // Verify deployments

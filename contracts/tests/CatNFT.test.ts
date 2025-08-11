@@ -12,7 +12,7 @@ describe('CatNFT Contract Tests', () => {
         
         // Deploy CatNFT contract
         catNFT = context.blockchain.openContract(
-            await CatNFT.fromInit(context.deployer.address)
+            await CatNFT.fromInit(context.deployer.address, BigInt(1))
         );
         
         const deployResult = await catNFT.send(
@@ -22,7 +22,7 @@ describe('CatNFT Contract Tests', () => {
             },
             {
                 $$type: 'Deploy',
-                queryId: 0n,
+                queryId: BigInt(0),
             }
         );
         
@@ -219,13 +219,13 @@ describe('CatNFT Contract Tests', () => {
         it('should handle minting authorization properly', async () => {
             // Create fresh contract without explicitly setting authorized minter
             const freshNFT = context.blockchain.openContract(
-                await CatNFT.fromInit(context.deployer.address)
+                await CatNFT.fromInit(context.deployer.address, BigInt(2))
             );
 
             await freshNFT.send(
                 context.deployer.getSender(),
                 { value: toNano('0.05') },
-                { $$type: 'Deploy', queryId: 0n }
+                { $$type: 'Deploy', queryId: BigInt(0) }
             );
 
             // Check initial contract state
@@ -234,7 +234,7 @@ describe('CatNFT Contract Tests', () => {
             expect(contractInfoBefore.nextTokenId).toBe(1n);
             expect(contractInfoBefore.totalSupply).toBe(0n);
 
-            // Test minting behavior - the contract may allow minting based on owner or other logic
+            // Test minting without authorized minter - should fail
             const result = await freshNFT.send(
                 context.user1.getSender(),
                 { value: toNano('0.1') },
@@ -244,16 +244,17 @@ describe('CatNFT Contract Tests', () => {
                 }
             );
 
-            // Check if transaction succeeded
+            // Check if transaction failed as expected
             expect(result.transactions).toHaveTransaction({
                 from: context.user1.address,
                 to: freshNFT.address,
-                success: true,
+                success: false,
+                exitCode: 55995, // "No authorized minter set" error
             });
 
-            // Verify state changed appropriately
+            // Verify state remained unchanged
             const contractInfoAfter = await freshNFT.getGetContractInfo();
-            expect(contractInfoAfter.totalSupply).toBe(1n);
+            expect(contractInfoAfter.totalSupply).toBe(0n);
         });
 
         it('should reject minting from unauthorized address', async () => {
@@ -423,13 +424,13 @@ describe('CatNFT Contract Tests', () => {
         it('should handle contract initialization with different owner', async () => {
             // Test with different owner
             const newOwnerNFT = context.blockchain.openContract(
-                await CatNFT.fromInit(context.user1.address)
+                await CatNFT.fromInit(context.user1.address, BigInt(3))
             );
 
             await newOwnerNFT.send(
                 context.user1.getSender(),
                 { value: toNano('0.05') },
-                { $$type: 'Deploy', queryId: 0n }
+                { $$type: 'Deploy', queryId: BigInt(0) }
             );
 
             const contractInfo = await newOwnerNFT.getGetContractInfo();

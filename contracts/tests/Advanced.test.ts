@@ -23,7 +23,7 @@ describe('Advanced Tests - Security & Performance', () => {
         
         // Deploy CatNFT contract
         catNFT = context.blockchain.openContract(
-            await CatNFT.fromInit(context.deployer.address)
+            await CatNFT.fromInit(context.deployer.address, 1n)
         );
         
         // Deploy both contracts

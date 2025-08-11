@@ -1,24 +1,49 @@
 import { toNano } from '@ton/core';
 import { CatNFT } from '../build/CatNFT_CatNFT';
-import { compile, NetworkProvider } from '@ton/blueprint';
+import { NetworkProvider } from '@ton/blueprint';
+import { 
+  DeploymentValidator, 
+  ContractChecker, 
+  DeploymentLogger, 
+  SafeDeployment 
+} from './deploymentUtils';
 
 export async function run(provider: NetworkProvider) {
   const ui = provider.ui();
 
   ui.write('🐱 正在部署 CatNFT 合約...');
 
-  // 獲取部署者地址
-  const deployerAddress = provider.sender().address;
-  if (!deployerAddress) {
-    throw new Error('無法獲取部署者地址');
-  }
+  // 載入配置
+  const config = DeploymentLogger.loadConfig();
+  const DEPLOYMENT_FEE = toNano(config.catNFT.deploymentFee);
+
+  // 安全驗證
+  await DeploymentValidator.validateNetwork(provider, config.network);
+  await DeploymentValidator.validateBalance(provider, config.minBalance);
+
+  // 獲取並驗證部署者地址
+  const deployerAddress = DeploymentValidator.validateDeployerAddress(provider.sender().address);
 
   ui.write(`📦 部署者地址: ${deployerAddress}`);
   ui.write(`🔗 部署者 tonviewer：https://testnet.tonviewer.com/${deployerAddress}`);
+  
+  // 檢查錢包連接狀態
+  ui.write(`🔍 檢查錢包連接狀態...`);
+  try {
+    const sender = provider.sender();
+    if (!sender) {
+      throw new Error('錢包未連接');
+    }
+    ui.write(`✅ 錢包連接正常`);
+  } catch (error) {
+    ui.write(`❌ 錢包連接問題: ${error}`);
+    return;
+  }
 
-  // 創建合約實例
-  const catNFT = provider.open(
-    await CatNFT.fromInit(deployerAddress)
+  // 使用配置的默認 salt 檢查預設合約
+  let salt = BigInt(config.catNFT.defaultSalt);
+  let catNFT = provider.open(
+    await CatNFT.fromInit(deployerAddress, salt)
   );
 
   ui.write(`\n`);
@@ -27,20 +52,21 @@ export async function run(provider: NetworkProvider) {
   ui.write(`🔨 請記得在 Tonkeeper （https://wallet.tonkeeper.com/coins）中確認交易！`);
   ui.write(`\n`);
 
-  // 檢查合約是否已部署
-  if (await provider.isContractDeployed(catNFT.address)) {
-    ui.write(`✅ 合約已部署在: ${catNFT.address}`);
+  // 檢查現有合約並獲取用戶選擇
+  const choice = await ContractChecker.checkExistingContract(
+    provider,
+    catNFT.address,
+    'CatNFT',
+    async () => {
+      const info = await catNFT.getGetContractInfo();
+      const contractInfo: any = {
+        '擁有者': info.owner,
+        '授權鑄造者': info.authorizedMinter || '未設定',
+        '下一個 NFT ID': info.nextTokenId,
+        '總供應量': info.totalSupply
+      };
 
-    // 顯示合約信息
-    try {
-      const contractInfo = await catNFT.getGetContractInfo();
-      ui.write(`\n📊 合約狀態:`);
-      ui.write(`   - 擁有者: ${contractInfo.owner}`);
-      ui.write(`   - 授權鑄造者: ${contractInfo.authorizedMinter || '未設定'}`);
-      ui.write(`   - 下一個 NFT ID: ${contractInfo.nextTokenId}`);
-      ui.write(`   - 總供應量: ${contractInfo.totalSupply}`);
-
-      // 顯示貓咪模板
+      // 添加貓咪模板信息
       ui.write(`\n🐱 貓咪模板:`);
       for (let i = 0; i < 4; i++) {
         try {
@@ -52,35 +78,67 @@ export async function run(provider: NetworkProvider) {
           // 忽略錯誤
         }
       }
-    } catch (error) {
-      ui.write(`⚠️ 無法獲取合約狀態: ${error}`);
-    }
 
+      return contractInfo;
+    }
+  );
+
+  if (choice === 'use_existing') {
+    ui.write(`\n💡 使用現有 CatNFT 合約: ${catNFT.address}`);
     return;
+  } else if (choice === 'exit') {
+    return;
+  }
+    
+  // 需要部署新合約時，生成新的 salt
+  if (choice === 'deploy_new') {
+    salt = SafeDeployment.generateUniqueSalt();
+    ui.write(`🔄 將部署新的合約實例...`);
+    ui.write(`🎲 使用 salt: ${salt}`);
+    
+    catNFT = provider.open(
+      await CatNFT.fromInit(deployerAddress, salt)
+    );
+    
+    ui.write(`📍 新合約地址: ${catNFT.address}`);
   }
 
   // 部署合約
-  ui.write(`🔨 正在部署合約...`);
-
-  await catNFT.send(
+  ui.write(`💸 發送部署交易...`);
+  ui.write(`💰 部署費用: ${Number(DEPLOYMENT_FEE) / 1e9} TON`);
+  ui.write(`📱 請在錢包中確認交易...`);
+  
+  // 直接發送交易，不等待回應
+  catNFT.send(
     provider.sender(),
     {
-      value: toNano('0.3'), // NFT 合約需要更多部署費用
+      value: DEPLOYMENT_FEE,
     },
     {
       $$type: 'Deploy',
-      queryId: 0n,
+      queryId: BigInt(0),
     }
   );
-
-  // 等待部署完成
-  await provider.waitForDeploy(catNFT.address);
-
-  ui.write(`🎉 部署成功！`);
+  
+  ui.write(`\n✅ 部署交易已發送！`);
   ui.write(`📍 合約地址: ${catNFT.address}`);
-  ui.write(
-    `🔗 TON Explorer: https://testnet.tonviewer.com/${catNFT.address}`
-  );
+  ui.write(`🔗 TON Explorer: https://testnet.tonviewer.com/${catNFT.address}`);
+  ui.write(`📝 注意：交易已發送到區塊鏈，請稍等幾分鐘讓交易確認`);
+  ui.write(`\n⏳ 請在錢包中確認交易，然後等待幾分鐘讓交易確認...`);
+  
+  // 手動確認部署狀態
+  ui.write(`\n❓ 請確認部署狀態:`);
+  ui.write(`   1. 部署成功 - 繼續驗證合約`);
+  ui.write(`   2. 部署失敗 - 退出腳本`);
+
+  const deployChoice = await ui.choose('部署狀態', ['部署成功', '部署失敗'], (c) => c);
+
+  if (deployChoice === '部署失敗') {
+    ui.write(`👋 腳本已退出`);
+    return;
+  }
+
+  ui.write(`🎉 繼續驗證合約狀態...`);
 
   // 驗證合約狀態
   ui.write(`🔍 驗證合約狀態...`);
@@ -108,20 +166,15 @@ export async function run(provider: NetworkProvider) {
     ui.write(`⚠️ 無法驗證合約狀態: ${error}`);
   }
 
-  // 提供後續操作建議
-  ui.write(`\n📋 後續操作建議:`);
-  ui.write(`1. 設定授權鑄造者 (CatLottery 合約地址):`);
-  ui.write(`   使用 SetAuthorizedMinter 消息`);
-  ui.write(`2. 在 CatLottery 合約中設定 NFT 合約地址:`);
-  ui.write(`   CONTRACT_ADDRESS = '${catNFT.address}'`);
-  ui.write(`3. 測試 NFT 鑄造:`);
-  ui.write(`   從授權鑄造者發送 MintTo 消息`);
+  ui.write(`\n✅ CatNFT 合約部署完成！`);
+  ui.write(`📍 合約地址: ${catNFT.address}`);
 
   // 保存部署資訊到文件
   const deploymentInfo = {
-    network: 'testnet',
+    network: config.network,
     contractAddress: catNFT.address.toString(),
     deployerAddress: deployerAddress.toString(),
+    salt: salt.toString(),
     deployedAt: new Date().toISOString(),
     explorerUrl: `https://testnet.tonviewer.com/${catNFT.address}`,
     catTemplates: [
@@ -132,21 +185,5 @@ export async function run(provider: NetworkProvider) {
     ]
   };
 
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const deploymentsDir = path.join(__dirname, '../deployments');
-
-    if (!fs.existsSync(deploymentsDir)) {
-      fs.mkdirSync(deploymentsDir, { recursive: true });
-    }
-
-    const filename = `catNFT-${Date.now()}.json`;
-    const filepath = path.join(deploymentsDir, filename);
-
-    fs.writeFileSync(filepath, JSON.stringify(deploymentInfo, null, 2));
-    ui.write(`💾 部署資訊已保存至: ${filename}`);
-  } catch (error) {
-    ui.write(`⚠️ 保存部署資訊失敗: ${error}`);
-  }
+  await DeploymentLogger.saveDeploymentInfo('catNFT', deploymentInfo);
 }

@@ -74,7 +74,7 @@ contract CatNFT with Deployable, Ownable {
     catTemplates: map<Int, CatMetadata>; // templateId -> 貓咪屬性
 
     // === 初始化 ===
-    init(owner: Address) {
+    init(owner: Address, salt: Int) {
         self.owner = owner;
         self.authorizedMinter = null;
         self.nextTokenId = 1;
@@ -82,6 +82,9 @@ contract CatNFT with Deployable, Ownable {
         
         // 初始化 4 種貓咪模板
         self.initializeCatTemplates();
+        
+        // salt 用於生成唯一合約地址，但不需要儲存
+        require(salt > 0, "Salt must be positive");
     }
 
     // 初始化貓咪模板
