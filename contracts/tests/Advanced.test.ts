@@ -335,8 +335,8 @@ describe('Advanced Tests - Security & Performance', () => {
             
             // Verify final state consistency
             const finalInfo = await catLottery.getGetContractInfo();
-            expect(finalInfo.currentRound).toBe(3n);
-            expect(finalInfo.lotteryActive).toBe(false);
+            expect(finalInfo.currentRound).toBe(4n); // Auto-incremented after last draw
+            expect(finalInfo.lotteryActive).toBe(true); // New round auto-started
             
             const finalNFTInfo = await catNFT.getGetContractInfo();
             expect(finalNFTInfo.totalSupply).toBe(3n);
@@ -498,7 +498,7 @@ describe('Advanced Tests - Security & Performance', () => {
             
             // Verify final state
             const finalInfo = await catLottery.getGetContractInfo();
-            expect(finalInfo.currentRound).toBe(5n);
+            expect(finalInfo.currentRound).toBe(6n); // Auto-incremented after last draw
             
             const finalNFTInfo = await catNFT.getGetContractInfo();
             expect(finalNFTInfo.totalSupply).toBe(5n);

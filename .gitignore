@@ -154,3 +154,6 @@ k8s/**/secrets/
 .claude/*
 
 contracts/deployments
+
+
+git_commit_message*.txt

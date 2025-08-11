@@ -23,20 +23,20 @@ describe('Integration Tests - Contract Interactions', () => {
         
         // Deploy CatNFT contract
         catNFT = context.blockchain.openContract(
-            await CatNFT.fromInit(context.deployer.address, BigInt(1))
+            await CatNFT.fromInit(context.deployer.address, 1n)
         );
         
         // Deploy both contracts
         const lotteryDeployResult = await catLottery.send(
             context.deployer.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'Deploy', queryId: BigInt(0) }
+            { $$type: 'Deploy', queryId: 0n }
         );
         
         const nftDeployResult = await catNFT.send(
             context.deployer.getSender(),
             { value: toNano('0.05') },
-            { $$type: 'Deploy', queryId: BigInt(0) }
+            { $$type: 'Deploy', queryId: 0n }
         );
         
         // Verify deployments
@@ -164,10 +164,11 @@ describe('Integration Tests - Contract Interactions', () => {
                 success: true,
             });
 
-            // Step 4: Verify lottery state reset
+            // Step 4: Verify lottery state reset and auto new round started
             const contractInfoAfterDraw = await catLottery.getGetContractInfo();
             expect(contractInfoAfterDraw.participantCount).toBe(0n);
-            expect(contractInfoAfterDraw.lotteryActive).toBe(false);
+            expect(contractInfoAfterDraw.lotteryActive).toBe(true); // Auto-started new round
+            expect(contractInfoAfterDraw.currentRound).toBe(2n); // Round incremented
 
             // Step 5: Verify winner was recorded
             const winner = await catLottery.getGetWinner(1n);
@@ -258,21 +259,9 @@ describe('Integration Tests - Contract Interactions', () => {
                 expect(winner!.nftId).toBeGreaterThanOrEqual(BigInt(round * 1000));
                 expect(winner!.nftId).toBeLessThanOrEqual(BigInt(round * 1000 + 99));
 
-                // Start next round (except for last iteration)
+                // Verify new round auto-started (except for last iteration)
                 if (round < 3) {
-                    const startRoundResult = await catLottery.send(
-                        context.deployer.getSender(),
-                        { value: toNano('0.05') },
-                        'startNewRound'
-                    );
-
-                    expect(startRoundResult.transactions).toHaveTransaction({
-                        from: context.deployer.address,
-                        to: catLottery.address,
-                        success: true,
-                    });
-
-                    // Verify new round started
+                    // New round should automatically start after drawWinner
                     const contractInfo = await catLottery.getGetContractInfo();
                     expect(contractInfo.currentRound).toBe(BigInt(round + 1));
                     expect(contractInfo.lotteryActive).toBe(true);
@@ -282,7 +271,7 @@ describe('Integration Tests - Contract Interactions', () => {
 
             // Verify final state
             const finalContractInfo = await catLottery.getGetContractInfo();
-            expect(finalContractInfo.currentRound).toBe(3n);
+            expect(finalContractInfo.currentRound).toBe(4n); // Auto incremented after last round
             
             const finalNFTInfo = await catNFT.getGetContractInfo();
             expect(finalNFTInfo.totalSupply).toBe(3n); // 3 NFTs minted across 3 rounds

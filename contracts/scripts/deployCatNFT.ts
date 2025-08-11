@@ -167,7 +167,8 @@ export async function run(provider: NetworkProvider) {
   }
 
   ui.write(`\n✅ CatNFT 合約部署完成！`);
-  ui.write(`📍 合約地址: ${catNFT.address}`);
+  ui.write(`\n🔗 合約 tonviewer: https://testnet.tonviewer.com/${catNFT.address}`);
+  ui.write(`\n📍 合約地址: ${catNFT.address}`);
 
   // 保存部署資訊到文件
   const deploymentInfo = {

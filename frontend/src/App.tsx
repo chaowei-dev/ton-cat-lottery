@@ -4,12 +4,12 @@ import ContractStatus from './components/ContractStatus';
 import JoinLottery from './components/JoinLottery';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
+import { contractAddress } from './Address';
 import type { ContractInfo } from './services/contractService';
 import './styles/App.css';
 
 function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
-  const contractAddress = 'EQCOfqSzzgHmoEg2K27kBx_iyLzkQETWiC9aPueccPWyvnEN';
   const toast = useToast();
 
   // 合約狀態更新回調函數

@@ -71,7 +71,8 @@ async function connectContracts(provider: NetworkProvider, ui: any, deployerAddr
     ui.write(`\n1️⃣ 設定 CatNFT 的授權鑄造者為 CatLottery...`);
     
     // 設定 NFT 合約的授權鑄造者
-    await catNFT.send(
+    // 直接發送交易，不等待回應
+    catNFT.send(
       provider.sender(),
       { value: toNano('0.05') },
       {
@@ -83,13 +84,22 @@ async function connectContracts(provider: NetworkProvider, ui: any, deployerAddr
     ui.write(`✅ 已設定 CatNFT 授權鑄造者`);
     ui.write(`🔨 請在錢包中確認交易...`);
 
-    // 等待交易確認
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // 手動確認部署狀態
+    ui.write(`\n❓ 請確認 CatNFT 授權狀態:`);
+    ui.write(`   1. 授權成功 - 繼續`);
+    ui.write(`   2. 授權失敗 - 退出`);
+
+    const authorizedChoice = await ui.choose('授權狀態', ['授權成功', '授權失敗'], (c: string) => c);
+
+    if (authorizedChoice === '授權失敗') {
+      ui.write(`👋 退出設定工具`);
+      return;
+    }
 
     ui.write(`\n2️⃣ 設定 CatLottery 的 NFT 合約地址...`);
 
     // 設定 Lottery 合約的 NFT 地址
-    await catLottery.send(
+    catLottery.send(
       provider.sender(),
       { value: toNano('0.05') },
       {
@@ -101,12 +111,23 @@ async function connectContracts(provider: NetworkProvider, ui: any, deployerAddr
     ui.write(`✅ 已設定 CatLottery NFT 合約地址`);
     ui.write(`🔨 請在錢包中確認交易...`);
 
+    // 手動確認交易狀態
+    ui.write(`\n❓ 請確認 CatLottery NFT 合約地址設定狀態:`);
+    ui.write(`   1. 設定成功 - 繼續`);
+    ui.write(`   2. 設定失敗 - 退出`);
+
+    const lotteryChoice = await ui.choose('設定狀態', ['設定成功', '設定失敗'], (c: string) => c);
+
+    if (lotteryChoice === '設定失敗') {
+      ui.write(`👋 退出設定工具`);
+      return;
+    }
+
     ui.write(`\n🎉 合約連接完成！`);
     ui.write(`📋 配置摘要:`);
-    ui.write(`   - CatLottery: ${lotteryAddress}`);
-    ui.write(`   - CatNFT: ${nftAddress}`);
-    ui.write(`   - CatNFT 授權鑄造者: ${lotteryAddress}`);
+    ui.write(`   - CatLottery 合約: ${lotteryAddress}`);
     ui.write(`   - CatLottery NFT 合約: ${nftAddress}`);
+    ui.write(`   - CatNFT 授權鑄造者: ${lotteryAddress}`);
 
   } catch (error) {
     ui.write(`❌ 連接失敗: ${error}`);
@@ -142,9 +163,20 @@ async function checkContractStatus(provider: NetworkProvider, ui: any, deployerA
 
     // 檢查 CatNFT 狀態
     ui.write(`\n🐱 CatNFT 合約狀態:`);
+    
+    // 先嘗試最基本的 owner getter
+    try {
+      const owner = await catNFT.getOwner();
+      ui.write(`   - 擁有者: ${owner}`);
+    } catch (e) {
+      ui.write(`   ❌ 無法獲取擁有者: ${e}`);
+      ui.write(`   💡 這可能表示合約地址錯誤或合約未正確初始化`);
+      return;
+    }
+
+    // 嘗試獲取完整合約資訊
     try {
       const nftInfo = await catNFT.getGetContractInfo();
-      ui.write(`   - 擁有者: ${nftInfo.owner}`);
       ui.write(`   - 授權鑄造者: ${nftInfo.authorizedMinter || '未設定'}`);
       ui.write(`   - 下一個 NFT ID: ${nftInfo.nextTokenId}`);
       ui.write(`   - 總供應量: ${nftInfo.totalSupply}`);
@@ -158,11 +190,12 @@ async function checkContractStatus(provider: NetworkProvider, ui: any, deployerA
             ui.write(`   ${i}: ${template.name} (${template.rarity})`);
           }
         } catch (e) {
-          ui.write(`   ${i}: 模板讀取失敗`);
+          ui.write(`   ${i}: 模板讀取失敗 - ${e}`);
         }
       }
     } catch (e) {
-      ui.write(`   ❌ 無法獲取狀態: ${e}`);
+      ui.write(`   ❌ 無法獲取完整合約資訊: ${e}`);
+      ui.write(`   💡 合約可能需要重新初始化或等待網路同步`);
     }
 
   } catch (error) {
@@ -216,7 +249,6 @@ async function testNFTMinting(provider: NetworkProvider, ui: any, deployerAddres
 
 async function simulateLottery(provider: NetworkProvider, ui: any, deployerAddress: Address) {
   ui.write(`\n🎲 模擬抽獎流程`);
-  ui.write(`⚠️  此功能需要多個錢包參與測試`);
   
   const lotteryAddressStr = await ui.input('請輸入 CatLottery 合約地址: ');
   
@@ -233,52 +265,51 @@ async function simulateLottery(provider: NetworkProvider, ui: any, deployerAddre
 
     const action = await ui.choose(
       '選擇操作',
-      ['參與抽獎', '執行抽獎 (僅擁有者)', '檢查中獎記錄', '返回'],
+      ['執行抽獎 (僅擁有者)', '確認抽獎清單', '檢查中獎記錄', '返回'],
       (c: string) => c
     );
 
-    if (action === '參與抽獎') {
-      ui.write(`\n🎫 參與抽獎...`);
-      
-      await catLottery.send(
-        provider.sender(),
-        { value: lotteryInfo.entryFee + toNano('0.05') }, // 參與費用 + gas
-        'join'
-      );
-
-      ui.write(`✅ 參與請求已發送`);
-      ui.write(`🔨 請在錢包中確認交易...`);
-      ui.write(`💰 費用: ${Number(lotteryInfo.entryFee) / 1e9} TON`);
-
-    } else if (action === '執行抽獎 (僅擁有者)') {
+    if (action === '執行抽獎 (僅擁有者)') {
       ui.write(`\n🎰 執行抽獎...`);
-      
-      await catLottery.send(
+
+      ui.write(`🔨 請在錢包中確認交易...`);
+
+      ui.write(`\n請確認交易狀態`);
+      ui.write(`   1. 確認抽獎請求 - 繼續`);
+      ui.write(`   2. 取消抽獎請求 - 返回`);
+
+      // 直接發送抽獎請求
+      catLottery.send(
         provider.sender(),
         { value: toNano('0.1') },
         'drawWinner'
       );
 
-      ui.write(`✅ 抽獎請求已發送`);
-      ui.write(`🔨 請在錢包中確認交易...`);
+      // 手動確認
+      const lotteryConfirm = await ui.choose(
+        '確認抽獎請求',
+        ['確認', '取消'],
+        (c: string) => c
+      );
 
+      if (lotteryConfirm === '確認') {
+        ui.write(`✅ 抽獎請求已確認`);
+      } else {
+        ui.write(`❌ 抽獎請求已取消`);
+        return;
+      }
+
+    // TODO: 確認抽獎清單
+    } else if (action === '確認抽獎清單') {
+      ui.write(`\n📋 確認抽獎清單...`);
+
+
+    // TODO: 檢查中獎記錄
     } else if (action === '檢查中獎記錄') {
       ui.write(`\n🏆 檢查中獎記錄...`);
       
-      const roundStr = await ui.input('請輸入輪次 (預設: 最新): ') || lotteryInfo.currentRound.toString();
-      const round = BigInt(roundStr);
-
-      try {
-        const winner = await catLottery.getGetWinner(round);
-        if (winner) {
-          ui.write(`✅ 第 ${round} 輪中獎者: ${winner}`);
-        } else {
-          ui.write(`ℹ️ 第 ${round} 輪尚無中獎者`);
-        }
-      } catch (e) {
-        ui.write(`❌ 無法獲取中獎記錄: ${e}`);
-      }
-    }
+    
+    } 
 
   } catch (error) {
     ui.write(`❌ 操作失敗: ${error}`);

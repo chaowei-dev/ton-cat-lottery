@@ -134,15 +134,8 @@ contract CatLottery with Deployable {
             participantCount: self.participantCount,
         }.toCell());
 
-        // 9. 重置抽獎狀態（準備下一輪）
-        self.lotteryActive = false;
-        // 清空參與者列表
-        let i: Int = 0;
-        while (i < self.participantCount) {
-            self.participants.set(i, null);
-            i = i + 1;
-        }
-        self.participantCount = 0;
+        // 9. 自動開始新輪次
+        self.autoStartNewRound();
     }
 
     // 發送 NFT 給中獎者
@@ -173,6 +166,27 @@ contract CatLottery with Deployable {
         }.toCell());
     }
 
+    // 自動開始新輪次（內部方法）
+    fun autoStartNewRound() {
+        // 清空參與者列表
+        let i: Int = 0;
+        while (i < self.participantCount) {
+            self.participants.set(i, null);
+            i = i + 1;
+        }
+        
+        // 重置狀態並開始新輪次
+        self.participantCount = 0;
+        self.currentRound = self.currentRound + 1;
+        self.lotteryActive = true;
+        
+        // 發送新輪次開始事件
+        emit(NewRoundStarted {
+            round: self.currentRound,
+            timestamp: now(),
+        }.toCell());
+    }
+
     // 根據模板 ID 獲取貓咪名稱
     fun getCatNameByTemplate(templateId: Int): String {
         if (templateId == 0) {
@@ -194,27 +208,21 @@ contract CatLottery with Deployable {
         self.nftContract = msg.nftContract;
     }
 
-    // 開始新一輪抽獎
+    // 手動開始新一輪抽獎（緊急情況下使用）
     receive("startNewRound") {
         require(sender() == self.owner, "Only owner can start new round");
         require(!self.lotteryActive, "Current lottery is still active");
 
-        // 確保參與者列表已清空（雙重保護）
-        let i: Int = 0;
-        while (i < self.maxParticipants) {
-            self.participants.set(i, null);
-            i = i + 1;
-        }
+        // 手動呼叫自動開始新輪次函數
+        self.autoStartNewRound();
+    }
 
-        self.lotteryActive = true;
-        self.participantCount = 0;
-        self.currentRound = self.currentRound + 1;
-
-        // 發送新輪次開始事件
-        emit(NewRoundStarted {
-            round: self.currentRound,
-            timestamp: now(),
-        }.toCell());
+    // 暫停抽獎（用於維護或提取資金）
+    receive("pauseLottery") {
+        require(sender() == self.owner, "Only owner can pause lottery");
+        require(self.lotteryActive, "Lottery is already inactive");
+        
+        self.lotteryActive = false;
     }
 
     // 提取合約餘額

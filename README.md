@@ -17,6 +17,20 @@
 
 ---
 
+## 📋 目錄
+
+- [🖼️ 系統架構圖](#️-系統架構圖)
+- [🛠️ 開發工具](#️-開發工具)
+- [📦 專案目錄結構](#-專案目錄結構)
+- [🧠 核心功能模組](#-核心功能模組)
+  - [🎯 智能合約（CatLottery.tact）](#-智能合約catlotterytact)
+  - [🧰 後端自動抽獎機器人（Go）](#-後端自動抽獎機器人go)
+  - [⚙️ DevOps 架構細節](#️-devops-架構細節)
+- [🚀 智能合約](#-智能合約)
+- [📚 技術棧](#-技術棧)
+- [🏁 TODO Checklist - 功能導向模組拆解](#-todo-checklist---功能導向模組拆解)
+
+---
 ## 🖼️ 系統架構圖
 ![ProjectArch](figures/ProjectArch.png)
 
@@ -39,7 +53,11 @@
 - 部署流程：
   ![DevOpsArch](figures/DevOpsArch.png)
 
-
+### 環境需求
+```
+- Node.js >= 22.18.0
+- Go >= 1.24.5
+```
 
 ---
 
@@ -67,7 +85,7 @@ ton-cat-lottery/
 
 ### 🎯 智能合約（CatLottery.tact）
 
-[NFT 合約文檔](docs/NFTREADME.md)
+[NFT 合約文檔](docs/ContractREADME.md)
 
 [貓咪樂園抽獎故事](docs/NFTStory.md)
 
@@ -85,51 +103,12 @@ ton-cat-lottery/
 
 ---
 
-## 🛠️ 環境需求
+## 🚀 智能合約
 
-```
-- Node.js >= 22.18.0
-- Go >= 1.24.5
-- Docker & Docker Compose
-- Tact CLI
-```
-
----
-
-## 🚀 智能合約部署
-
-> 在運行應用之前，需要先部署智能合約到 TON 區塊鏈。
-
-### 部署到測試網
-
-```bash
-# 進入合約目錄
-cd contracts
-
-# 安裝依賴
-npm install
-
-# 部署合約到測試網
-npx blueprint run deployCatLottery --testnet --tonconnec
-```
-
-### 部署後設定
-
-1. **記錄合約地址**: 部署完成後，將顯示的合約地址記錄下來
-2. **更新環境變數**: 在 `.env` 檔案中設定合約地址
-   ```bash
-   LOTTERY_CONTRACT_ADDRESS=你的抽獎合約地址
-   NFT_CONTRACT_ADDRESS=你的NFT合約地址
-   ```
-
-#### 部署到主網
-
-```bash
-# 部署到主網 (請確保錢包有足夠的 TON)
-npx blueprint run deployCatLottery --mainnet --tonconnec
-```
-
-⚠️ **注意**: 主網部署需要真實的 TON 代幣作為 gas 費用。
+| 類別        | 合約地址                                            |
+| ---------- | -------------------------------------------------- |
+| CatLottery | `EQDv5_XyunYSZ7XUQqOsrKw2W6S_iz2ljLIJAZBkHsg6nTBk` |
+| CatNFT     | `EQBtv44v7Bw3aQmGxLu5RBo76ENwpRmrbNB3pEMsJYt-o-lP` |
 
 ---
 
@@ -151,12 +130,6 @@ npx blueprint run deployCatLottery --mainnet --tonconnec
 ## 🏁 TODO Checklist - 功能導向模組拆解
 
 > 本清單依照功能模組拆解為可執行任務，便於開發與進度追蹤。
-
-- [ ] 智能合約模組: 需要環境特定的合約部署策略
-- [ ] 後端模組: 需要環境變數和配置管理
-- [ ] 前端模組: 需要環境特定的構建配置
-- [ ] DevOps模組: 需要重新設計Terraform和K8s配置
-- [ ] CI/CD模組: 需要多環境部署流程
 
 ---
 ### 智能合約模組（Tact）

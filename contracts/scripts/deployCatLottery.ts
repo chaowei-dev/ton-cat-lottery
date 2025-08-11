@@ -144,6 +144,7 @@ export async function run(provider: NetworkProvider) {
   }
 
   ui.write(`\n✅ CatLottery 合約部署完成！`);
+  ui.write(`🔗 合約 tonviewer: https://testnet.tonviewer.com/${catLottery.address}`);
   ui.write(`📍 合約地址: ${catLottery.address}`);
 
   // 保存部署資訊到文件
