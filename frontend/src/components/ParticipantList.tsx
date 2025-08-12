@@ -76,7 +76,13 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
   };
 
   if (!contractInfo) {
-    return null;
+    return (
+      <div className="participant-list">
+        <div className="loading">
+          <span>🔄 等待合約資訊載入...</span>
+        </div>
+      </div>
+    );
   }
 
   return (

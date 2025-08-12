@@ -178,6 +178,23 @@
   opacity: 0.6;
 }
 
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.loading span {
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
 .participant-address .value {
   font-size: 13px;
   max-width: 120px;

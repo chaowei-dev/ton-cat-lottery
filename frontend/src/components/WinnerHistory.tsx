@@ -102,7 +102,13 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
   };
 
   if (!contractInfo) {
-    return null;
+    return (
+      <div className="winner-history">
+        <div className="loading">
+          <span>🔄 等待合約資訊載入...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
