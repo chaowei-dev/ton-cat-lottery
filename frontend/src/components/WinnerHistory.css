@@ -26,6 +26,8 @@
   border-radius: 12px;
   backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .total-rounds,
@@ -141,6 +143,31 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.load-btn {
+  background: linear-gradient(135deg, #FF6B35, #FF8C42);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.load-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #FF8C42, #FF6B35);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.load-btn:disabled {
+  background: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .label {

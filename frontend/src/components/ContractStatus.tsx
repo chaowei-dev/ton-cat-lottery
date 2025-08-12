@@ -142,14 +142,7 @@ const ContractStatus: React.FC<ContractStatusProps> = ({
     }
   }, [refreshTrigger, loadContractStatus]);
 
-  // 定期刷新（每 30 秒）
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     loadContractStatus();
-  //   }, 30000);
-    
-  //   return () => clearInterval(interval);
-  // }, []); // 移除 loadContractStatus 依賴，避免重複設置定時器
+  // 移除定期刷新功能，改為手動更新
 
   // 清理函數
   useEffect(() => {

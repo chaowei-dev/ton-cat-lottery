@@ -17,10 +17,11 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   
   const contractService = createContractService(contractAddress);
 
-  // 載入參與者清單
+  // 載入參與者清單 - 使用批量請求
   const loadParticipants = async () => {
     if (!contractInfo || contractInfo.participantCount === 0) {
       setParticipants([]);
@@ -31,17 +32,16 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
     setError(null);
     
     try {
-      const participantPromises: Promise<Participant | null>[] = [];
-      
-      // 查詢所有參與者
-      for (let i = 0; i < contractInfo.participantCount; i++) {
-        participantPromises.push(contractService.getParticipant(i));
-      }
-      
-      const participantResults = await Promise.all(participantPromises);
-      const validParticipants = participantResults.filter((p): p is Participant => p !== null);
+      console.log(`📋 載入 ${contractInfo.participantCount} 個參與者`);
+      // 使用批量請求方法，避免併發問題
+      const validParticipants = await contractService.getParticipantsBatch(contractInfo.participantCount);
       
       setParticipants(validParticipants);
+      
+      if (toast && validParticipants.length > 0) {
+        setLoaded(true);
+        toast.success('載入成功', `成功載入 ${validParticipants.length} 個參與者`);
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '載入參與者失敗';
@@ -55,12 +55,12 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
     }
   };
 
-  // 當合約資訊變化時重新載入
-  useEffect(() => {
-    if (contractInfo) {
-      loadParticipants();
-    }
-  }, [contractInfo?.currentRound, contractInfo?.participantCount]);
+  // 移除自動載入，改為手動查詢
+  // useEffect(() => {
+  //   if (contractInfo) {
+  //     loadParticipants();
+  //   }
+  // }, [contractInfo?.currentRound, contractInfo?.participantCount]);
 
   // 格式化時間
   const formatTime = (timestamp: number) => {
@@ -85,9 +85,18 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
       
       <div className="participant-summary">
         <span className="round-info">輪次 #{contractInfo.currentRound}</span>
-        <span className="count-info">
+        {/* <span className="count-info">
           {contractInfo.participantCount} / {contractInfo.maxParticipants} 人
-        </span>
+        </span> */}
+        {!loaded &&
+          <button 
+          onClick={loadParticipants} 
+          className="load-btn"
+          disabled={loading || contractInfo.participantCount === 0}
+          >
+          🔍 {loading ? '載入中...' : '查看參與者'}
+        </button>
+        }
       </div>
 
       {loading && (
@@ -108,6 +117,12 @@ const ParticipantList: React.FC<ParticipantListProps> = ({
       {!loading && !error && contractInfo.participantCount === 0 && (
         <div className="empty-state">
           <span>🎭 還沒有人參與此輪抽獎</span>
+        </div>
+      )}
+
+      {!loading && !error && participants.length === 0 && contractInfo.participantCount > 0 && (
+        <div className="empty-state">
+          <span>📋 點擊「查看參與者」按鈕載入清單</span>
         </div>
       )}
 
