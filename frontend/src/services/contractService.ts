@@ -165,38 +165,91 @@ export class ContractService {
 
   // 獲取參與者資訊
   async getParticipant(index: number): Promise<Participant | null> {
-    try {
-      const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: this.contractAddress,
-          method: 'getParticipant',
-          stack: [['num', index.toString()]]
-        })
-      });
+    const maxRetries = 3;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 添加延遲避免 API 限制
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, (attempt * 500) + Math.random() * 500));
+        }
+        
+        const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: this.contractAddress,
+            method: 'getParticipant',
+            stack: [['num', index.toString()]]
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        if (!response.ok) {
+          if (response.status === 429 && attempt < maxRetries - 1) {
+            console.warn(`API 限制，第 ${attempt + 1} 次重試...`);
+            continue;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      const data = await response.json() as any;
+        const data = await response.json() as any;
       
       if (data.ok && data.result?.stack && data.result.stack.length > 0) {
         const stack = data.result.stack;
         if (stack.length > 0 && stack[0][0] === 'tuple') {
           const tupleElements = stack[0][1].elements;
           if (tupleElements && tupleElements.length >= 3) {
-            // 解析地址 (slice 需要特殊處理)
+            // 調試：打印原始數據結構
+            console.log('🔍 Tuple elements:', tupleElements);
+            console.log('🔍 Address element:', tupleElements[0]);
+            
+            // 解析地址 (使用正確的 TON 地址解析方式)
             const addressSlice = tupleElements[0].slice?.bytes;
             let parsedAddress = '';
             
             try {
               if (addressSlice) {
-                parsedAddress = addressSlice;
+                console.log('🔧 開始解析地址:', addressSlice);
+                
+                // 使用 TON Connect 方式解析地址
+                // Cell 格式的地址需要特殊處理
+                // 暫時使用簡化的轉換方法
+                
+                // 如果地址已經是標準格式（以0Q或UQ開頭），直接使用
+                if (addressSlice.startsWith('0Q') || addressSlice.startsWith('UQ') || addressSlice.startsWith('EQ')) {
+                  parsedAddress = addressSlice;
+                  console.log('✅ 使用標準格式地址:', parsedAddress);
+                } else {
+                  // 對於 Cell 格式地址，使用 TON Center API 轉換
+                  try {
+                    const convertResponse = await fetch('https://testnet.toncenter.com/api/v2/packAddress', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        address: addressSlice
+                      })
+                    });
+                    
+                    if (convertResponse.ok) {
+                      const convertData = await convertResponse.json();
+                      if (convertData.ok && convertData.result) {
+                        parsedAddress = convertData.result;
+                        console.log('✅ API 轉換地址成功:', parsedAddress);
+                      } else {
+                        throw new Error('API 轉換失敗');
+                      }
+                    } else {
+                      throw new Error('API 請求失敗');
+                    }
+                  } catch (apiError) {
+                    console.warn('API 轉換失敗，使用原始數據:', apiError);
+                    parsedAddress = addressSlice;
+                  }
+                }
               }
             } catch (e) {
-              console.warn('地址解析失敗:', e);
+              console.error('❌ 地址解析失敗:', e);
+              console.log('原始地址數據:', addressSlice);
               parsedAddress = addressSlice || '';
             }
             
@@ -214,10 +267,16 @@ export class ContractService {
       }
       
       return null;
-    } catch (error) {
-      console.error('獲取參與者資訊失敗:', error);
-      return null;
+      } catch (error) {
+        console.error(`獲取參與者資訊失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
+        
+        if (attempt === maxRetries - 1) {
+          break;
+        }
+      }
     }
+    
+    return null;
   }
 
   // 獲取中獎記錄
