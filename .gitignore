@@ -150,3 +150,10 @@ k8s/**/secrets/
 .github/**/*.secret
 .github/**/*.key
 .github/workflows/secrets/
+
+.claude/*
+
+contracts/deployments
+
+
+git_commit_message*.txt

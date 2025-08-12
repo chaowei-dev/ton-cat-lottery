@@ -1,0 +1,256 @@
+.winner-history {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.winner-history h3 {
+  margin: 0 0 20px 0;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.history-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.total-rounds,
+.total-winners {
+  font-weight: 500;
+  color: white;
+  font-size: 1rem;
+}
+
+.total-winners {
+  color: #ffd700;
+}
+
+.loading,
+.error,
+.empty-state {
+  text-align: center;
+  padding: 24px;
+  margin: 16px 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.loading {
+  color: #81c784;
+}
+
+.error {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+
+.empty-state {
+  color: rgba(255, 255, 255, 0.8);
+  font-style: italic;
+}
+
+.retry-btn {
+  margin-left: 8px;
+  padding: 8px 16px;
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.retry-btn:hover {
+  background: #ff5252;
+}
+
+.winner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.winner-card {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  transition: all 0.2s;
+}
+
+.winner-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.winner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.round-badge {
+  background: linear-gradient(45deg, #4caf50, #8bc34a);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.winner-time {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-family: 'Monaco', 'Consolas', monospace;
+}
+
+.winner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.winner-address,
+.winner-nft {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.value {
+  color: white;
+  font-weight: 500;
+  font-family: 'Monaco', 'Consolas', monospace;
+  font-size: 13px;
+}
+
+.nft-info {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.refresh-section {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.refresh-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(5px);
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.refresh-btn:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 特殊動畫效果 - 最新中獎記錄 */
+.winner-card:first-child {
+  border-left: 4px solid #ffd700;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 255, 255, 0.1) 100%);
+}
+
+.winner-card:first-child .round-badge {
+  background: linear-gradient(135deg, #ffd700, #ffed4a);
+  color: #2c3e50;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+  }
+  to {
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.8), 0 0 24px rgba(255, 215, 0, 0.4);
+  }
+}
+
+@media (max-width: 768px) {
+  .winner-history {
+    margin: 16px 0;
+    padding: 16px;
+  }
+
+  .history-summary {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .winner-header {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+
+  .winner-content {
+    gap: 12px;
+  }
+
+  .winner-address,
+  .winner-nft {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .label {
+    min-width: auto;
+  }
+
+  .value {
+    word-break: break-all;
+  }
+}

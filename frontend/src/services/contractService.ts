@@ -1,5 +1,3 @@
-// 真實的合約服務，使用 TON API 查詢
-
 // 合約狀態介面
 export interface ContractInfo {
   owner: string;
@@ -68,13 +66,13 @@ export class ContractService {
         if (data.ok && data.result) {
           // 解析合約返回的數據
           const stack = data.result.stack;
-          if (stack && stack.length >= 6) {
-            // 解析返回的數據
-            const entryFeeNano = parseInt(stack[1][1], 16); // 0x5f5e100 = 100000000
-            const maxParticipants = parseInt(stack[2][1], 16); // 0x3 = 3
-            const currentRound = parseInt(stack[3][1], 16); // 0x1 = 1
-            const lotteryActiveRaw = parseInt(stack[4][1], 16); // -0x1 = -1
-            const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
+          if (stack && stack.length >= 9) {
+            // ContractInfo 結構: owner, entryFee, maxParticipants, currentRound, lotteryActive, drawInProgress, drawStartTime, participantCount, nftContract
+            const entryFeeNano = parseInt(stack[1][1], 16); 
+            const maxParticipants = parseInt(stack[2][1], 16); 
+            const currentRound = parseInt(stack[3][1], 16); 
+            const lotteryActiveRaw = parseInt(stack[4][1], 16); 
+            const participantCount = parseInt(stack[7][1], 16); // participantCount 在第8個位置 (index 7)
 
             // 轉換 entryFee 從 nanoTON 到 TON
             const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
@@ -166,22 +164,171 @@ export class ContractService {
   }
 
   // 獲取參與者資訊
-  async getParticipant(_index: number): Promise<Participant | null> {
-    try {
-      // 實作參與者查詢邏輯
-      // 暫時返回 null，實際實作需要通過合約查詢
+  async getParticipant(index: number): Promise<Participant | null> {
+    const maxRetries = 3;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // 添加延遲避免 API 限制
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve, (attempt * 500) + Math.random() * 500));
+        }
+        
+        const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: this.contractAddress,
+            method: 'getParticipant',
+            stack: [['num', index.toString()]]
+          })
+        });
+
+        if (!response.ok) {
+          if (response.status === 429 && attempt < maxRetries - 1) {
+            console.warn(`API 限制，第 ${attempt + 1} 次重試...`);
+            continue;
+          }
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json() as any;
+      
+      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            // 調試：打印原始數據結構
+            console.log('🔍 Tuple elements:', tupleElements);
+            console.log('🔍 Address element:', tupleElements[0]);
+            
+            // 解析地址 (使用正確的 TON 地址解析方式)
+            const addressSlice = tupleElements[0].slice?.bytes;
+            let parsedAddress = '';
+            
+            try {
+              if (addressSlice) {
+                console.log('🔧 開始解析地址:', addressSlice);
+                
+                // 使用 TON Connect 方式解析地址
+                // Cell 格式的地址需要特殊處理
+                // 暫時使用簡化的轉換方法
+                
+                // 如果地址已經是標準格式（以0Q或UQ開頭），直接使用
+                if (addressSlice.startsWith('0Q') || addressSlice.startsWith('UQ') || addressSlice.startsWith('EQ')) {
+                  parsedAddress = addressSlice;
+                  console.log('✅ 使用標準格式地址:', parsedAddress);
+                } else {
+                  // 對於 Cell 格式地址，使用 TON Center API 轉換
+                  try {
+                    const convertResponse = await fetch('https://testnet.toncenter.com/api/v2/packAddress', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        address: addressSlice
+                      })
+                    });
+                    
+                    if (convertResponse.ok) {
+                      const convertData = await convertResponse.json();
+                      if (convertData.ok && convertData.result) {
+                        parsedAddress = convertData.result;
+                        console.log('✅ API 轉換地址成功:', parsedAddress);
+                      } else {
+                        throw new Error('API 轉換失敗');
+                      }
+                    } else {
+                      throw new Error('API 請求失敗');
+                    }
+                  } catch (apiError) {
+                    console.warn('API 轉換失敗，使用原始數據:', apiError);
+                    parsedAddress = addressSlice;
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('❌ 地址解析失敗:', e);
+              console.log('原始地址數據:', addressSlice);
+              parsedAddress = addressSlice || '';
+            }
+            
+            // 解析金額和時間戳
+            const amount = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            return {
+              address: parsedAddress,
+              amount: (amount / 1e9).toFixed(4), // 轉換為 TON
+              timestamp: timestamp
+            };
+          }
+        }
+      }
+      
       return null;
-    } catch (error) {
-      console.error('獲取參與者資訊失敗:', error);
-      return null;
+      } catch (error) {
+        console.error(`獲取參與者資訊失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
+        
+        if (attempt === maxRetries - 1) {
+          break;
+        }
+      }
     }
+    
+    return null;
   }
 
   // 獲取中獎記錄
-  async getWinner(_round: number): Promise<LotteryResult | null> {
+  async getWinner(round: number): Promise<LotteryResult | null> {
     try {
-      // 實作中獎記錄查詢邏輯
-      // 暫時返回 null，實際實作需要通過合約查詢
+      const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: this.contractAddress,
+          method: 'getWinner',
+          stack: [['num', round.toString()]]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json() as any;
+      
+      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            // 解析中獎者地址
+            const winnerSlice = tupleElements[0].slice?.bytes;
+            let parsedWinner = '';
+            
+            try {
+              if (winnerSlice) {
+                parsedWinner = winnerSlice;
+              }
+            } catch (e) {
+              console.warn('中獎者地址解析失敗:', e);
+              parsedWinner = winnerSlice || '';
+            }
+            
+            // 解析 NFT ID 和時間戳
+            const nftId = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            return {
+              winner: parsedWinner,
+              nftId: nftId,
+              timestamp: timestamp
+            };
+          }
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('獲取中獎記錄失敗:', error);

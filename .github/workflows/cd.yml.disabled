@@ -1,0 +1,360 @@
+name: CD - Continuous Deployment
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  NODE_VERSION: '22.18.0'
+  GO_VERSION: '1.24.5'
+  GCP_REGION: 'asia-east1'
+  GKE_CLUSTER: 'ton-cat-lottery-cluster'
+
+jobs:
+  determine-environment:
+    name: Determine Deployment Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      namespace: ${{ steps.set-env.outputs.namespace }}
+      domain: ${{ steps.set-env.outputs.domain }}
+    steps:
+      - name: Set environment based on branch or input
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+          else
+            if [ "${{ github.ref_name }}" = "main" ]; then
+              ENVIRONMENT="production"
+            elif [ "${{ github.ref_name }}" = "dev" ]; then
+              ENVIRONMENT="staging"
+            else
+              echo "❌ Unsupported branch for deployment: ${{ github.ref_name }}"
+              exit 1
+            fi
+          fi
+          
+          if [ "$ENVIRONMENT" = "production" ]; then
+            NAMESPACE="ton-cat-lottery-production"
+            DOMAIN="cat-lottery.chaowei-liu.com"
+          else
+            NAMESPACE="ton-cat-lottery-staging"
+            DOMAIN="staging.cat-lottery.chaowei-liu.com"
+          fi
+          
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+          
+          echo "🚀 Deploying to environment: $ENVIRONMENT"
+          echo "📦 Namespace: $NAMESPACE"
+          echo "🌐 Domain: $DOMAIN"
+
+  build-and-push:
+    name: Build & Push Container Images
+    runs-on: ubuntu-latest
+    needs: determine-environment
+    outputs:
+      backend-image: ${{ steps.image-tags.outputs.backend-image }}
+      frontend-image: ${{ steps.image-tags.outputs.frontend-image }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tags
+        id: image-tags
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          ENV="${{ needs.determine-environment.outputs.environment }}"
+          
+          BACKEND_TAG="${ENV}-${COMMIT_SHA}"
+          FRONTEND_TAG="${ENV}-${COMMIT_SHA}"
+          
+          BACKEND_IMAGE="asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/backend:${BACKEND_TAG}"
+          FRONTEND_IMAGE="asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/frontend:${FRONTEND_TAG}"
+          
+          echo "backend-image=${BACKEND_IMAGE}" >> $GITHUB_OUTPUT
+          echo "frontend-image=${FRONTEND_IMAGE}" >> $GITHUB_OUTPUT
+          
+          echo "🏗️ Backend image: ${BACKEND_IMAGE}"
+          echo "🏗️ Frontend image: ${FRONTEND_IMAGE}"
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: 'gha-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use gcloud as credential helper
+        run: gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.backend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image-tags.outputs.backend-image }}
+            asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/backend:${{ needs.determine-environment.outputs.environment }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.frontend
+          target: production
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image-tags.outputs.frontend-image }}
+            asia-east1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ton-cat-lottery/frontend:${{ needs.determine-environment.outputs.environment }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify images pushed successfully
+        run: |
+          echo "✅ Verifying pushed images..."
+          gcloud artifacts docker images describe ${{ steps.image-tags.outputs.backend-image }}
+          gcloud artifacts docker images describe ${{ steps.image-tags.outputs.frontend-image }}
+          echo "✅ Images verified successfully"
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [determine-environment, build-and-push]
+    if: needs.determine-environment.outputs.environment == 'staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: 'gha-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to staging namespace
+        run: |
+          # Create or ensure namespace exists
+          kubectl create namespace ${{ needs.determine-environment.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Apply K8s configurations for staging
+          if [ -d "k8s/staging" ]; then
+            kubectl apply -f k8s/staging/
+          else
+            # Fallback to base k8s configs with namespace override
+            kubectl apply -f k8s/config/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/backend/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/frontend/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/ingress/ -n ${{ needs.determine-environment.outputs.namespace }}
+          fi
+
+      - name: Update deployment images
+        run: |
+          kubectl set image deployment/backend-deployment \
+            backend=${{ needs.build-and-push.outputs.backend-image }} \
+            -n ${{ needs.determine-environment.outputs.namespace }}
+          
+          kubectl set image deployment/frontend-deployment \
+            frontend=${{ needs.build-and-push.outputs.frontend-image }} \
+            -n ${{ needs.determine-environment.outputs.namespace }}
+
+      - name: Wait for deployment to complete
+        run: |
+          kubectl rollout status deployment/backend-deployment -n ${{ needs.determine-environment.outputs.namespace }} --timeout=300s
+          kubectl rollout status deployment/frontend-deployment -n ${{ needs.determine-environment.outputs.namespace }} --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          echo "🔍 Checking deployment status..."
+          kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl get services -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl get ingress -n ${{ needs.determine-environment.outputs.namespace }}
+          
+          echo "🔍 Testing service connectivity..."
+          kubectl get endpoints -n ${{ needs.determine-environment.outputs.namespace }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [determine-environment, build-and-push]
+    if: needs.determine-environment.outputs.environment == 'production'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: 'gha-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Pre-deployment backup
+        run: |
+          echo "📦 Creating deployment backup..."
+          kubectl get deployment backend-deployment -n ${{ needs.determine-environment.outputs.namespace }} -o yaml > backup-backend-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing backend deployment"
+          kubectl get deployment frontend-deployment -n ${{ needs.determine-environment.outputs.namespace }} -o yaml > backup-frontend-$(date +%Y%m%d-%H%M%S).yaml || echo "No existing frontend deployment"
+
+      - name: Deploy to production namespace (Blue-Green Strategy)
+        run: |
+          # Create or ensure namespace exists
+          kubectl create namespace ${{ needs.determine-environment.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Apply K8s configurations for production
+          if [ -d "k8s/production" ]; then
+            kubectl apply -f k8s/production/
+          else
+            # Fallback to base k8s configs with namespace override
+            kubectl apply -f k8s/config/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/backend/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/frontend/ -n ${{ needs.determine-environment.outputs.namespace }}
+            kubectl apply -f k8s/ingress/ -n ${{ needs.determine-environment.outputs.namespace }}
+          fi
+
+      - name: Update deployment images
+        run: |
+          kubectl set image deployment/backend-deployment \
+            backend=${{ needs.build-and-push.outputs.backend-image }} \
+            -n ${{ needs.determine-environment.outputs.namespace }}
+          
+          kubectl set image deployment/frontend-deployment \
+            frontend=${{ needs.build-and-push.outputs.frontend-image }} \
+            -n ${{ needs.determine-environment.outputs.namespace }}
+
+      - name: Wait for deployment to complete
+        run: |
+          kubectl rollout status deployment/backend-deployment -n ${{ needs.determine-environment.outputs.namespace }} --timeout=600s
+          kubectl rollout status deployment/frontend-deployment -n ${{ needs.determine-environment.outputs.namespace }} --timeout=600s
+
+      - name: Production health checks
+        run: |
+          echo "🏥 Performing production health checks..."
+          
+          # Check pod status
+          kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }}
+          
+          # Wait for pods to be ready
+          kubectl wait --for=condition=ready pod -l app=backend -n ${{ needs.determine-environment.outputs.namespace }} --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=frontend -n ${{ needs.determine-environment.outputs.namespace }} --timeout=300s
+          
+          # Test internal connectivity
+          echo "🔍 Testing internal connectivity..."
+          kubectl get endpoints -n ${{ needs.determine-environment.outputs.namespace }}
+
+      - name: Smoke tests
+        run: |
+          echo "🧪 Running smoke tests..."
+          
+          # Wait for ingress to be ready
+          sleep 30
+          
+          # Test HTTPS endpoint
+          EXTERNAL_IP=$(kubectl get ingress -n ${{ needs.determine-environment.outputs.namespace }} -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          
+          if [ -n "$EXTERNAL_IP" ]; then
+            echo "🌐 Testing external access via IP: $EXTERNAL_IP"
+            curl -I -k --connect-timeout 30 "https://$EXTERNAL_IP" || echo "Direct IP test failed, checking domain..."
+          fi
+          
+          echo "🌐 Testing domain: ${{ needs.determine-environment.outputs.domain }}"
+          curl -I --connect-timeout 30 "https://${{ needs.determine-environment.outputs.domain }}" || echo "Domain test failed - may need DNS propagation time"
+
+  post-deploy-verification:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: [determine-environment, build-and-push, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: 'gha-deploy@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Final verification
+        run: |
+          echo "🔍 Final deployment verification..."
+          kubectl get pods -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl get services -n ${{ needs.determine-environment.outputs.namespace }}
+          kubectl get ingress -n ${{ needs.determine-environment.outputs.namespace }}
+          
+          echo "📊 Resource usage:"
+          kubectl top pods -n ${{ needs.determine-environment.outputs.namespace }} || echo "Metrics not available"
+
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ needs.determine-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace**: ${{ needs.determine-environment.outputs.namespace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Domain**: https://${{ needs.determine-environment.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backend Image**: \`${{ needs.build-and-push.outputs.backend-image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend Image**: \`${{ needs.build-and-push.outputs.frontend-image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Deployment completed successfully!**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" = "success" ] || [ "${{ needs.deploy-production.result }}" = "success" ]; then
+            echo "✅ Deployment to ${{ needs.determine-environment.outputs.environment }} completed successfully"
+            echo "🌐 Application available at: https://${{ needs.determine-environment.outputs.domain }}"
+          else
+            echo "❌ Deployment to ${{ needs.determine-environment.outputs.environment }} failed"
+            exit 1
+          fi
