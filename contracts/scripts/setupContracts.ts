@@ -1,4 +1,4 @@
-import { toNano, Address } from '@ton/core';
+import { toNano, Address, Cell } from '@ton/core';
 import { CatLottery } from '../build/CatLottery_CatLottery';
 import { CatNFT } from '../build/CatNFT_CatNFT';
 import { compile, NetworkProvider } from '@ton/blueprint';
@@ -22,8 +22,9 @@ export async function run(provider: NetworkProvider) {
   ui.write(`   1. 連接 CatLottery 和 CatNFT 合約`);
   ui.write(`   2. 檢查合約狀態`);
   ui.write(`   3. 測試 NFT 鑄造`);
-  ui.write(`   4. 模擬抽獎流程`);
-  ui.write(`   5. 退出`);
+  ui.write(`   4. 執行抽獎（滿3人）`);
+  ui.write(`   5. 抽獎管理中心`);
+  ui.write(`   6. 退出`);
 
   const operation = await ui.choose(
     '請選擇操作',
@@ -31,7 +32,8 @@ export async function run(provider: NetworkProvider) {
       '連接 CatLottery 和 CatNFT 合約',
       '檢查合約狀態',
       '測試 NFT 鑄造',
-      '模擬抽獎流程',
+      '執行抽獎（滿3人）',
+      '抽獎管理中心',
       '退出'
     ],
     (c) => c
@@ -48,8 +50,10 @@ export async function run(provider: NetworkProvider) {
     await checkContractStatus(provider, ui, deployerAddress);
   } else if (operation === '測試 NFT 鑄造') {
     await testNFTMinting(provider, ui, deployerAddress);
-  } else if (operation === '模擬抽獎流程') {
-    await simulateLottery(provider, ui, deployerAddress);
+  } else if (operation === '執行抽獎（滿3人）') {
+    await drawLottery(provider, ui, deployerAddress);
+  } else if (operation === '抽獎管理中心') {
+    await getLotteryResults(provider, ui);
   }
 }
 
@@ -422,8 +426,67 @@ async function testNFTMinting(provider: NetworkProvider, ui: any, deployerAddres
   }
 }
 
-async function simulateLottery(provider: NetworkProvider, ui: any, deployerAddress: Address) {
-  ui.write(`\n🎲 模擬抽獎流程`);
+async function drawLottery(provider: NetworkProvider, ui: any, deployerAddress: Address) {
+  ui.write(`\n🎰 執行抽獎...`);
+
+  const lotteryAddressStr = await ui.input('請輸入 CatLottery 合約地址: ');
+
+  // 檢查當前狀態
+  try {
+    const lotteryAddress = Address.parse(lotteryAddressStr);
+    const catLottery = provider.open(CatLottery.fromAddress(lotteryAddress));
+
+    ui.write(`\n🔍 連接到合約: ${lotteryAddress}`);
+    ui.write(`⏳ 正在查詢合約狀態...`);
+
+    // 檢查當前狀態
+    const lotteryInfo = await catLottery.getGetContractInfo();
+    ui.write(`\n📊 當前抽獎狀態:`);
+    ui.write(`   - 當前輪次: ${lotteryInfo.currentRound}`);
+    ui.write(`   - 參與者數量: ${lotteryInfo.participantCount}/${lotteryInfo.maxParticipants}`);
+    ui.write(`   - 抽獎狀態: ${lotteryInfo.lotteryActive ? '活躍' : '非活躍'}`);
+    ui.write(`   - 參與費用: ${Number(lotteryInfo.entryFee) / 1e9} TON`);
+
+    // 當參與者 >= 3 人時，才可以執行抽獎
+    if (lotteryInfo.participantCount < 3) {
+      ui.write(`❌ 參與者不足 3 人，無法執行抽獎`);
+      return;
+    }
+
+    // 執行抽獎
+    ui.write(`\n🎰 執行抽獎...`);
+    ui.write(`🔨 請在錢包中確認交易...`);
+
+    // 直接發送抽獎請求
+    catLottery.send(
+      provider.sender(),
+      { value: toNano('0.1') },
+      'drawWinner'
+    );
+
+    const lotteryConfirm = await ui.choose(
+      '確認抽獎請求',
+      ['確認', '取消'],
+      (c: string) => c
+    );
+
+    if (lotteryConfirm === '確認') {
+      ui.write(`✅ 抽獎請求已確認`);
+      ui.write(`💡 請等待交易確認後重新查詢狀態查看結果`);
+    } else {
+      ui.write(`❌ 抽獎請求已取消`);
+    }
+
+
+  } catch (error) {
+    ui.write(`❌ 查詢合約狀態失敗: ${error}`);
+    return;
+  }
+
+}
+
+async function getLotteryResults(provider: NetworkProvider, ui: any) {
+  ui.write(`\n🎲 抽獎管理中心`);
   
   const lotteryAddressStr = await ui.input('請輸入 CatLottery 合約地址: ');
   
@@ -437,48 +500,22 @@ async function simulateLottery(provider: NetworkProvider, ui: any, deployerAddre
     // 檢查當前狀態
     const lotteryInfo = await catLottery.getGetContractInfo();
     ui.write(`\n📊 當前抽獎狀態:`);
+    ui.write(`   - 當前輪次: ${lotteryInfo.currentRound}`);
     ui.write(`   - 參與者數量: ${lotteryInfo.participantCount}/${lotteryInfo.maxParticipants}`);
     ui.write(`   - 抽獎狀態: ${lotteryInfo.lotteryActive ? '活躍' : '非活躍'}`);
     ui.write(`   - 參與費用: ${Number(lotteryInfo.entryFee) / 1e9} TON`);
 
     const action = await ui.choose(
       '選擇操作',
-      ['執行抽獎 (僅擁有者)', '確認抽獎清單', '檢查中獎記錄', '返回'],
+      ['確認抽獎清單', '檢查最近中獎記錄', '返回'],
       (c: string) => c
     );
 
-    if (action === '執行抽獎 (僅擁有者)') {
-      ui.write(`\n🎰 執行抽獎...`);
+    if (action === '返回') {
+      return;
+    }
 
-      ui.write(`🔨 請在錢包中確認交易...`);
-
-      ui.write(`\n請確認交易狀態`);
-      ui.write(`   1. 確認抽獎請求 - 繼續`);
-      ui.write(`   2. 取消抽獎請求 - 返回`);
-
-      // 直接發送抽獎請求
-      catLottery.send(
-        provider.sender(),
-        { value: toNano('0.1') },
-        'drawWinner'
-      );
-
-      // 手動確認
-      const lotteryConfirm = await ui.choose(
-        '確認抽獎請求',
-        ['確認', '取消'],
-        (c: string) => c
-      );
-
-      if (lotteryConfirm === '確認') {
-        ui.write(`✅ 抽獎請求已確認`);
-      } else {
-        ui.write(`❌ 抽獎請求已取消`);
-        return;
-      }
-
-    // 確認抽獎清單 (getParticipant)
-    } else if (action === '確認抽獎清單') {
+    if (action === '確認抽獎清單') {
       ui.write(`\n📋 確認抽獎清單...`);
       
       if (lotteryInfo.participantCount === BigInt(0)) {
@@ -488,83 +525,163 @@ async function simulateLottery(provider: NetworkProvider, ui: any, deployerAddre
         ui.write(`   總參與人數: ${lotteryInfo.participantCount}`);
         ui.write(`   參與費用: ${Number(lotteryInfo.entryFee) / 1e9} TON`);
         ui.write(`   總獎池金額: ${Number(lotteryInfo.participantCount) * Number(lotteryInfo.entryFee) / 1e9} TON`);
-        ui.write(`\n⚠️  注意: 由於 TON 區塊鏈的技術限制，無法直接查詢具體的參與者清單。`);
-        ui.write(`   如需查看詳細參與者資訊，請查看區塊鏈瀏覽器中的 ParticipantJoined 事件。`);
-      }
-
-
-    // 檢查中獎記錄 (getWinner)
-    } else if (action === '檢查中獎記錄') {
-      ui.write(`\n🏆 檢查中獎記錄...`);
-      
-      // 顯示查詢選項
-      const checkType = await ui.choose(
-        '選擇查詢方式',
-        ['查看特定輪次中獎記錄', '查看最近中獎記錄', '返回'],
-        (c: string) => c
-      );
-      
-      if (checkType === '返回') {
-        return;
-      }
-      
-      if (checkType === '查看特定輪次中獎記錄') {
-        const roundInput = await ui.input('請輸入要查詢的輪次 (數字): ');
-        const round = parseInt(roundInput);
         
-        if (isNaN(round) || round < 1) {
-          ui.write(`❌ 無效的輪次號碼`);
-          return;
-        }
+        // 查詢參與者詳細資訊 (TON Center API)
+        ui.write(`\n🔍 查詢參與者詳細資訊...`);
         
         try {
-          const winner = await catLottery.getGetWinner(BigInt(round));
-          if (winner) {
-            ui.write(`\n🎉 輪次 ${round} 中獎記錄:`);
-            ui.write(`   🏆 中獎者地址: ${winner.winner}`);
-            ui.write(`   🎁 NFT ID: ${winner.nftId}`);
-            ui.write(`   📅 中獎時間: ${new Date(Number(winner.timestamp) * 1000).toLocaleString()}`);
-          } else {
-            ui.write(`   ❌ 輪次 ${round} 沒有中獎記錄 (可能尚未開獎或輪次不存在)`);
+          for (let i = 0; i < Math.min(Number(lotteryInfo.participantCount), 3); i++) {
+            try {
+              ui.write(`\n📋 查詢參與者 #${i}...`);
+              
+              const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  address: lotteryAddress.toString(),
+                  method: 'getParticipant',
+                  stack: [['num', i.toString()]]
+                })
+              });
+
+              if (response.ok) {
+                const data = await response.json() as any;
+                
+                if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+                  // 解析 stack 數據 (TON API 返回的是 tuple 結構)
+                  const stack = data.result.stack;
+                  if (stack.length > 0 && stack[0][0] === 'tuple') {
+                    const tupleElements = stack[0][1].elements;
+                    if (tupleElements && tupleElements.length >= 3) {
+                      // 解析地址 (slice 需要特殊處理)
+                      const addressSlice = tupleElements[0].slice?.bytes;
+                      let parsedAddress = 'N/A';
+                      
+                      try {
+                        if (addressSlice) {
+                          const cell = Cell.fromBase64(addressSlice);
+                          const slice = cell.beginParse();
+                          const addr = slice.loadAddress();
+                          parsedAddress = addr.toString();
+                        }
+                      } catch (e) {
+                        parsedAddress = `解析失敗: ${addressSlice}`;
+                      }
+                      
+                      // 解析金額
+                      const amount = parseInt(tupleElements[1].number?.number || '0');
+                      // 解析時間戳
+                      const timestamp = parseInt(tupleElements[2].number?.number || '0');
+                      
+                      ui.write(`   ✅ 參與者 #${i}:`);
+                      ui.write(`      地址: ${parsedAddress}`);
+                      ui.write(`      金額: ${amount / 1e9} TON`);
+                      ui.write(`      時間: ${new Date(timestamp * 1000).toLocaleString()}`);
+                    } else {
+                      ui.write(`   ⚠️ 參與者 #${i}: 數據結構異常`);
+                    }
+                  } else {
+                    ui.write(`   ⚠️ 參與者 #${i}: 非預期的數據格式`);
+                  }
+                } else {
+                  ui.write(`   ❌ 參與者 #${i}: 無數據或查詢錯誤`);
+                }
+              } else {
+                ui.write(`   ❌ 參與者 #${i}: HTTP 錯誤 ${response.status}`);
+              }
+            } catch (e) {
+              ui.write(`   ❌ 參與者 #${i} 查詢失敗: ${e}`);
+            }
           }
         } catch (e) {
-          ui.write(`   ❌ 查詢失敗: ${e}`);
-        }
-        
-      } else if (checkType === '查看最近中獎記錄') {
-        ui.write(`\n🏆 最近中獎記錄:`);
-        const currentRound = Number(lotteryInfo.currentRound);
-        
-        // 查看最近 5 輪的記錄
-        const maxRounds = Math.min(5, currentRound);
-        let foundWinners = 0;
-        
-        for (let round = currentRound - 1; round >= Math.max(1, currentRound - maxRounds); round--) {
-          try {
-            const winner = await catLottery.getGetWinner(BigInt(round));
-            if (winner) {
-              foundWinners++;
-              ui.write(`\n   輪次 ${round}:`);
-              ui.write(`   🏆 中獎者: ${winner.winner}`);
-              ui.write(`   🎁 NFT ID: ${winner.nftId}`);
-              ui.write(`   📅 中獎時間: ${new Date(Number(winner.timestamp) * 1000).toLocaleString()}`);
-              ui.write(`   ────────────────────────────`);
-            }
-          } catch (e) {
-            // 忽略查詢錯誤，繼續下一輪
-          }
-        }
-        
-        if (foundWinners === 0) {
-          ui.write(`   ❌ 沒有找到最近的中獎記錄`);
-          ui.write(`   💡 可能需要先執行抽獎或等待抽獎完成`);
-        } else {
-          ui.write(`\n📊 共找到 ${foundWinners} 個中獎記錄`);
+          ui.write(`   ❌ 參與者查詢測試失敗: ${e}`);
         }
       }
-    } 
+
+    // 檢查最近中獎記錄 (使用 TON Center API)
+    } else if (action === '檢查最近中獎記錄') {
+      ui.write(`\n🏆 最近中獎記錄 (最近5輪):`);
+      const currentRound = Number(lotteryInfo.currentRound);
+      
+      const maxRounds = Math.min(5, currentRound);
+      let foundWinners = 0;
+      
+      for (let round = currentRound - 1; round >= Math.max(1, currentRound - maxRounds); round--) {
+        try {
+          ui.write(`\n🔍 查詢輪次 ${round}...`);
+          
+          const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              address: lotteryAddress.toString(),
+              method: 'getWinner',
+              stack: [['num', round.toString()]]
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json() as any;
+            
+            if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+              const stack = data.result.stack;
+              if (stack.length > 0 && stack[0][0] === 'tuple') {
+                const tupleElements = stack[0][1].elements;
+                if (tupleElements && tupleElements.length >= 3) {
+                  // 解析中獎者地址
+                  const winnerSlice = tupleElements[0].slice?.bytes;
+                  let parsedWinner = 'N/A';
+                  
+                  try {
+                    if (winnerSlice) {
+                      const cell = Cell.fromBase64(winnerSlice);
+                      const slice = cell.beginParse();
+                      const addr = slice.loadAddress();
+                      parsedWinner = addr.toString();
+                    }
+                  } catch (e) {
+                    parsedWinner = `解析失敗: ${winnerSlice}`;
+                  }
+                  
+                  // 解析 NFT ID
+                  const nftId = parseInt(tupleElements[1].number?.number || '0');
+                  // 解析時間戳
+                  const timestamp = parseInt(tupleElements[2].number?.number || '0');
+                  
+                  foundWinners++;
+                  ui.write(`   ✅ 輪次 ${round}:`);
+                  ui.write(`      🏆 中獎者: ${parsedWinner}`);
+                  ui.write(`      🎁 NFT ID: ${nftId}`);
+                  ui.write(`      📅 中獎時間: ${new Date(timestamp * 1000).toLocaleString()}`);
+                  ui.write(`      ────────────────────────────`);
+                } else {
+                  ui.write(`   ⚠️ 輪次 ${round}: 數據結構異常`);
+                }
+              } else {
+                ui.write(`   ⚠️ 輪次 ${round}: 非預期的數據格式`);
+              }
+            } else {
+              ui.write(`   ❌ 輪次 ${round}: 無中獎記錄`);
+            }
+          } else {
+            ui.write(`   ❌ 輪次 ${round}: HTTP 錯誤 ${response.status}`);
+          }
+        } catch (e) {
+          ui.write(`   ❌ 輪次 ${round} 查詢失敗: ${e}`);
+        }
+      }
+      
+      if (foundWinners === 0) {
+        ui.write(`\n❌ 沒有找到最近的中獎記錄`);
+        ui.write(`💡 可能需要等待抽獎交易確認或檢查合約狀態`);
+      } else {
+        ui.write(`\n📊 共找到 ${foundWinners} 個中獎記錄`);
+      }
+    }
 
   } catch (error) {
     ui.write(`❌ 操作失敗: ${error}`);
+    return;
   }
 }
+

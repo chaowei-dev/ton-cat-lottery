@@ -4,7 +4,9 @@ import {
   WalletService,
   TransactionError,
   ERROR_MESSAGES,
+  createContractService,
   type ContractInfo,
+  type Participant,
 } from '../services/contractService';
 import type { useToast } from '../hooks/useToast';
 import './JoinLottery.css';
@@ -31,6 +33,8 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   const [walletBalance, setWalletBalance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [balanceRetryCount, setBalanceRetryCount] = useState(0);
+  const [hasParticipated, setHasParticipated] = useState(false);
+  const [checkingParticipation, setCheckingParticipation] = useState(false);
   
   const MAX_BALANCE_RETRY = 3;
   const BALANCE_RETRY_DELAY = 2000;
@@ -123,20 +127,66 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     }
   }, [address, connectionRestored, toast]); // 移除 balanceRetryCount 依賴
 
-  // 當錢包連接且連接已恢復時載入餘額
+  // 檢查用戶是否已參與當前輪次
+  const checkParticipation = useCallback(async () => {
+    if (!address || !connectionRestored || currentParticipants === 0) {
+      setHasParticipated(false);
+      return;
+    }
+
+    setCheckingParticipation(true);
+    
+    try {
+      const contractService = createContractService(contractAddress);
+      
+      console.log('🔍 開始檢查參與狀態');
+      console.log('錢包地址:', address);
+      console.log('當前參與者數量:', currentParticipants);
+      
+      // 查詢所有參與者
+      for (let i = 0; i < currentParticipants; i++) {
+        const participant = await contractService.getParticipant(i);
+        if (participant && participant.address === address) {
+          console.log('✅ 找到匹配的參與者，設定已參與狀態');
+          setHasParticipated(true);
+          return;
+        }
+      }
+      
+      console.log('❌ 未找到匹配的參與者');
+      setHasParticipated(false);
+    } catch (error) {
+      console.error('檢查參與狀態失敗:', error);
+      // 發生錯誤時假設未參與，讓用戶嘗試
+      setHasParticipated(false);
+    } finally {
+      setCheckingParticipation(false);
+    }
+  }, [address, connectionRestored, contractAddress, currentParticipants]);
+
+  // 當錢包連接且連接已恢復時載入餘額和檢查參與狀態
   useEffect(() => {
     if (address && connectionRestored) {
       // 延遲載入確保連接穩定
       const timer = setTimeout(() => {
         loadWalletBalance(false);
+        checkParticipation();
       }, 500);
       
       return () => clearTimeout(timer);
     } else if (!address) {
       setWalletBalance(null);
       setBalanceRetryCount(0);
+      setHasParticipated(false);
     }
-  }, [address, connectionRestored]); // 移除 loadWalletBalance 依賴
+  }, [address, connectionRestored, checkParticipation]); // 添加 checkParticipation 依賴
+
+  // 當合約資訊變化時重新檢查參與狀態
+  useEffect(() => {
+    if (address && connectionRestored) {
+      checkParticipation();
+    }
+  }, [contractInfo.currentRound, contractInfo.participantCount, checkParticipation]);
 
   // 註：移除了備用載入機制以避免重複載入問題
 
@@ -153,6 +203,8 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     currentParticipants < maxParticipants &&
     hasEnoughBalance &&
     !isLoadingBalance &&
+    !hasParticipated &&
+    !checkingParticipation &&
     transactionStatus === TransactionStatus.IDLE;
 
   // 參加抽獎
@@ -229,6 +281,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         setTimeout(() => {
           onJoinSuccess();
           loadWalletBalance(false); // 重新載入餘額
+          checkParticipation(); // 重新檢查參與狀態
         }, 5000);
       }
 
@@ -241,6 +294,8 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       // 重置狀態
       setTimeout(() => {
         setTransactionStatus(TransactionStatus.IDLE);
+        // 再次檢查參與狀態確保按鈕狀態正確
+        checkParticipation();
       }, 10000);
     } catch (error: any) {
       console.error('參加抽獎失敗:', error);
@@ -309,6 +364,8 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     if (!isWalletConnected) return '請先連接錢包';
     if (!lotteryActive) return '抽獎未開放';
     if (currentParticipants >= maxParticipants) return '抽獎已滿員';
+    if (checkingParticipation) return '檢查參與狀態中...';
+    if (hasParticipated) return '您已參與本輪抽獎';
     if (isLoadingBalance) return '正在載入餘額...';
     if (!hasEnoughBalance) return `需讀取餘額`;
     if (transactionStatus !== TransactionStatus.IDLE) return '交易進行中...';

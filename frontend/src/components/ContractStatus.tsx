@@ -9,12 +9,14 @@ interface ContractStatusProps {
   contractAddress: string;
   onContractInfoUpdate?: (info: ContractInfo | null) => void;
   toast?: ReturnType<typeof useToast>;
+  refreshTrigger?: number; // 用於外部觸發刷新的 prop
 }
 
 const ContractStatus: React.FC<ContractStatusProps> = ({ 
   contractAddress, 
   onContractInfoUpdate,
-  toast 
+  toast,
+  refreshTrigger 
 }) => {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -127,6 +129,18 @@ const ContractStatus: React.FC<ContractStatusProps> = ({
       return () => clearTimeout(timer);
     }
   }, [address]); // 只依賴 address 變化
+
+  // 外部觸發刷新
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      // 延遲刷新以確保區塊鏈狀態已更新
+      const timer = setTimeout(() => {
+        loadContractStatus();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [refreshTrigger, loadContractStatus]);
 
   // 定期刷新（每 30 秒）
   // useEffect(() => {

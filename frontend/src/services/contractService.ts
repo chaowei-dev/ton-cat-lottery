@@ -1,5 +1,3 @@
-// 真實的合約服務，使用 TON API 查詢
-
 // 合約狀態介面
 export interface ContractInfo {
   owner: string;
@@ -68,13 +66,13 @@ export class ContractService {
         if (data.ok && data.result) {
           // 解析合約返回的數據
           const stack = data.result.stack;
-          if (stack && stack.length >= 6) {
-            // 解析返回的數據
-            const entryFeeNano = parseInt(stack[1][1], 16); // 0x5f5e100 = 100000000
-            const maxParticipants = parseInt(stack[2][1], 16); // 0x3 = 3
-            const currentRound = parseInt(stack[3][1], 16); // 0x1 = 1
-            const lotteryActiveRaw = parseInt(stack[4][1], 16); // -0x1 = -1
-            const participantCount = parseInt(stack[5][1], 16); // 0x0 = 0
+          if (stack && stack.length >= 9) {
+            // ContractInfo 結構: owner, entryFee, maxParticipants, currentRound, lotteryActive, drawInProgress, drawStartTime, participantCount, nftContract
+            const entryFeeNano = parseInt(stack[1][1], 16); 
+            const maxParticipants = parseInt(stack[2][1], 16); 
+            const currentRound = parseInt(stack[3][1], 16); 
+            const lotteryActiveRaw = parseInt(stack[4][1], 16); 
+            const participantCount = parseInt(stack[7][1], 16); // participantCount 在第8個位置 (index 7)
 
             // 轉換 entryFee 從 nanoTON 到 TON
             const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
@@ -166,10 +164,55 @@ export class ContractService {
   }
 
   // 獲取參與者資訊
-  async getParticipant(_index: number): Promise<Participant | null> {
+  async getParticipant(index: number): Promise<Participant | null> {
     try {
-      // 實作參與者查詢邏輯
-      // 暫時返回 null，實際實作需要通過合約查詢
+      const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: this.contractAddress,
+          method: 'getParticipant',
+          stack: [['num', index.toString()]]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json() as any;
+      
+      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            // 解析地址 (slice 需要特殊處理)
+            const addressSlice = tupleElements[0].slice?.bytes;
+            let parsedAddress = '';
+            
+            try {
+              if (addressSlice) {
+                parsedAddress = addressSlice;
+              }
+            } catch (e) {
+              console.warn('地址解析失敗:', e);
+              parsedAddress = addressSlice || '';
+            }
+            
+            // 解析金額和時間戳
+            const amount = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            return {
+              address: parsedAddress,
+              amount: (amount / 1e9).toFixed(4), // 轉換為 TON
+              timestamp: timestamp
+            };
+          }
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('獲取參與者資訊失敗:', error);
@@ -178,10 +221,55 @@ export class ContractService {
   }
 
   // 獲取中獎記錄
-  async getWinner(_round: number): Promise<LotteryResult | null> {
+  async getWinner(round: number): Promise<LotteryResult | null> {
     try {
-      // 實作中獎記錄查詢邏輯
-      // 暫時返回 null，實際實作需要通過合約查詢
+      const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: this.contractAddress,
+          method: 'getWinner',
+          stack: [['num', round.toString()]]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json() as any;
+      
+      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            // 解析中獎者地址
+            const winnerSlice = tupleElements[0].slice?.bytes;
+            let parsedWinner = '';
+            
+            try {
+              if (winnerSlice) {
+                parsedWinner = winnerSlice;
+              }
+            } catch (e) {
+              console.warn('中獎者地址解析失敗:', e);
+              parsedWinner = winnerSlice || '';
+            }
+            
+            // 解析 NFT ID 和時間戳
+            const nftId = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            return {
+              winner: parsedWinner,
+              nftId: nftId,
+              timestamp: timestamp
+            };
+          }
+        }
+      }
+      
       return null;
     } catch (error) {
       console.error('獲取中獎記錄失敗:', error);

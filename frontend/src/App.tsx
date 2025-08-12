@@ -1,7 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import WalletConnect from './components/WalletConnect';
 import ContractStatus from './components/ContractStatus';
 import JoinLottery from './components/JoinLottery';
+import ParticipantList from './components/ParticipantList';
+import WinnerHistory from './components/WinnerHistory';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
 import { contractAddress } from './Address';
@@ -10,11 +12,18 @@ import './styles/App.css';
 
 function App() {
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
+  const [contractInfoUpdated, setContractInfoUpdated] = useState(0);
   const toast = useToast();
 
   // 合約狀態更新回調函數
   const handleContractInfoUpdate = useCallback((info: ContractInfo | null) => {
     setContractInfo(info);
+  }, []);
+
+  // 觸發合約狀態刷新的函數
+  const refreshContractInfo = useCallback(() => {
+    // 通過更新一個數字狀態來強制 ContractStatus 組件重新載入
+    setContractInfoUpdated(prev => prev + 1);
   }, []);
 
   return (
@@ -32,6 +41,7 @@ function App() {
             contractAddress={contractAddress} 
             onContractInfoUpdate={handleContractInfoUpdate}
             toast={toast}
+            refreshTrigger={contractInfoUpdated}
           />
 
           {/* 錢包連接組件 */}
@@ -42,10 +52,25 @@ function App() {
             <JoinLottery
               contractAddress={contractAddress}
               contractInfo={contractInfo}
-              onJoinSuccess={() => {
-                // 觸發合約狀態重新載入
-                // ContractStatus 組件會處理這個更新
-              }}
+              onJoinSuccess={refreshContractInfo}
+              toast={toast}
+            />
+          ) : null}
+
+          {/* 當前輪次參與者清單 */}
+          {contractInfo ? (
+            <ParticipantList
+              contractAddress={contractAddress}
+              contractInfo={contractInfo}
+              toast={toast}
+            />
+          ) : null}
+
+          {/* 歷史中獎記錄 */}
+          {contractInfo ? (
+            <WinnerHistory
+              contractAddress={contractAddress}
+              contractInfo={contractInfo}
               toast={toast}
             />
           ) : null}
