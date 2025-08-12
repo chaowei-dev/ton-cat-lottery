@@ -327,4 +327,307 @@ describe('Integration Tests - Contract Interactions', () => {
             expect(uniqueIds.size).toBe(winners.length);
         });
     });
+
+    describe('NFT Minting Failure and Recovery Tests', () => {
+        it('should handle NFT contract authorization failure gracefully', async () => {
+            // Set up contracts without proper authorization
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            // Set NFT contract but don't authorize it
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            // Don't call SetAuthorizedMinter - this simulates authorization failure
+            
+            // Add participants
+            for (const user of [context.user1, context.user2, context.user3]) {
+                await catLottery.send(
+                    user.getSender(),
+                    { value: toNano('0.02') },
+                    'join'
+                );
+            }
+            
+            // Try to draw winner - should succeed in lottery contract
+            // but NFT minting will fail due to authorization
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+            
+            // The draw transaction itself should succeed
+            expect(drawResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+            
+            // But there might be a failed NFT transaction due to authorization
+            // Since we use bounce: false, the main transaction still succeeds
+        });
+
+        it('should handle callback mechanism with MintToAndNotify', async () => {
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            // Properly set up authorization
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+            
+            // Add participant
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.02') },
+                'join'
+            );
+            
+            // Execute draw - this should use the new MintToAndNotify flow
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+            
+            expect(drawResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+            
+            // Verify that MintToAndNotify was called
+            expect(drawResult.transactions).toHaveTransaction({
+                from: catLottery.address,
+                to: catNFT.address,
+                success: true,
+            });
+            
+            // Verify that NFTMintSuccess callback was sent
+            expect(drawResult.transactions).toHaveTransaction({
+                from: catNFT.address,
+                to: catLottery.address,
+                success: true,
+            });
+            
+            // Verify winner was recorded after callback
+            const winner = await catLottery.getGetWinner(1n);
+            expect(winner).not.toBeNull();
+            expect(winner!.winner).toEqualAddress(context.user1.address);
+            
+            // Verify NFT was actually minted
+            const nftInfo = await catNFT.getGetContractInfo();
+            expect(nftInfo.totalSupply).toBe(1n);
+        });
+
+        it('should handle insufficient gas for NFT minting', async () => {
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+            
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.02') },
+                'join'
+            );
+            
+            // Try draw with very low gas - might cause NFT minting to fail
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') }, // Very low gas
+                'drawWinner'
+            );
+            
+            // The transaction should still succeed due to bounce: false
+            expect(drawResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+        });
+
+        it('should maintain state consistency across failed operations', async () => {
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+            
+            // Add participants
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.02') },
+                'join'
+            );
+            
+            const beforeInfo = await catLottery.getGetContractInfo();
+            expect(beforeInfo.drawInProgress).toBe(false);
+            expect(beforeInfo.currentRound).toBe(1n);
+            expect(beforeInfo.participantCount).toBe(1n);
+            
+            // Execute successful draw
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+            
+            const afterInfo = await catLottery.getGetContractInfo();
+            expect(afterInfo.drawInProgress).toBe(false);
+            expect(afterInfo.currentRound).toBe(2n); // Should increment
+            expect(afterInfo.participantCount).toBe(0n); // Should reset
+            expect(afterInfo.lotteryActive).toBe(true); // Should be active for new round
+        });
+
+        it('should handle recovery from stuck draw state', async () => {
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+            
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.02') },
+                'join'
+            );
+            
+            // In a real failure scenario, we would need to test resetDrawState
+            // For now, we verify the recovery mechanisms exist
+            const info = await catLottery.getGetContractInfo();
+            expect(info.drawInProgress).toBe(false);
+            
+            // Test that resetDrawState exists and can be called (will fail since no draw in progress)
+            const resetResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                'resetDrawState'
+            );
+            
+            expect(resetResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: false, // Should fail since no draw in progress
+            });
+            
+            // Test timeout reset exists
+            const timeoutResetResult = await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.05') },
+                'resetDrawStateIfTimeout'
+            );
+            
+            expect(timeoutResetResult.transactions).toHaveTransaction({
+                from: context.user1.address,
+                to: catLottery.address,
+                success: false, // Should fail since no draw in progress
+            });
+        });
+    });
+
+    describe('Enhanced Event Tracking Tests', () => {
+        it('should emit new callback-related events', async () => {
+            const { catLottery, catNFT } = await setupContracts(context);
+            
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+            
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.02') },
+                'join'
+            );
+            
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+            
+            // The new flow should emit different events
+            // We can verify transactions occurred even if we can't parse events directly
+            expect(drawResult.transactions).toHaveLength(4); // Main transaction + NFT transactions
+            
+            const winner = await catLottery.getGetWinner(1n);
+            expect(winner).not.toBeNull();
+        });
+    });
 });

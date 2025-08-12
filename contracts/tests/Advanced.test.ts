@@ -504,4 +504,352 @@ describe('Advanced Tests - Security & Performance', () => {
             expect(finalNFTInfo.totalSupply).toBe(5n);
         });
     });
+
+    describe('Enhanced Security and Edge Cases Tests', () => {
+        let catLottery: SandboxContract<CatLottery>;
+        let catNFT: SandboxContract<CatNFT>;
+
+        beforeEach(async () => {
+            // Deploy CatLottery contract
+            catLottery = context.blockchain.openContract(
+                await CatLottery.fromInit(
+                    context.deployer.address,
+                    TEST_CONSTANTS.ENTRY_FEE,
+                    TEST_CONSTANTS.MAX_PARTICIPANTS
+                )
+            );
+            
+            // Deploy CatNFT contract
+            catNFT = context.blockchain.openContract(
+                await CatNFT.fromInit(context.deployer.address, 1n)
+            );
+            
+            // Deploy both contracts
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                { $$type: 'Deploy', queryId: 0n }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                { $$type: 'Deploy', queryId: 0n }
+            );
+            
+            // Configure cross-contract authorization
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetNFTContract',
+                    nftContract: catNFT.address,
+                }
+            );
+            
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: catLottery.address,
+                }
+            );
+        });
+
+        it('should handle rapid successive draw attempts', async () => {
+            // Add participants
+            await Promise.all([
+                catLottery.send(context.user1.getSender(), { value: TEST_CONSTANTS.ENTRY_FEE }, 'join'),
+                catLottery.send(context.user2.getSender(), { value: TEST_CONSTANTS.ENTRY_FEE }, 'join'),
+                catLottery.send(context.user3.getSender(), { value: TEST_CONSTANTS.ENTRY_FEE }, 'join')
+            ]);
+
+            // First draw should succeed
+            const draw1 = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+
+            expect(draw1.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+
+            // Immediate second draw attempt should fail (no participants in new round)
+            const draw2 = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+
+            expect(draw2.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: false,
+            });
+        });
+
+        it('should handle malicious reset attempts', async () => {
+            // Add participant
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            // Non-owner tries to reset (should fail)
+            const maliciousReset1 = await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('0.05') },
+                'resetDrawState'
+            );
+
+            expect(maliciousReset1.transactions).toHaveTransaction({
+                from: context.user1.address,
+                to: catLottery.address,
+                success: false,
+            });
+
+            // Try timeout reset without timeout (should fail)
+            const maliciousReset2 = await catLottery.send(
+                context.user2.getSender(),
+                { value: toNano('0.05') },
+                'resetDrawStateIfTimeout'
+            );
+
+            expect(maliciousReset2.transactions).toHaveTransaction({
+                from: context.user2.address,
+                to: catLottery.address,
+                success: false,
+            });
+
+            // Contract state should remain unchanged
+            const info = await catLottery.getGetContractInfo();
+            expect(info.drawInProgress).toBe(false);
+            expect(info.participantCount).toBe(1n);
+        });
+
+        it('should handle extreme gas edge cases', async () => {
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            // Test with minimal gas
+            const lowGasDraw = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.01') }, // Very low gas
+                'drawWinner'
+            );
+
+            // Should still succeed due to improved error handling
+            expect(lowGasDraw.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+        });
+
+        it('should maintain data integrity under high load', async () => {
+            const rounds = 3;
+            const participantsPerRound = 3;
+
+            for (let round = 0; round < rounds; round++) {
+                // Add participants for this round
+                for (let i = 0; i < participantsPerRound; i++) {
+                    const userIndex = (round * participantsPerRound + i) % 3;
+                    const user = [context.user1, context.user2, context.user3][userIndex];
+                    
+                    await catLottery.send(
+                        user.getSender(),
+                        { value: TEST_CONSTANTS.ENTRY_FEE },
+                        'join'
+                    );
+                }
+
+                // Execute draw
+                const drawResult = await catLottery.send(
+                    context.deployer.getSender(),
+                    { value: toNano('0.2') },
+                    'drawWinner'
+                );
+
+                expect(drawResult.transactions).toHaveTransaction({
+                    from: context.deployer.address,
+                    to: catLottery.address,
+                    success: true,
+                });
+
+                // Verify state consistency
+                const winner = await catLottery.getGetWinner(BigInt(round + 1));
+                expect(winner).not.toBeNull();
+                expect(winner!.nftId).toBeGreaterThan(0n);
+            }
+
+            // Verify final state integrity
+            const finalInfo = await catLottery.getGetContractInfo();
+            expect(finalInfo.currentRound).toBe(BigInt(rounds + 1));
+            expect(finalInfo.participantCount).toBe(0n);
+            expect(finalInfo.drawInProgress).toBe(false);
+
+            // Verify NFT consistency
+            const nftInfo = await catNFT.getGetContractInfo();
+            expect(nftInfo.totalSupply).toBe(BigInt(rounds));
+        });
+
+        it('should handle NFT contract state inconsistencies', async () => {
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            // Remove authorization mid-process (simulates admin error)
+            await catNFT.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                {
+                    $$type: 'SetAuthorizedMinter',
+                    minter: context.deployer.address, // Change to different address
+                }
+            );
+
+            // Draw should still succeed (lottery state managed separately)
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+
+            expect(drawResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+
+            // But NFT minting might fail due to authorization change
+            // The lottery should still handle this gracefully
+        });
+
+        it('should validate contract upgrade compatibility', async () => {
+            // Test that new state variables don't break existing functionality
+            const info = await catLottery.getGetContractInfo();
+            
+            // New fields should be present
+            expect(info.drawInProgress).toBeDefined();
+            expect(info.drawStartTime).toBeDefined();
+            
+            // Existing fields should still work
+            expect(info.owner).toEqualAddress(context.deployer.address);
+            expect(info.entryFee).toBe(TEST_CONSTANTS.ENTRY_FEE);
+            expect(info.lotteryActive).toBe(true);
+            expect(info.currentRound).toBe(1n);
+        });
+
+        it('should handle callback loop prevention', async () => {
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            // Execute draw
+            const drawResult = await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+
+            expect(drawResult.transactions).toHaveTransaction({
+                from: context.deployer.address,
+                to: catLottery.address,
+                success: true,
+            });
+
+            // Verify that callback completed and state is properly reset
+            const afterInfo = await catLottery.getGetContractInfo();
+            expect(afterInfo.drawInProgress).toBe(false);
+            expect(afterInfo.drawStartTime).toBe(0n);
+            expect(afterInfo.currentRound).toBe(2n);
+        });
+    });
+
+    describe('Boundary Value Analysis Tests', () => {
+        let catLottery: SandboxContract<CatLottery>;
+
+        beforeEach(async () => {
+            // Deploy CatLottery contract
+            catLottery = context.blockchain.openContract(
+                await CatLottery.fromInit(
+                    context.deployer.address,
+                    TEST_CONSTANTS.ENTRY_FEE,
+                    TEST_CONSTANTS.MAX_PARTICIPANTS
+                )
+            );
+            
+            // Deploy contract
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.05') },
+                { $$type: 'Deploy', queryId: 0n }
+            );
+        });
+
+        it('should handle maximum safe integer values', async () => {
+            // Test with large but safe nanoTON values
+            const largeEntry = await catLottery.send(
+                context.user1.getSender(),
+                { value: toNano('1000') }, // Large but reasonable amount
+                'join'
+            );
+
+            expect(largeEntry.transactions).toHaveTransaction({
+                from: context.user1.address,
+                to: catLottery.address,
+                success: true,
+            });
+        });
+
+        it('should handle minimum valid values', async () => {
+            // Test with exactly the entry fee
+            const minEntry = await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            expect(minEntry.transactions).toHaveTransaction({
+                from: context.user1.address,
+                to: catLottery.address,
+                success: true,
+            });
+        });
+
+        it('should validate NFT ID generation ranges', async () => {
+            await catLottery.send(
+                context.user1.getSender(),
+                { value: TEST_CONSTANTS.ENTRY_FEE },
+                'join'
+            );
+
+            await catLottery.send(
+                context.deployer.getSender(),
+                { value: toNano('0.2') },
+                'drawWinner'
+            );
+
+            const winner = await catLottery.getGetWinner(1n);
+            expect(winner).not.toBeNull();
+            
+            // NFT ID should be in expected range (round * 1000 + 0-99)
+            const expectedMin = 1000n;
+            const expectedMax = 1099n;
+            expect(winner!.nftId).toBeGreaterThanOrEqual(expectedMin);
+            expect(winner!.nftId).toBeLessThanOrEqual(expectedMax);
+        });
+    });
 });

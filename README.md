@@ -107,8 +107,8 @@ ton-cat-lottery/
 
 | 類別        | 合約地址                                            |
 | ---------- | -------------------------------------------------- |
-| CatLottery | `EQDv5_XyunYSZ7XUQqOsrKw2W6S_iz2ljLIJAZBkHsg6nTBk` |
-| CatNFT     | `EQBtv44v7Bw3aQmGxLu5RBo76ENwpRmrbNB3pEMsJYt-o-lP` |
+| CatLottery | `EQCryV3r0cEnqgvzyWq4yNxubV517muKMYSyoaAWDpOjW1o7` |
+| CatNFT     | `EQAe1Lf-KV_IPAfOQ1JJBEZRJ6_5wqyvzW9a_o7kGmpUdsVJ` |
 
 ---
 

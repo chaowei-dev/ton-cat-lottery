@@ -26,6 +26,21 @@ message MintTo {
     to: Address;
 }
 
+// NFT 鑄造並通知訊息（包含回調資訊）
+message MintToAndNotify {
+    to: Address;
+    nftId: Int;
+    lotteryContract: Address;
+    round: Int;
+}
+
+// NFT 鑄造成功通知（回傳給 CatLottery）
+message NFTMintSuccess {
+    recipient: Address;
+    nftId: Int;
+    round: Int;
+}
+
 // NFT 轉移訊息（符合 TON NFT 標準）
 message NFTTransfer {
     queryId: Int;
@@ -184,6 +199,76 @@ contract CatNFT with Deployable, Ownable {
                 queryId: 0,
                 prevOwner: myAddress(),
                 forwardPayload: emptySlice()
+            }.toCell()
+        });
+    }
+
+    // 鑄造 NFT 並通知 CatLottery 合約
+    receive(msg: MintToAndNotify) {
+        // 1. 檢查授權
+        require(self.authorizedMinter != null, "No authorized minter set");
+        require(sender() == self.authorizedMinter!!, "Only authorized minter can mint NFTs");
+        
+        // 2. 確定稀有度（基於 tokenId）
+        let templateId: Int = self.determineRarity(self.nextTokenId);
+        let template: CatMetadata? = self.catTemplates.get(templateId);
+        require(template != null, "Invalid template");
+        
+        let catMetadata: CatMetadata = template!!;
+        
+        // 3. 創建 NFT 資料
+        let nftData: NFTData = NFTData {
+            owner: msg.to,
+            tokenId: self.nextTokenId,
+            metadata: catMetadata,
+            mintTimestamp: now()
+        };
+        
+        // 4. 儲存 NFT 資料
+        self.nfts.set(self.nextTokenId, nftData);
+        
+        // 5. 更新擁有者資料
+        let ownerCount: Int? = self.ownerNfts.get(msg.to);
+        let currentCount: Int = ownerCount != null ? ownerCount!! : 0;
+        self.ownerNfts.set(msg.to, currentCount + 1);
+        
+        // 6. 更新狀態
+        self.totalSupply = self.totalSupply + 1;
+        let mintedTokenId: Int = self.nextTokenId;
+        self.nextTokenId = self.nextTokenId + 1;
+        
+        // 7. 發送鑄造事件
+        emit(NFTMinted {
+            tokenId: mintedTokenId,
+            owner: msg.to,
+            rarity: catMetadata.rarity,
+            timestamp: now()
+        }.toCell());
+        
+        // 8. 發送轉移通知給新擁有者
+        send(SendParameters {
+            to: msg.to,
+            value: ton("0.01"),
+            mode: SendPayGasSeparately,
+            bounce: false,
+            body: NFTTransferNotification {
+                queryId: 0,
+                prevOwner: myAddress(),
+                forwardPayload: emptySlice()
+            }.toCell()
+        });
+
+        // 9. 關鍵：回調通知 CatLottery 合約 NFT 鑄造成功
+        // 使用抽獎合約指定的 nftId，而不是實際的 tokenId
+        send(SendParameters {
+            to: msg.lotteryContract,
+            value: ton("0.05"),
+            mode: SendPayGasSeparately,
+            bounce: false,
+            body: NFTMintSuccess {
+                recipient: msg.to,
+                nftId: msg.nftId, // 使用抽獎合約計算的 ID
+                round: msg.round,
             }.toCell()
         });
     }
