@@ -331,17 +331,20 @@ ton-cat-lottery/
 - [x] 保障機制設計（重試、監控、恢復機制）
 
 #### 撰寫邏輯代碼
-- [ ] 項目基礎設置
-  - [ ] 初始化 Go 項目：`go mod init ton-cat-lottery-backend`
-  - [ ] 創建目錄結構：`cmd/`, `internal/`, `pkg/`, `config/`
-  - [ ] 基礎配置管理：環境變數讀取、合約地址配置、私鑰管理
-  - [ ] 基礎日志記錄：使用標準 log 套件或 logrus
+- TON API 的實作可以參考: `contracts/scripts/setupContracts.ts`
 
-- [ ] 合約客戶端
-  - [ ] TON API 客戶端：使用 TonCenter API 或 TON HTTP API
-  - [ ] 實現 `getContractInfo()` 調用：HTTP GET 請求到 TON API，解析合約狀態返回值
-  - [ ] 連接管理：HTTP 客戶端連接池、超時設置、重試邏輯
-  - [ ] API 限速處理：每分鐘 20 請求限制、最小間隔 3 秒
+- [x] 項目基礎設置
+  - [x] 初始化 Go 項目：`go mod init ton-cat-lottery-backend`
+  - [x] 創建目錄結構：`cmd/`, `internal/`, `pkg/`, `config/`
+  - [x] 基礎配置管理：環境變數讀取、合約地址配置、私鑰管理
+  - [x] 基礎日志記錄：使用標準 log 套件或 logrus
+  - [x] 環境配置文件：創建 `.env` 和 `.env.example`，支援 godotenv 加載
+
+- [x] 合約客戶端
+  - [x] TON API 客戶端：使用 TonCenter API 或 TON HTTP API
+  - [x] 實現 `getContractInfo()` 調用：HTTP POST 請求到 TON API，解析合約狀態返回值
+  - [x] 連接管理：HTTP 客戶端連接池、超時設置、重試邏輯
+  - [x] API 限速處理：每分鐘 20 請求限制、最小間隔 3 秒
 
 - [ ] 錢包管理
   - [ ] 私鑰管理：從環境變數或配置文件讀取
