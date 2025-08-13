@@ -1,3 +1,5 @@
+import { tonApiManager } from './tonApiManager';
+
 // 合約狀態介面
 export interface ContractInfo {
   owner: string;
@@ -33,225 +35,82 @@ export class ContractService {
 
   // 獲取合約狀態
   async getContractInfo(): Promise<ContractInfo | null> {
-    const maxRetries = 3;
+    try {
+      console.log('📋 獲取合約狀態:', this.contractAddress);
+      const data = await tonApiManager.getContractInfo(this.contractAddress);
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        // 使用 TON Center API 查詢合約狀態
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超時
+      if (data.result) {
+        // 解析合約返回的數據
+        const stack = data.result.stack;
+        if (stack && stack.length >= 9) {
+          // ContractInfo 結構: owner, entryFee, maxParticipants, currentRound, lotteryActive, drawInProgress, drawStartTime, participantCount, nftContract
+          const entryFeeNano = parseInt(stack[1][1], 16); 
+          const maxParticipants = parseInt(stack[2][1], 16); 
+          const currentRound = parseInt(stack[3][1], 16); 
+          const lotteryActiveRaw = parseInt(stack[4][1], 16); 
+          const participantCount = parseInt(stack[7][1], 16); // participantCount 在第8個位置 (index 7)
 
-        const response = await fetch(
-          `https://testnet.toncenter.com/api/v2/runGetMethod`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              address: this.contractAddress,
-              method: 'getContractInfo',
-              stack: [],
-            }),
-            signal: controller.signal,
-          }
-        );
+          // 轉換 entryFee 從 nanoTON 到 TON
+          const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
 
-        clearTimeout(timeoutId);
+          // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
+          const lotteryActive = lotteryActiveRaw !== 0;
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.ok && data.result) {
-          // 解析合約返回的數據
-          const stack = data.result.stack;
-          if (stack && stack.length >= 9) {
-            // ContractInfo 結構: owner, entryFee, maxParticipants, currentRound, lotteryActive, drawInProgress, drawStartTime, participantCount, nftContract
-            const entryFeeNano = parseInt(stack[1][1], 16); 
-            const maxParticipants = parseInt(stack[2][1], 16); 
-            const currentRound = parseInt(stack[3][1], 16); 
-            const lotteryActiveRaw = parseInt(stack[4][1], 16); 
-            const participantCount = parseInt(stack[7][1], 16); // participantCount 在第8個位置 (index 7)
-
-            // 轉換 entryFee 從 nanoTON 到 TON
-            const entryFeeTON = (entryFeeNano / 1e9).toFixed(2);
-
-            // 判斷抽獎是否活躍 (通常 -1 表示 true, 0 表示 false)
-            const lotteryActive = lotteryActiveRaw !== 0;
-
-            return {
-              owner: this.contractAddress,
-              entryFee: entryFeeTON,
-              maxParticipants: maxParticipants,
-              currentRound: currentRound,
-              lotteryActive: lotteryActive,
-              participantCount: participantCount,
-              nftContract: null,
-            };
-          } else {
-            throw new Error('合約返回數據格式不正確');
-          }
+          return {
+            owner: this.contractAddress,
+            entryFee: entryFeeTON,
+            maxParticipants: maxParticipants,
+            currentRound: currentRound,
+            lotteryActive: lotteryActive,
+            participantCount: participantCount,
+            nftContract: null,
+          };
         } else {
-          throw new Error('合約查詢失敗: ' + (data.error || 'Unknown error'));
+          throw new Error('合約返回數據格式不正確');
         }
-      } catch (error) {
-        console.error(`獲取合約狀態失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
-        
-        // 如果是最後一次嘗試，拋出錯誤
-        if (attempt === maxRetries - 1) {
-          break;
-        }
-        
-        // 等待一段時間後重試（指數退避）
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      } else {
+        throw new Error('合約查詢失敗');
       }
+    } catch (error) {
+      console.error('獲取合約狀態失敗:', error);
+      return this.getFallbackData();
     }
-
-    // 所有重試都失敗，返回備用數據
-    console.error('所有重試都失敗，使用備用數據');
-    return this.getFallbackData();
   }
 
   // 獲取合約餘額
   async getBalance(): Promise<string | null> {
-    const maxRetries = 3;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const url = new URL(
-          'https://testnet.toncenter.com/api/v2/getAddressBalance'
-        );
-        url.searchParams.append('address', this.contractAddress);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超時
-
-        const balanceResponse = await fetch(url.toString(), {
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!balanceResponse.ok) {
-          throw new Error(`HTTP error! status: ${balanceResponse.status}`);
-        }
-
-        const balanceData = await balanceResponse.json();
-
-        if (balanceData.ok && balanceData.result) {
-          // 將 nanoTON 轉換為 TON
-          const balanceInTON = (parseInt(balanceData.result) / 1e9).toFixed(4);
-          return balanceInTON;
-        } else {
-          throw new Error('獲取餘額失敗: ' + (balanceData.error || 'Unknown error'));
-        }
-      } catch (error) {
-        console.error(`獲取合約餘額失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
-        
-        // 如果是最後一次嘗試，拋出錯誤
-        if (attempt === maxRetries - 1) {
-          break;
-        }
-        
-        // 等待一段時間後重試
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    try {
+      console.log('💰 獲取合約餘額:', this.contractAddress);
+      const data = await tonApiManager.getAddressBalance(this.contractAddress);
+      
+      if (data.result !== undefined) {
+        // 將 nanoTON 轉換為 TON
+        const balanceInTON = (parseInt(data.result) / 1e9).toFixed(4);
+        return balanceInTON;
+      } else {
+        throw new Error('獲取餘額失敗');
       }
+    } catch (error) {
+      console.error('獲取合約餘額失敗:', error);
+      return '0.0000';
     }
-
-    console.error('獲取餘額的所有重試都失敗，返回 0');
-    return '0.0000';
   }
 
   // 獲取參與者資訊
   async getParticipant(index: number): Promise<Participant | null> {
-    const maxRetries = 3;
-    
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        // 添加延遲避免 API 限制
-        if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve, (attempt * 500) + Math.random() * 500));
-        }
-        
-        const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            address: this.contractAddress,
-            method: 'getParticipant',
-            stack: [['num', index.toString()]]
-          })
-        });
-
-        if (!response.ok) {
-          if (response.status === 429 && attempt < maxRetries - 1) {
-            console.warn(`API 限制，第 ${attempt + 1} 次重試...`);
-            continue;
-          }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json() as any;
+    try {
+      console.log(`👥 獲取參與者 ${index}:`, this.contractAddress);
+      const data = await tonApiManager.getParticipant(this.contractAddress, index);
       
-      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+      if (data.result?.stack && data.result.stack.length > 0) {
         const stack = data.result.stack;
         if (stack.length > 0 && stack[0][0] === 'tuple') {
           const tupleElements = stack[0][1].elements;
           if (tupleElements && tupleElements.length >= 3) {
-            // 調試：打印原始數據結構
-            console.log('🔍 Tuple elements:', tupleElements);
-            console.log('🔍 Address element:', tupleElements[0]);
             
-            // 解析地址 (使用正確的 TON 地址解析方式)
+            // 解析地址（簡化處理）
             const addressSlice = tupleElements[0].slice?.bytes;
-            let parsedAddress = '';
-            
-            try {
-              if (addressSlice) {
-                console.log('🔧 開始解析地址:', addressSlice);
-                
-                // 使用 TON Connect 方式解析地址
-                // Cell 格式的地址需要特殊處理
-                // 暫時使用簡化的轉換方法
-                
-                // 如果地址已經是標準格式（以0Q或UQ開頭），直接使用
-                if (addressSlice.startsWith('0Q') || addressSlice.startsWith('UQ') || addressSlice.startsWith('EQ')) {
-                  parsedAddress = addressSlice;
-                  console.log('✅ 使用標準格式地址:', parsedAddress);
-                } else {
-                  // 對於 Cell 格式地址，使用 TON Center API 轉換
-                  try {
-                    const convertResponse = await fetch('https://testnet.toncenter.com/api/v2/packAddress', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        address: addressSlice
-                      })
-                    });
-                    
-                    if (convertResponse.ok) {
-                      const convertData = await convertResponse.json();
-                      if (convertData.ok && convertData.result) {
-                        parsedAddress = convertData.result;
-                        console.log('✅ API 轉換地址成功:', parsedAddress);
-                      } else {
-                        throw new Error('API 轉換失敗');
-                      }
-                    } else {
-                      throw new Error('API 請求失敗');
-                    }
-                  } catch (apiError) {
-                    console.warn('API 轉換失敗，使用原始數據:', apiError);
-                    parsedAddress = addressSlice;
-                  }
-                }
-              }
-            } catch (e) {
-              console.error('❌ 地址解析失敗:', e);
-              console.log('原始地址數據:', addressSlice);
-              parsedAddress = addressSlice || '';
-            }
+            let parsedAddress = addressSlice || '';
             
             // 解析金額和時間戳
             const amount = parseInt(tupleElements[1].number?.number || '0');
@@ -267,54 +126,26 @@ export class ContractService {
       }
       
       return null;
-      } catch (error) {
-        console.error(`獲取參與者資訊失敗 (嘗試 ${attempt + 1}/${maxRetries}):`, error);
-        
-        if (attempt === maxRetries - 1) {
-          break;
-        }
-      }
+    } catch (error) {
+      console.error(`獲取參與者資訊失敗:`, error);
+      return null;
     }
-    
-    return null;
   }
 
   // 獲取中獎記錄
   async getWinner(round: number): Promise<LotteryResult | null> {
     try {
-      const response = await fetch('https://testnet.toncenter.com/api/v2/runGetMethod', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: this.contractAddress,
-          method: 'getWinner',
-          stack: [['num', round.toString()]]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json() as any;
+      console.log(`🏆 獲取中獎記錄 輪次 ${round}:`, this.contractAddress);
+      const data = await tonApiManager.getWinner(this.contractAddress, round);
       
-      if (data.ok && data.result?.stack && data.result.stack.length > 0) {
+      if (data.result?.stack && data.result.stack.length > 0) {
         const stack = data.result.stack;
         if (stack.length > 0 && stack[0][0] === 'tuple') {
           const tupleElements = stack[0][1].elements;
           if (tupleElements && tupleElements.length >= 3) {
-            // 解析中獎者地址
+            // 解析中獎者地址（簡化處理）
             const winnerSlice = tupleElements[0].slice?.bytes;
-            let parsedWinner = '';
-            
-            try {
-              if (winnerSlice) {
-                parsedWinner = winnerSlice;
-              }
-            } catch (e) {
-              console.warn('中獎者地址解析失敗:', e);
-              parsedWinner = winnerSlice || '';
-            }
+            let parsedWinner = winnerSlice || '';
             
             // 解析 NFT ID 和時間戳
             const nftId = parseInt(tupleElements[1].number?.number || '0');
@@ -334,6 +165,70 @@ export class ContractService {
       console.error('獲取中獎記錄失敗:', error);
       return null;
     }
+  }
+
+  // 批量獲取參與者資訊 - 使用統一管理器
+  async getParticipantsBatch(count: number): Promise<Participant[]> {
+    if (count === 0) return [];
+    
+    console.log(`📋 批量獲取 ${count} 個參與者`);
+    const results = await tonApiManager.getParticipantsBatch(this.contractAddress, count);
+    
+    const participants: Participant[] = [];
+    results.forEach((data) => {
+      if (data?.result?.stack) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            const addressSlice = tupleElements[0].slice?.bytes;
+            const amount = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            participants.push({
+              address: addressSlice || '',
+              amount: (amount / 1e9).toFixed(4),
+              timestamp: timestamp
+            });
+          }
+        }
+      }
+    });
+    
+    return participants;
+  }
+
+  // 批量獲取中獎記錄
+  async getWinnersBatch(rounds: number[]): Promise<(LotteryResult & { round: number })[]> {
+    if (rounds.length === 0) return [];
+    
+    console.log(`🏆 批量獲取 ${rounds.length} 個中獎記錄`);
+    const results = await tonApiManager.getWinnersBatch(this.contractAddress, rounds);
+    
+    const winners: (LotteryResult & { round: number })[] = [];
+    results.forEach((data, index) => {
+      if (data?.result?.stack) {
+        const stack = data.result.stack;
+        if (stack.length > 0 && stack[0][0] === 'tuple') {
+          const tupleElements = stack[0][1].elements;
+          if (tupleElements && tupleElements.length >= 3) {
+            const winnerSlice = tupleElements[0].slice?.bytes;
+            const nftId = parseInt(tupleElements[1].number?.number || '0');
+            const timestamp = parseInt(tupleElements[2].number?.number || '0');
+            
+            winners.push({
+              winner: winnerSlice || '',
+              nftId: nftId,
+              timestamp: timestamp,
+              round: rounds[index]
+            });
+          }
+        }
+      }
+    });
+    
+    // 按輪次排序（最新在前）
+    return winners.sort((a, b) => b.round - a.round);
   }
 
   // 格式化 TON 金額

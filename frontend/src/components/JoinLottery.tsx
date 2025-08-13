@@ -6,7 +6,6 @@ import {
   ERROR_MESSAGES,
   createContractService,
   type ContractInfo,
-  type Participant,
 } from '../services/contractService';
 import type { useToast } from '../hooks/useToast';
 import './JoinLottery.css';
@@ -35,6 +34,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   const [balanceRetryCount, setBalanceRetryCount] = useState(0);
   const [hasParticipated, setHasParticipated] = useState(false);
   const [checkingParticipation, setCheckingParticipation] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const MAX_BALANCE_RETRY = 3;
   const BALANCE_RETRY_DELAY = 2000;
@@ -42,6 +42,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   // 交易狀態
   const TransactionStatus = {
     IDLE: 'IDLE',
+    CHECKING_PARTICIPATION: 'CHECKING_PARTICIPATION',
     CHECKING_BALANCE: 'CHECKING_BALANCE',
     PREPARING: 'PREPARING',
     SENDING: 'SENDING',
@@ -207,6 +208,30 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
     }
   }, [address, connectionRestored, contractAddress, currentParticipants]);
 
+  // 手動刷新狀態
+  const refreshStatus = useCallback(async () => {
+    if (!address || !connectionRestored) {
+      toast.warning('刷新失敗', '請先連接錢包');
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      // 重新載入錢包餘額和參與狀態
+      await Promise.all([
+        loadWalletBalance(),
+        checkParticipation()
+      ]);
+      
+      toast.success('刷新成功', '已更新錢包餘額和參與狀態');
+    } catch (error) {
+      console.error('刷新失敗:', error);
+      toast.error('刷新失敗', '請稍後重試');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [address, connectionRestored, loadWalletBalance, checkParticipation, toast]);
+
   // 當錢包連接且連接已恢復時載入餘額和檢查參與狀態
   useEffect(() => {
     if (address && connectionRestored) {
@@ -274,7 +299,34 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
       setIsJoining(true);
       setTransactionStatus(TransactionStatus.CHECKING_BALANCE);
 
-      // 第一步：檢查餘額
+      // Step 1：檢查是否已參加過（比較目前錢包的地址是否存在於已參加名單中）
+      setTransactionStatus(TransactionStatus.CHECKING_PARTICIPATION);
+      toast.info('檢查參與狀態', '正在檢查您是否已參與當前輪次...');
+
+      try {
+        const contractService = createContractService(contractAddress);
+        
+        // 查詢所有參與者
+        for (let i = 0; i < currentParticipants; i++) {
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200));
+          }
+          
+          const participant = await contractService.getParticipant(i);
+          if (participant && participant.address) {
+            if (addressesMatch(address, participant.address)) {
+              setTransactionStatus(TransactionStatus.FAILED);
+              toast.error('重複參與', '您已經參與了本輪抽獎，請等待結果');
+              return;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('檢查參與狀態失敗:', error);
+        toast.warning('檢查警告', '無法確認參與狀態，將繼續交易流程');
+      }
+
+      // Step 2：檢查餘額
       toast.info('檢查餘額', '正在檢查您的錢包餘額...');
 
       const balanceCheck = await WalletService.checkSufficientBalance(
@@ -294,7 +346,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         return;
       }
 
-      // 第二步：準備交易
+      // Step 3：準備交易
       setTransactionStatus(TransactionStatus.PREPARING);
       toast.info('準備交易', '正在準備交易參數...');
 
@@ -304,7 +356,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         payload: 'te6cckEBAQEACgAAEAAAAABqb2lukPEtIw==', // 正確的 "join" 文字消息 BOC
       };
 
-      // 第三步：發送交易
+      // Step 4：發送交易
       setTransactionStatus(TransactionStatus.SENDING);
       toast.info('發送交易', '正在發送交易到區塊鏈...');
 
@@ -315,7 +367,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
 
       console.log('交易已發送:', result);
 
-      // 第四步：等待確認
+      // Step 5：等待確認
       setTransactionStatus(TransactionStatus.WAITING_CONFIRMATION);
       toast.success('交易已發送', '正在等待區塊鏈確認，預計需要 1-2 分鐘');
 
@@ -368,6 +420,8 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   // 獲取交易狀態顯示文字
   const getTransactionStatusText = () => {
     switch (transactionStatus) {
+      case TransactionStatus.CHECKING_PARTICIPATION:
+        return '正在檢查參與狀態...';
       case TransactionStatus.CHECKING_BALANCE:
         return '正在檢查餘額...';
       case TransactionStatus.PREPARING:
@@ -388,6 +442,7 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
   // 獲取進度步驟狀態
   const getStepStatus = (step: string) => {
     const steps = [
+      'CHECKING_PARTICIPATION',
       'CHECKING_BALANCE',
       'PREPARING',
       'SENDING',
@@ -563,6 +618,11 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
         {transactionStatus !== TransactionStatus.IDLE && (
           <div className="transaction-progress">
             <div
+              className={`progress-step ${getStepStatus('CHECKING_PARTICIPATION')}`}
+            >
+              檢查重複
+            </div>
+            <div
               className={`progress-step ${getStepStatus('CHECKING_BALANCE')}`}
             >
               檢查餘額
@@ -599,6 +659,17 @@ const JoinLottery: React.FC<JoinLotteryProps> = ({
           <span>✅ 參加成功！請等待抽獎結果</span>
         </div>
       )}
+
+      {/* 刷新按鈕 */}
+      <div className="refresh-section">
+        <button 
+          onClick={refreshStatus} 
+          className="refresh-btn"
+          disabled={isRefreshing || isLoadingBalance || checkingParticipation || isJoining}
+        >
+          🔄 {isRefreshing ? '刷新中...' : '刷新狀態'}
+        </button>
+      </div>
 
       {/* 說明文字 */}
       <div className="instructions">

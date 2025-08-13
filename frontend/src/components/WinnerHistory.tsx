@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createContractService, type ContractInfo, type LotteryResult } from '../services/contractService';
 import type { useToast } from '../hooks/useToast';
 import './WinnerHistory.css';
@@ -20,11 +20,12 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
 }) => {
   const [winners, setWinners] = useState<WinnerWithRound[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const contractService = createContractService(contractAddress);
 
-  // 載入中獎記錄
+  // 載入中獎記錄 - 使用批量請求
   const loadWinners = async () => {
     if (!contractInfo || contractInfo.currentRound <= 1) {
       setWinners([]);
@@ -35,31 +36,25 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
     setError(null);
     
     try {
-      const winnerPromises: Promise<LotteryResult | null>[] = [];
       const roundsToCheck = Math.min(10, contractInfo.currentRound - 1); // 查詢最近10輪
+      const rounds: number[] = [];
       
-      // 查詢最近的中獎記錄
+      // 生成要查詢的輪次列表
       for (let round = contractInfo.currentRound - 1; round >= Math.max(1, contractInfo.currentRound - roundsToCheck); round--) {
-        winnerPromises.push(contractService.getWinner(round));
+        rounds.push(round);
       }
       
-      const winnerResults = await Promise.all(winnerPromises);
-      const validWinners: WinnerWithRound[] = [];
+      console.log(`🏆 載入輪次 ${rounds.join(', ')} 的中獎記錄`);
       
-      winnerResults.forEach((winner, index) => {
-        if (winner) {
-          const round = contractInfo.currentRound - 1 - index;
-          validWinners.push({
-            ...winner,
-            round: round
-          });
-        }
-      });
-      
-      // 按輪次排序（最新的在前）
-      validWinners.sort((a, b) => b.round - a.round);
+      // 使用批量請求方法
+      const validWinners = await contractService.getWinnersBatch(rounds);
       
       setWinners(validWinners);
+      
+      if (toast && validWinners.length > 0) {
+        setLoaded(true);
+        toast.success('載入成功', `成功載入 ${validWinners.length} 個中獎記錄`);
+      }
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '載入中獎記錄失敗';
@@ -73,12 +68,12 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
     }
   };
 
-  // 當合約資訊變化時重新載入
-  useEffect(() => {
-    if (contractInfo && contractInfo.currentRound > 1) {
-      loadWinners();
-    }
-  }, [contractInfo?.currentRound]);
+  // 移除自動載入，改為手動查詢
+  // useEffect(() => {
+  //   if (contractInfo && contractInfo.currentRound > 1) {
+  //     loadWinners();
+  //   }
+  // }, [contractInfo?.currentRound]);
 
   // 格式化時間
   const formatTime = (timestamp: number) => {
@@ -107,7 +102,13 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
   };
 
   if (!contractInfo) {
-    return null;
+    return (
+      <div className="winner-history">
+        <div className="loading">
+          <span>🔄 等待合約資訊載入...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,7 +117,16 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
       
       <div className="history-summary">
         <span className="total-rounds">已完成輪次: {Math.max(0, contractInfo.currentRound - 1)}</span>
-        <span className="total-winners">中獎記錄: {winners.length}</span>
+        {/* <span className="total-winners">中獎記錄: {winners.length}</span> */}
+        {!loaded &&
+          <button 
+          onClick={loadWinners} 
+          className="load-btn"
+          disabled={loading || contractInfo.currentRound <= 1}
+          >
+          🏆 {loading ? '載入中...' : '查看中獎記錄'}
+        </button>
+        }
       </div>
 
       {loading && (
@@ -140,9 +150,9 @@ const WinnerHistory: React.FC<WinnerHistoryProps> = ({
         </div>
       )}
 
-      {!loading && !error && contractInfo.currentRound > 1 && winners.length === 0 && (
+      {!loading && !error && winners.length === 0 && contractInfo.currentRound > 1 && (
         <div className="empty-state">
-          <span>📋 暫無中獎記錄</span>
+          <span>📋 點擊「查看中獎記錄」按鈕載入歷史記錄</span>
         </div>
       )}
 

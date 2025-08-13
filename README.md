@@ -309,13 +309,13 @@ ton-cat-lottery/
 
 
 #### 部署
-- [ ] 部署抽獎合約到 TON testnet
-- [ ] 部署 NFT 合約到 TON testnet
-- [ ] 設定合約間整合（CatLottery 指向 CatNFT 地址）
-- [ ] 基礎部署後驗證
-  - [ ] 合約地址記錄和備份（已記錄在 docs/ContractREADME.md）
-  - [ ] 合約功能驗證測試（完整抽獎流程）
-  - [ ] 更新環境配置檔案（deployments/ 目錄自動生成部署資訊）
+- [x] 部署抽獎合約到 TON testnet
+- [x] 部署 NFT 合約到 TON testnet
+- [x] 設定合約間整合（CatLottery 指向 CatNFT 地址）
+- [x] 基礎部署後驗證
+  - [x] 合約地址記錄和備份（已記錄在 docs/ContractREADME.md）
+  - [x] 合約功能驗證測試（完整抽獎流程）
+  - [x] 更新環境配置檔案（deployments/ 目錄自動生成部署資訊）
 
 
 ---
@@ -417,8 +417,8 @@ ton-cat-lottery/
 - [x] 顯示用戶錢包資訊 - 地址、TON 餘額
 - [x] 基礎交易狀態提示 - 發送中、成功、失敗通知
 - [x] 基礎錯誤處理 - 網路錯誤、餘額不足、抽獎已滿等
-- [ ] 參與者列表顯示 - 當前輪次的參與者地址
-- [ ] 顯示中獎歷史記錄 - 查詢歷史輪次的中獎者和 NFT
+- [x] 參與者列表顯示 - 當前輪次的參與者地址
+- [x] 顯示中獎歷史記錄 - 查詢歷史輪次的中獎者和 NFT
 
 ##### 進階功能
 
@@ -427,24 +427,25 @@ ton-cat-lottery/
 - [ ] 基礎響應式設計 - 支援手機和桌面瀏覽
 
 #### 測試
-- [ ] 基礎測試
-  - [ ] 撰寫 unit test (Component 測試)
-  - [ ] ESLint 和 TypeScript 檢查
-  - [ ] Mock 測試
-    - [ ] Mock TonConnect 錢包互動
-    - [ ] Mock 合約 API 回應
+- [x] 基礎測試
+  - [x] ESLint 和 TypeScript 檢查
+  - [x] 產品建構測試 (npm run build)
 
-- [ ] 容器化與測試
-  - [ ] 完善 `Dockerfile.frontend`
-  - [ ] 測試 Dockerfile
+- [x] 整合測試
+  - [x] 與 testnet 合約的整合測試
+  - [x] 端到端 (E2E) 測試 (錢包連接 → 參與抽獎流程)
 
-- [ ] 整合測試
-  - [ ] 與 testnet 合約的整合測試
-  - [ ] 端到端 (E2E) 測試 (錢包連接 → 參與抽獎流程)
+- [x] 容器化與測試
+  - [x] 完善 `../docker/Dockerfile.frontend`
+  - [x] 完善 `.dockerignore`
+  - [x] 測試 Dockerfile
+  - [x] 完善 docker-compose.yml
 
 - [ ] 建構測試
-  - [ ] 產品建構測試 (npm run build)
   - [ ] 不同環境建構驗證 (staging/production)
+    - `dev` branch for staging env
+    - `main` branch for production env
+  - [ ] 更新 ci.yml 和 cd.yml
 
 ---
 ### DevOps / 雲端自動化部署

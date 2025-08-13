@@ -65,13 +65,17 @@ backend/coverage.*
 backend/*.log
 
 # ================================
-# 前端相關 (如果有)
+# 前端相關
 # ================================
 frontend/node_modules/
 frontend/build/
 frontend/dist/
 frontend/.next/
 frontend/out/
+frontend/coverage/
+frontend/*.log
+frontend/.env
+frontend/.env.local
 
 # ================================
 # 文檔
@@ -85,7 +89,7 @@ documentation/
 # Docker 相關
 # ================================
 # 注意：不能排除 docker/ 目錄中的 Dockerfile
-docker-compose*.yml
+# docker-compose*.yml  # 移除這個，因為在 CI/CD 中可能需要
 .dockerignore
 
 # ================================

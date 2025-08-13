@@ -2,72 +2,26 @@
 # 統一管理後端服務和前端應用
 services:
   # ================================
-  # 後端服務
+  # 後端服務（後端是守護進程，不提供 HTTP API）
   # ================================
   backend:
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
     container_name: ton-cat-lottery-backend
-    ports:
-      - '8080:8080'
-    networks:
-      - ton-lottery-network
-    env_file:
-      - .env # 從根目錄的 .env 檔案讀取環境變數
-    environment:
-      # 服務配置 - 從 .env 讀取，允許覆蓋
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - PORT=${PORT:-8080}
-
-      # TON 網路配置 - 從 .env 讀取
-      - TON_API_ENDPOINT=${TON_API_ENDPOINT:-https://testnet.toncenter.com/api/v2/}
-      - TON_NETWORK=${TON_NETWORK:-testnet}
-
-      # 合約地址 - 從 .env 讀取
-      - LOTTERY_CONTRACT_ADDRESS=${LOTTERY_CONTRACT_ADDRESS}
-      - NFT_CONTRACT_ADDRESS=${NFT_CONTRACT_ADDRESS}
-
-      # 錢包配置 - 從 .env 讀取
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
-
-      # 抽獎參數 - 從 .env 讀取
-      - DRAW_INTERVAL=${DRAW_INTERVAL:-5m}
-      - MAX_PARTICIPANTS=${MAX_PARTICIPANTS:-3}
-      - MIN_PARTICIPANTS=${MIN_PARTICIPANTS:-1}
-      - ENTRY_FEE_TON=${ENTRY_FEE_TON:-0.01}
-      - AUTO_DRAW=${AUTO_DRAW:-false}
-
-      # 重試配置 - 從 .env 讀取
-      - RETRY_COUNT=${RETRY_COUNT:-3}
-      - RETRY_DELAY=${RETRY_DELAY:-5s}
-
-    restart: unless-stopped
-    # 後端是守護進程，不提供 HTTP API，暫時註釋健康檢查
-    # healthcheck:
-    #   test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 15s
 
   # ================================
-  # 前端服務
+  # 前端服務（前端直接用 TON SDK 與區塊鏈互動，不會經過後端）
   # ================================
   frontend:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
-      target: production
     container_name: ton-cat-lottery-frontend
     ports:
-      - '3000:80'
-    networks:
-      - ton-lottery-network
+      - '${FRONTEND_PORT:-3000}:80'  # 根據環境變數決定 port
     environment:
       - NODE_ENV=production
-
     restart: unless-stopped
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:80/health']
@@ -76,32 +30,3 @@ services:
       retries: 3
       start_period: 10s
 
-  # ================================
-  # 前端開發服務 (可選)
-  # ================================
-  frontend-dev:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-      target: development
-    container_name: ton-cat-lottery-frontend-dev
-    ports:
-      - '5173:5173'
-    networks:
-      - ton-lottery-network
-    environment:
-      - NODE_ENV=development
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    profiles:
-      - development
-    restart: unless-stopped
-
-# ================================
-# 網路配置
-# ================================
-networks:
-  ton-lottery-network:
-    driver: bridge
-    name: ton-lottery-network

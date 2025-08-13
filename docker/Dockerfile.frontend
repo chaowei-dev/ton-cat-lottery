@@ -13,40 +13,29 @@ WORKDIR /app
 RUN apk add --no-cache git curl
 
 # ================================
-# 依賴安裝階段
-# ================================
-FROM base AS deps
-
-# 複製 package 文件
-COPY frontend/package*.json ./
-
-# 安裝依賴
-RUN npm ci --only=production && npm cache clean --force
-
-# ================================
-# 開發依賴階段
-# ================================
-FROM base AS deps-dev
-
-# 複製 package 文件
-COPY frontend/package*.json ./
-
-# 安裝所有依賴 (包括開發依賴)
-RUN npm ci && npm cache clean --force
-
-# ================================
 # 構建階段
 # ================================
-FROM deps-dev AS builder
+FROM base AS builder
+
+# 複製 package 文件
+COPY frontend/package*.json ./
+
+# 安裝所有依賴 (包括開發依賴，用於建構)
+RUN npm ci --silent && npm cache clean --force
 
 # 複製前端源代碼
 COPY frontend/ ./
 
 # 設置環境變數
 ENV NODE_ENV=production
+ENV VITE_BUILD_PATH=/app/dist
 
 # 構建前端應用
 RUN npm run build
+
+# 驗證構建結果
+RUN ls -la /app/dist && \
+    test -f /app/dist/index.html || (echo "Build failed: index.html not found" && exit 1)
 
 # ================================
 # 生產階段 (使用 nginx 提供靜態文件)
@@ -80,31 +69,9 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:80/ || exit 1
 
+# 使用非 root 用戶啟動 nginx
+USER frontend
+
 # 啟動 nginx
 CMD ["nginx", "-g", "daemon off;"]
 
-# ================================
-# 開發階段 (用於開發環境)
-# ================================
-FROM deps-dev AS development
-
-# 複製前端源代碼
-COPY frontend/ ./
-
-# 創建非 root 用戶並設置權限
-RUN adduser -D -s /bin/sh frontend && \
-    chown -R frontend:frontend /app && \
-    chmod -R 755 /app
-
-# 切換到非 root 用戶
-USER frontend
-
-# 暴露開發端口
-EXPOSE 5173
-
-# 健康檢查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:5173/ || exit 1
-
-# 啟動開發服務器
-CMD ["npm", "run", "dev"]
