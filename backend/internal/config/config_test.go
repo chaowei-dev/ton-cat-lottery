@@ -42,10 +42,6 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Expected LotteryContractAddress 'EQTest123', got '%s'", cfg.LotteryContractAddress)
 	}
 	
-	if cfg.NFTContractAddress != "EQTestNFT456" {
-		t.Errorf("Expected NFTContractAddress 'EQTestNFT456', got '%s'", cfg.NFTContractAddress)
-	}
-	
 	if cfg.WalletPrivateKey != "test-private-key" {
 		t.Errorf("Expected WalletPrivateKey 'test-private-key', got '%s'", cfg.WalletPrivateKey)
 	}
@@ -153,7 +149,6 @@ func TestValidate(t *testing.T) {
 			name: "Valid config",
 			config: &Config{
 				LotteryContractAddress: "EQTest123",
-				NFTContractAddress:     "EQTestNFT456",
 				WalletPrivateKey:       "test-key",
 			},
 			expectError: false,
@@ -161,7 +156,6 @@ func TestValidate(t *testing.T) {
 		{
 			name: "Missing lottery contract address",
 			config: &Config{
-				NFTContractAddress: "EQTestNFT456",
 				WalletPrivateKey:   "test-key",
 			},
 			expectError: true,
@@ -180,7 +174,6 @@ func TestValidate(t *testing.T) {
 			name: "Missing wallet private key",
 			config: &Config{
 				LotteryContractAddress: "EQTest123",
-				NFTContractAddress:     "EQTestNFT456",
 			},
 			expectError: true,
 			errorField:  "WALLET_PRIVATE_KEY",

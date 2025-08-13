@@ -17,14 +17,20 @@
 ## 📁 檔案結構
 ```
 backend/
-├── cmd/backend/main.go          # 主程序入口
-├── internal/
+├── cmd/                         # 命令行工具
+│   ├── backend/                 # 主程序入口
+│   ├── convert/                 # 助記詞轉私鑰工具
+│   └── test-key/                # 私鑰測試工具
+├── internal/                    # 內部包
 │   ├── config/                  # 配置管理
 │   ├── contract/                # TON合約客戶端
-│   └── logger/                  # 日誌系統
+│   ├── logger/                  # 日誌系統
+│   └── wallet/                  # 錢包管理
 ├── pkg/types/                   # 公共類型定義
-├── test.sh                      # 測試腳本
-└── go.mod                       # Go模組定義
+├── docs/                        # 文檔資料夾
+├── .env                         # 環境配置文件
+├── go.mod                       # Go模組定義
+└── test.sh                      # 測試腳本
 ```
 
 ---
@@ -158,6 +164,122 @@ lotteryActive 變為 true → 回到步驟 1
 ---
 ## 🚀 快速開始
 
+### 📦 環境準備
+
+> Go 1.24.6+
+
+#### **安裝依賴**
+```bash
+cd backend
+go mod tidy
+```
+
+### ⚙️ 配置設置
+
+#### **1. 環境配置**
+```bash
+# 複製環境配置範例
+cp .env.example .env
+
+# 編輯配置文件
+vim .env
+```
+
+#### **2. 錢包配置**
+```bash
+# 生成測試助記詞
+go run cmd/convert/main.go generate
+
+# 將助記詞添加到 .env 後，轉換為私鑰
+go run cmd/convert/main.go
+
+# 測試私鑰有效性
+go run cmd/test-key/main.go
+```
+
+### 🚀 常用指令
+
+#### **開發指令**
+```bash
+# 運行主程序
+go run cmd/backend/main.go
+
+# 運行測試
+./test.sh
+go test ./...
+
+# 代碼格式化
+go fmt ./...
+
+# 依賴管理
+go mod tidy
+go mod download
+```
+
+#### **錢包工具**
+```bash
+# 生成新的測試助記詞
+go run cmd/convert/main.go generate
+
+# 助記詞轉私鑰
+go run cmd/convert/main.go
+
+# 測試私鑰功能
+go run cmd/test-key/main.go
+```
+
+#### **調試指令**
+```bash
+# 詳細日誌運行
+LOG_LEVEL=debug go run cmd/backend/main.go
+
+# 測試網環境
+IS_TESTNET=true go run cmd/backend/main.go
+
+# 檢查配置
+go run cmd/backend/main.go --check-config
+```
+
+### 🏃 快速啟動
+
+#### **本地開發**
+```bash
+# 1. 克隆項目
+git clone <your-repo>
+cd ton-cat-lottery/backend
+
+# 2. 安裝依賴
+go mod tidy
+
+# 3. 配置環境
+cp .env.example .env
+# 編輯 .env 添加你的配置
+
+# 4. 生成錢包
+go run cmd/convert/main.go generate    # 生成助記詞
+go run cmd/convert/main.go             # 轉換為私鑰
+
+# 5. 測試錢包
+go run cmd/test-key/main.go
+
+# 6. 啟動服務
+go run cmd/backend/main.go
+```
+
+#### **測試指令**
+```bash
+# 檢查 Go 版本
+go version
+
+# 檢查依賴
+go mod verify
+
+# 測試編譯
+go build cmd/backend/main.go
+
+# 運行測試套件
+./test.sh
+```
 
 ---
 ## 📦 部署配置
