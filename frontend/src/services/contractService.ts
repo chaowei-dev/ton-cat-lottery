@@ -175,7 +175,7 @@ export class ContractService {
     const results = await tonApiManager.getParticipantsBatch(this.contractAddress, count);
     
     const participants: Participant[] = [];
-    results.forEach((data, index) => {
+    results.forEach((data) => {
       if (data?.result?.stack) {
         const stack = data.result.stack;
         if (stack.length > 0 && stack[0][0] === 'tuple') {

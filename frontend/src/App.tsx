@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import WalletConnect from './components/WalletConnect';
 import ContractStatus from './components/ContractStatus';
 import JoinLottery from './components/JoinLottery';

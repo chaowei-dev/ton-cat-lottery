@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createContractService, type ContractInfo, type LotteryResult } from '../services/contractService';
 import type { useToast } from '../hooks/useToast';
 import './WinnerHistory.css';
