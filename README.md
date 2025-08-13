@@ -321,6 +321,8 @@ ton-cat-lottery/
 
 > 基於 Go 的智能抽獎守護進程，專注於自動化監聽和管理 TON 區塊鏈上的貓咪 NFT 抽獎系統。後端只做一件事：監聽 `lotteryActive` 狀態變化，自動觸發 `drawWinner`，依賴合約處理所有業務邏輯。
 
+**🏗️ 技術架構**: Go 1.19+、TON API 客戶端、HTTP 輪詢、無狀態守護進程、內存緩存 + 合約狀態同步
+
 **🎯 推薦實作順序：基礎設置 → 合約客戶端 → 核心監聽 → 保障機制 → 測試部署**
 
 #### 設計模組
@@ -337,34 +339,34 @@ ton-cat-lottery/
 
 - [ ] 合約客戶端
   - [ ] TON API 客戶端：使用 TonCenter API 或 TON HTTP API
-  - [ ] 實現 `getContractInfo()` 調用：查詢合約狀態
+  - [ ] 實現 `getContractInfo()` 調用：HTTP GET 請求到 TON API，解析合約狀態返回值
   - [ ] 連接管理：HTTP 客戶端連接池、超時設置、重試邏輯
   - [ ] API 限速處理：每分鐘 20 請求限制、最小間隔 3 秒
 
 - [ ] 錢包管理
   - [ ] 私鑰管理：從環境變數或配置文件讀取
   - [ ] TON 錢包地址生成：從私鑰生成 owner 地址
-  - [ ] 交易簽名：實現 drawWinner 交易構建和簽名
-  - [ ] 餘額檢查：查詢 owner 錢包 TON 餘額
+  - [ ] 交易簽名：實現 drawWinner 交易構建和簽名（私鑰簽名 + TON 標準交易格式 + 合約調用）
+  - [ ] 餘額檢查：查詢 owner 錢包 TON 餘額（TON API 查詢錢包餘額 + log 記錄）
 
 - [ ] 核心監聽邏輯
-  - [ ] 狀態輪詢器：每 30 秒調用 `getContractInfo()`
+  - [ ] 狀態輪詢器：每 30 秒調用 `getContractInfo()`（定期輪詢合約狀態變化，無需事件監聽）
   - [ ] 觸發條件檢查：`lotteryActive == false && drawInProgress == false && 輪次未處理`
   - [ ] drawWinner 交易發送：0.2 TON Gas 費用設置
-  - [ ] 本地狀態管理：記錄已處理的輪次，避免重複觸發
+  - [ ] 本地狀態管理：記錄已處理的輪次，避免重複觸發（內存 map[int]bool）
 
 - [ ] 交易監控
   - [ ] 交易狀態追蹤：監控交易 hash 直到確認
-  - [ ] 指數退避重試：30s → 60s → 120s，最多 3 次
+  - [ ] 指數退避重試：30s → 60s → 120s，最多 3 次（`time.Sleep(duration * time.Second)` + 錯誤分類）
   - [ ] 失敗分類處理：網路錯誤重試，邏輯錯誤停止
-  - [ ] 成功記錄：標記輪次已處理，等待合約自動化
+  - [ ] 成功記錄：標記輪次已處理，等待合約自動化（內存緩存 currentRound）
 
 - [ ] 保障機制
-  - [ ] 餘額監控：定期檢查 owner 錢包餘額，< 1 TON 告警
-  - [ ] 超時處理：檢測 `drawInProgress` > 5分鐘，調用 `resetDrawStateIfTimeout`
-  - [ ] 重複防護：使用 `currentRound` 追蹤已處理輪次
-  - [ ] 狀態恢復：服務重啟後從本地文件恢復狀態
-  - [ ] 健康檢查：實現 `/health` 端點用於監控
+  - [ ] 餘額監控：定期檢查 owner 錢包餘額，< 1 TON 告警（每小時檢查一次，log + 可選 webhook）
+  - [ ] 超時處理：檢測 `drawInProgress` > 5分鐘，調用 `resetDrawStateIfTimeout`（每次狀態檢查時同時檢查超時）
+  - [ ] 重複防護：使用 `currentRound` 追蹤已處理輪次（檢查 processedRounds[currentRound] 是否已存在）
+  - [ ] 狀態恢復：服務重啟後狀態恢復（重新同步合約狀態）
+  - [ ] 健康檢查：實現 `/health` 端點用於監控（HTTP endpoint /health + Docker 健康檢查 + Kubernetes liveness probe）
 
 #### 測試
 - [ ] 基礎測試
@@ -378,6 +380,7 @@ ton-cat-lottery/
   - [ ] 環境配置：`.env` 文件、Docker Compose 配置
   - [ ] 容器測試：驗證容器啟動、日志輸出、資源使用
   - [ ] 與合約連接驗證：確保容器內可正常調用合約 API
+  - [ ] 容器就緒探針：Docker 健康檢查 + Kubernetes liveness probe
 
 #### 部署
 - [ ] 基礎環境配置
@@ -392,6 +395,9 @@ ton-cat-lottery/
   - [ ] 端到端測試：完整抽獎流程自動化測試（join → 滿員 → 自動 drawWinner）
   - [ ] 長期運行測試：24小時穩定性測試，內存泄漏檢查
 
+#### 文檔
+- [ ] 確認 todos 是否有符合實作的過程
+- [ ] 更新 `docs/BackendREADME.md`
 
 ---
 ### 前端 dApp（React + TonConnect）
