@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-	
+
 	"ton-cat-lottery-backend/internal/config"
 	"ton-cat-lottery-backend/internal/logger"
 )
@@ -17,7 +17,7 @@ func TestGetContractInfo(t *testing.T) {
 		if r.Method != "POST" {
 			t.Errorf("Expected POST method, got %s", r.Method)
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
 			"ok": true,
@@ -33,54 +33,54 @@ func TestGetContractInfo(t *testing.T) {
 		}`))
 	}))
 	defer server.Close()
-	
+
 	cfg := &config.Config{
 		LotteryContractAddress: "EQTest123",
 		APITimeout:             5 * time.Second,
-		APIRateLimit:          100,
-		APIMinInterval:        0,
-		RetryAttempts:         1,
-		IsTestnet:             true,
+		APIRateLimit:           100,
+		APIMinInterval:         0,
+		RetryAttempts:          1,
+		IsTestnet:              true,
 	}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	// Replace the URL to use our test server
 	client.config.IsTestnet = false // Force use of custom URL
-	
+
 	// We need to mock the request by overriding the makeRequest method
 	// For this test, we'll test the parsing logic separately
-	
+
 	// Test parseContractInfoStack directly
 	stack := [][]interface{}{
-		{"num", "5"},    // currentRound
-		{"num", "1"},    // lotteryActive (true)
-		{"num", "0"},    // drawInProgress (false)  
-		{"num", "2"},    // participantCount
-		{"num", "3"},    // maxParticipants
+		{"num", "5"}, // currentRound
+		{"num", "1"}, // lotteryActive (true)
+		{"num", "0"}, // drawInProgress (false)
+		{"num", "2"}, // participantCount
+		{"num", "3"}, // maxParticipants
 	}
-	
+
 	contractInfo, err := client.parseContractInfoStack(stack)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	
+
 	if contractInfo.CurrentRound != 5 {
 		t.Errorf("Expected CurrentRound 5, got %d", contractInfo.CurrentRound)
 	}
-	
+
 	if !contractInfo.LotteryActive {
 		t.Errorf("Expected LotteryActive true, got %t", contractInfo.LotteryActive)
 	}
-	
+
 	if contractInfo.DrawInProgress {
 		t.Errorf("Expected DrawInProgress false, got %t", contractInfo.DrawInProgress)
 	}
-	
+
 	if contractInfo.ParticipantCount != 2 {
 		t.Errorf("Expected ParticipantCount 2, got %d", contractInfo.ParticipantCount)
 	}
-	
+
 	if contractInfo.MaxParticipants != 3 {
 		t.Errorf("Expected MaxParticipants 3, got %d", contractInfo.MaxParticipants)
 	}
@@ -90,12 +90,12 @@ func TestParseContractInfoStackInvalidLength(t *testing.T) {
 	cfg := &config.Config{}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	// Test with insufficient stack elements
 	stack := [][]interface{}{
-		{"num", "5"},    // Only 1 element, need at least 5
+		{"num", "5"}, // Only 1 element, need at least 5
 	}
-	
+
 	_, err := client.parseContractInfoStack(stack)
 	if err == nil {
 		t.Fatal("Expected error for insufficient stack elements")
@@ -106,7 +106,7 @@ func TestParseStackInt(t *testing.T) {
 	cfg := &config.Config{}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	tests := []struct {
 		name        string
 		stackItem   []interface{}
@@ -156,11 +156,11 @@ func TestParseStackInt(t *testing.T) {
 			expectError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := client.parseStackInt(tt.stackItem)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -181,7 +181,7 @@ func TestParseStackBool(t *testing.T) {
 	cfg := &config.Config{}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	tests := []struct {
 		name        string
 		stackItem   []interface{}
@@ -225,11 +225,11 @@ func TestParseStackBool(t *testing.T) {
 			expectError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := client.parseStackBool(tt.stackItem)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -253,11 +253,11 @@ func TestRetryLogicDemonstration(t *testing.T) {
 	}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	attemptCount := 0
 	ctx := context.Background()
-	
-	// Test that retry logic works - fails twice then succeeds  
+
+	// Test that retry logic works - fails twice then succeeds
 	err := client.retryWithBackoff(ctx, func() error {
 		attemptCount++
 		if attemptCount < 3 {
@@ -265,11 +265,11 @@ func TestRetryLogicDemonstration(t *testing.T) {
 		}
 		return nil // Success on third attempt
 	})
-	
+
 	if err != nil {
 		t.Fatalf("Expected success after retries, got %v", err)
 	}
-	
+
 	if attemptCount != 3 {
 		t.Errorf("Expected exactly 3 attempts, got %d", attemptCount)
 	}
@@ -281,16 +281,16 @@ func TestTONCenterRequestFormat(t *testing.T) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
 		}
-		
+
 		if r.Header.Get("User-Agent") != "ton-cat-lottery-backend/1.0" {
 			t.Errorf("Expected User-Agent ton-cat-lottery-backend/1.0, got %s", r.Header.Get("User-Agent"))
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"ok": true, "result": {"stack": []}}`))
 	}))
 	defer server.Close()
-	
+
 	cfg := &config.Config{
 		APITimeout:     5 * time.Second,
 		APIRateLimit:   100,
@@ -298,14 +298,14 @@ func TestTONCenterRequestFormat(t *testing.T) {
 	}
 	log := logger.NewDefault()
 	client := NewClient(cfg, log)
-	
+
 	ctx := context.Background()
 	requestBody := TONCenterRequest{
 		Address: "EQTest123",
 		Method:  "getContractInfo",
 		Stack:   []interface{}{},
 	}
-	
+
 	_, err := client.makeRequest(ctx, "POST", server.URL, requestBody)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)

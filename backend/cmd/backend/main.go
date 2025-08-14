@@ -23,44 +23,44 @@ func main() {
 	// Initialize default logger
 	log := logger.NewDefault()
 	log.Info("Starting TON Cat Lottery Backend...")
-	
+
 	// Load .env file if it exists (ignore error if file doesn't exist)
 	if err := godotenv.Load(); err != nil {
 		log.Info("No .env file found, using system environment variables")
 	} else {
 		log.Info("Loaded configuration from .env file")
 	}
-	
+
 	// Load and validate configuration from environment variables
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("Configuration validation failed: %v", err)
 	}
-	
+
 	// Create TON API client for contract interactions
 	client := contract.NewClient(cfg, log)
-	
+
 	// Set up context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	// Set up signal handling for graceful shutdown (SIGINT, SIGTERM)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	
+
 	// Handle shutdown signals in a separate goroutine
 	go func() {
 		<-sigChan
 		log.Info("Received shutdown signal")
 		cancel()
 	}()
-	
+
 	log.Info("Backend service started successfully")
-	
+
 	// Create ticker for periodic lottery status polling
 	ticker := time.NewTicker(cfg.PollingInterval)
 	defer ticker.Stop()
-	
+
 	// Main service loop - monitors lottery status and triggers draws
 	for {
 		select {
@@ -94,7 +94,7 @@ func checkLotteryStatus(ctx context.Context, client *contract.Client, log *logge
 	if err != nil {
 		return err
 	}
-	
+
 	// Log current lottery status for monitoring
 	log.Infof("Current lottery status: Round=%d, Active=%t, InProgress=%t, Participants=%d/%d",
 		contractInfo.CurrentRound,
@@ -102,10 +102,10 @@ func checkLotteryStatus(ctx context.Context, client *contract.Client, log *logge
 		contractInfo.DrawInProgress,
 		contractInfo.ParticipantCount,
 		contractInfo.MaxParticipants)
-	
+
 	// TODO: Add automatic lottery draw triggering logic here
 	// When lotteryActive == false && drawInProgress == false && round not processed
 	// Send drawWinner transaction to the contract
-	
+
 	return nil
 }

@@ -9,23 +9,23 @@ import (
 type Config struct {
 	// Contract Configuration
 	LotteryContractAddress string
-	
+
 	// Wallet Configuration
 	WalletPrivateKey string
-	
+
 	// API Configuration
-	TONAPIBaseURL     string
-	APITimeout        time.Duration
-	APIRateLimit      int
-	APIMinInterval    time.Duration
-	
+	TONAPIBaseURL  string
+	APITimeout     time.Duration
+	APIRateLimit   int
+	APIMinInterval time.Duration
+
 	// Monitoring Configuration
-	PollingInterval   time.Duration
-	RetryAttempts     int
-	RetryBaseDelay    time.Duration
-	MinBalanceAlert   float64
+	PollingInterval     time.Duration
+	RetryAttempts       int
+	RetryBaseDelay      time.Duration
+	MinBalanceAlert     float64
 	DrawTimeoutDuration time.Duration
-	
+
 	// Network Configuration
 	IsTestnet bool
 }
@@ -44,11 +44,11 @@ func Load() *Config {
 		DrawTimeoutDuration: getEnvDuration("DRAW_TIMEOUT_DURATION", 5*time.Minute),
 		IsTestnet:           getEnvBool("IS_TESTNET", true),
 	}
-	
+
 	// Required environment variables
 	cfg.LotteryContractAddress = os.Getenv("LOTTERY_CONTRACT_ADDRESS")
 	cfg.WalletPrivateKey = os.Getenv("WALLET_PRIVATE_KEY")
-	
+
 	return cfg
 }
 

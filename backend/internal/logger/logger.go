@@ -37,9 +37,9 @@ func New(level LogLevel, output io.Writer) *Logger {
 	if output == nil {
 		output = os.Stdout
 	}
-	
+
 	flags := log.LstdFlags | log.Lshortfile
-	
+
 	return &Logger{
 		debugLogger: log.New(output, "DEBUG: ", flags),
 		infoLogger:  log.New(output, "INFO: ", flags),
