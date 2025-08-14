@@ -221,11 +221,20 @@ go mod download
 # 生成新的測試助記詞
 go run cmd/convert/main.go generate
 
-# 助記詞轉私鑰
+# 生成新的測試私鑰
+go run cmd/convert/main.go generate
+
+# 驗證助記詞並轉換為私鑰
 go run cmd/convert/main.go
 
-# 測試私鑰功能
+# 測試私鑰管理和簽名功能（顯示 TON 地址）
 go run cmd/test-key/main.go
+
+# 驗證私鑰與助記詞關係
+go run cmd/reverse-convert/main.go
+
+# 驗證 TON 地址信息
+go run cmd/verify-address/main.go
 ```
 
 #### **調試指令**
