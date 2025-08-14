@@ -355,14 +355,27 @@ ton-cat-lottery/
   - [x] 驗證私鑰是否能"獨立簽名交易"
 
 - [ ] 錢包管理
-  - [ ] TON錢包地址生成：從私鑰生成正確的TON地址
+  - [x] TON錢包地址生成：從私鑰生成正確的TON地址
   - [ ] TON交易構建和簽名：實現 drawWinner 交易構建和簽名
-    - 使用 TON Go SDK
-    - 私鑰簽名 + TON 標準交易格式 + 合約調用
-    - 測試是否能真實調用 drawWinner (`contracts/CatLottery.tact`)
-  - [ ] TON API餘額查詢：查詢 owner 錢包 TON 餘額
-    - TON API 餘額查詢實現
-    - log 記錄功能
+    - [x] 私鑰簽名功能（ed25519 數位簽名）
+    - [x] 合約狀態查詢和驗證
+    - [ ] TON 標準交易格式實現（Cell/BOC 編碼）
+      - [ ] 實現 Cell 數據結構
+      - [ ] 實現 BOC (Bag of Cells) 序列化
+      - [ ] 實現 InternalMessage 構建
+      - [ ] 實現交易 (Transaction) 結構序列化
+    - [ ] 交易序列號 (seqno) 管理
+      - [ ] 查詢錢包合約當前 seqno
+      - [ ] 實現 seqno 自動遞增邏輯
+      - [ ] 處理交易過期時間 (valid_until)
+    - [ ] 交易廣播到 TON 網路
+      - [ ] 實現交易簽名 (使用錢包私鑰)
+      - [ ] 實現 sendBoc API 調用
+      - [ ] 實現交易狀態追蹤和確認
+    - [ ] 測試是否能真實調用 drawWinner (`contracts/CatLottery.tact`)
+  - [x] TON API餘額查詢：查詢 owner 錢包 TON 餘額
+    - [x] TON API 餘額查詢實現
+    - [x] log 記錄功能
 
 - [ ] 核心監聽邏輯
   - [ ] 狀態輪詢器：每 30 秒調用 `getContractInfo()`（定期輪詢合約狀態變化，無需事件監聽）

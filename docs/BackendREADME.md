@@ -63,7 +63,14 @@ TON Cat Lottery Backend 是一個基於 Go 的智能抽獎守護進程，專注�
 - **Gas 費用**: 0.2 TON (含 NFT mint 費用)
 - **餘額檢查**: 執行前確認錢包餘額 >= 0.3 TON
 - **一次性執行**: 發送後等待合約自動完成整個流程
-- **交易構建**: 私鑰簽名 + TON 標準交易格式 + 合約調用
+
+##### **交易構建流程**
+- **私鑰管理**: 從環境變數安全讀取 ed25519 私鑰，支援助記詞轉換
+- **交易序列號**: 查詢錢包合約當前 seqno，自動遞增防重複
+- **消息構建**: 創建 InternalMessage (目標合約 + 0.1 TON gas + drawWinner 調用)
+- **交易簽名**: 使用 ed25519 私鑰對交易數據進行數位簽名
+- **格式編碼**: 序列化為 TON 標準 Cell/BOC 格式
+- **網路廣播**: 通過 TON API sendBoc 端點廣播到測試網
 
 #### **3. 等待合約自動化**
 - **合約自動**: `drawWinner` → NFT mint → `WinnerConfirmed` → `NewRoundStarted`
@@ -218,24 +225,26 @@ go mod download
 
 #### **錢包工具**
 ```bash
-# 生成新的測試助記詞
-go run cmd/convert/main.go generate
+# 生成新的測試助記詞和私鑰
+go run cmd/convert/main.go generate    # 生成 24 詞助記詞
+go run cmd/convert/main.go             # 助記詞轉 ed25519 私鑰
 
-# 生成新的測試私鑰
-go run cmd/convert/main.go generate
+# 私鑰管理和驗證
+go run cmd/test-key/main.go            # 測試簽名功能，顯示 TON 地址
+go run cmd/reverse-convert/main.go     # 驗證私鑰與助記詞關係
+go run cmd/verify-address/main.go      # 驗證 TON 地址 (0QC0482t...)
 
-# 驗證助記詞並轉換為私鑰
-go run cmd/convert/main.go
-
-# 測試私鑰管理和簽名功能（顯示 TON 地址）
-go run cmd/test-key/main.go
-
-# 驗證私鑰與助記詞關係
-go run cmd/reverse-convert/main.go
-
-# 驗證 TON 地址信息
-go run cmd/verify-address/main.go
+# DrawWinner 工具 (包含餘額查詢和合約狀態)
+go run cmd/draw-winner/main.go         # 查詢錢包餘額和合約狀態
+go run cmd/draw-winner/main.go draw    # 準備執行 drawWinner (需完整實現)
 ```
+
+##### **錢包管理技術細節**
+- **私鑰格式**: 32 字節 ed25519 種子，十六進制編碼存儲
+- **地址生成**: 從私鑰生成對應的 TON testnet 地址
+- **簽名能力**: 支援任意消息的 ed25519 數位簽名和驗證
+- **餘額查詢**: 通過 TON API 查詢當前錢包餘額 (2.464426678 TON)
+- **合約交互**: 可查詢合約狀態，準備交易構建和廣播
 
 #### **調試指令**
 ```bash
@@ -297,6 +306,53 @@ go build cmd/backend/main.go
 ---
 ## 🛠️ 故障排除
 
+### 🔐 **私鑰和錢包問題**
+
+#### **私鑰格式錯誤**
+```bash
+# 錯誤: Error decoding private key
+# 解決方案: 檢查 .env 中的 WALLET_PRIVATE_KEY 格式
+go run cmd/test-key/main.go  # 驗證私鑰有效性
+```
+
+#### **TON 地址不匹配**
+```bash
+# 錯誤: 助記詞與私鑰地址不符
+# 解決方案: 重新生成或驗證轉換過程
+go run cmd/convert/main.go              # 重新轉換
+go run cmd/reverse-convert/main.go      # 驗證對應關係
+```
+
+#### **餘額查詢失敗**
+```bash
+# 錯誤: API error: 或 insufficient balance
+# 解決方案: 檢查網路連接和地址格式
+go run cmd/draw-winner/main.go          # 測試 API 連接
+```
+
+### 🔄 **交易構建問題**
+
+#### **Seqno 獲取失敗**
+```bash
+# 錯誤: 無法查詢錢包序列號
+# 解決方案: 檢查錢包地址和 TON API 連接
+# 當前狀態: 需要實現 seqno 管理組件
+```
+
+#### **交易簽名問題**
+```bash
+# 錯誤: 簽名驗證失敗
+# 解決方案: 驗證私鑰和消息格式
+go run cmd/demo-signing/main.go         # 測試基本簽名功能
+```
+
+#### **BOC 編碼錯誤**
+```bash
+# 錯誤: Cell/BOC 序列化失敗
+# 解決方案: TON 格式實現問題
+# 當前狀態: 需要完成 Cell/BOC 編碼組件
+```
+
 ---
 ## 📚 參考資源
 
@@ -304,7 +360,15 @@ go build cmd/backend/main.go
 - [TON 區塊鏈官方文檔](https://docs.ton.org/)
 - [TON Connect 文檔](https://docs.ton.org/develop/dapps/ton-connect/)
 - [TON API 文檔](https://tonapi.io/docs)
+- [TON HTTP API](https://toncenter.com/api/v2/)
 - [Tact 語言文檔](https://docs.tact-lang.org/)
+
+### 🔐 **錢包和交易技術**
+- [TON 錢包合約規範](https://docs.ton.org/develop/smart-contracts/guidelines/wallet)
+- [Cell/BOC 序列化格式](https://docs.ton.org/develop/data-formats/cell-boc)
+- [交易結構說明](https://docs.ton.org/develop/smart-contracts/messages)
+- [ed25519 數位簽名](https://ed25519.cr.yp.to/)
+- [BIP39 助記詞規範](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
 
 ### 📖 **技術參考**
 - [Go 語言官方文檔](https://golang.org/doc/)
