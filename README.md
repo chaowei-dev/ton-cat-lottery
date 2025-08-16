@@ -373,6 +373,8 @@ ton-cat-lottery/
       - [ ] 實現 sendBoc API 調用
       - [ ] 實現交易狀態追蹤和確認
     - [ ] 測試是否能真實調用 drawWinner (`contracts/CatLottery.tact`)
+      - [ ] 計算 drawWinner 方法的 opcode
+      - [ ] 測試真實的 drawWinner 調用
   - [x] TON API餘額查詢：查詢 owner 錢包 TON 餘額
     - [x] TON API 餘額查詢實現
     - [x] log 記錄功能
