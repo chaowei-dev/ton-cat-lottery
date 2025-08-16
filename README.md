@@ -326,108 +326,97 @@ ton-cat-lottery/
 **🎯 推薦實作順序：基礎設置 → 合約客戶端 → 核心監聽 → 保障機制 → 測試部署**
 
 #### 設計模組
-- [x] 簡化守護進程設計（狀態監聽 + 交易觸發）
-- [x] 最小化干預原則（依賴合約自動化流程）
-- [x] 保障機制設計（重試、監控、恢復機制）
+- [ ] 簡化守護進程設計（狀態監聽 + 交易觸發 `drawWinner`）
+- [ ] 最小化干預原則（依賴合約自動化流程）
+- [ ] 保障機制設計（重試、監控、恢復機制）
 
 #### 撰寫邏輯代碼
 - TON API 的實作可以參考: `contracts/scripts/setupContracts.ts`
 
-- [x] 項目基礎設置
-  - [x] 初始化 Go 項目：`go mod init ton-cat-lottery-backend`
-  - [x] 創建目錄結構：`cmd/`, `internal/`, `pkg/`, `config/`
-  - [x] 基礎配置管理：環境變數讀取、合約地址配置、私鑰管理
-  - [x] 基礎日志記錄：使用標準 log 套件或 logrus
-  - [x] 環境配置文件：創建 `.env` 和 `.env.example`，支援 godotenv 加載
+- [ ] 項目基礎設置
+  - [ ] 建立 `go.mod` 和基本目錄結構 (`internal/`, `cmd/`, `pkg/`)
+  - [ ] 配置 `tonutils-go` SDK 依賴 (github.com/xssnick/tonutils-go)
+  - [ ] 設置環境配置文件 `.env` 模板和讀取邏輯
+  - [ ] 實現基本日誌系統和錯誤處理
 
-- [x] 合約客戶端
-  - [x] TON API 客戶端：使用 TonCenter API 或 TON HTTP API
-  - [x] 實現 `getContractInfo()` 調用：HTTP POST 請求到 TON API，解析合約狀態返回值
-  - [x] 連接管理：HTTP 客戶端連接池、超時設置、重試邏輯
-  - [x] API 限速處理：每分鐘 20 請求限制、最小間隔 3 秒
-  
-- [x] 私鑰管理
-  - [x] 把助記詞放到 .env 中
-  - [x] 私鑰生成：實現一個 cmd，可以把 .env 中的 24 個助記詞 (`WALLET_MNEMONIC`)，生成為私鑰
-    - 錢包版本為 `W5`
-  - [x] 私鑰管理：從環境變數或配置文件讀取
-  - [x] 私鑰測試：實現一個 cmd，將 .env 的私鑰 (`WALLET_PRIVATE_KEY`) 轉換為助記詞
-  - [x] 驗證私鑰是否能"獨立簽名交易"
+- [ ] TON 客戶端和合約接口
+  - [ ] 實現 TON testnet 連接客戶端 (使用 tonutils-go)
+  - [ ] 創建 CatLottery 合約接口和狀態查詢功能
+  - [ ] 實現合約狀態緩存機制 (避免頻繁 API 調用)
+  - [ ] 添加合約調用重試和錯誤處理機制
 
-- [ ] 錢包管理
-  - [x] TON錢包地址生成：從私鑰生成正確的TON地址
-  - [ ] TON交易構建和簽名：實現 drawWinner 交易構建和簽名
-    - [x] 私鑰簽名功能（ed25519 數位簽名）
-    - [x] 合約狀態查詢和驗證
-    - [ ] TON 標準交易格式實現（Cell/BOC 編碼）
-      - [ ] 實現 Cell 數據結構
-      - [ ] 實現 BOC (Bag of Cells) 序列化
-      - [ ] 實現 InternalMessage 構建
-      - [ ] 實現交易 (Transaction) 結構序列化
-    - [ ] 交易序列號 (seqno) 管理
-      - [ ] 查詢錢包合約當前 seqno
-      - [ ] 實現 seqno 自動遞增邏輯
-      - [ ] 處理交易過期時間 (valid_until)
-    - [ ] 交易廣播到 TON 網路
-      - [ ] 實現交易簽名 (使用錢包私鑰)
-      - [ ] 實現 sendBoc API 調用
-      - [ ] 實現交易狀態追蹤和確認
-    - [ ] 測試是否能真實調用 drawWinner (`contracts/CatLottery.tact`)
-      - [ ] 計算 drawWinner 方法的 opcode
-      - [ ] 測試真實的 drawWinner 調用
-  - [x] TON API餘額查詢：查詢 owner 錢包 TON 餘額
-    - [x] TON API 餘額查詢實現
-    - [x] log 記錄功能
+- [ ] 核心監聽 `lotteryActive` 邏輯
+  - [ ] 實現定時器 (可配置間隔，建議 30-60 秒)
+  - [ ] 合約狀態輪詢邏輯 (`getContractInfo()` 調用)
+  - [ ] 狀態變化檢測 (從 `true` 到 `false` 的轉換)
+  - [ ] 參與者數量驗證 (確保 >= 3 人才觸發)
 
-- [ ] 核心監聽邏輯
-  - [ ] 狀態輪詢器：每 30 秒調用 `getContractInfo()`（定期輪詢合約狀態變化，無需事件監聽）
-  - [ ] 觸發條件檢查：`lotteryActive == false && drawInProgress == false && 輪次未處理`
-  - [ ] drawWinner 交易發送：0.2 TON Gas 費用設置
-  - [ ] 本地狀態管理：記錄已處理的輪次，避免重複觸發（內存 map[int]bool）
+- [ ] 錢包私鑰管理
+  - [ ] 實現 W5 錢包創建 (從 24 字助記詞)
+  - [ ] 安全的私鑰存儲和讀取 (從環境變數)
+  - [ ] 錢包餘額檢查和充足性驗證
+  - [ ] 交易簽名和發送封裝函數
 
-- [ ] 交易監控
-  - [ ] 交易狀態追蹤：監控交易 hash 直到確認
-  - [ ] 指數退避重試：30s → 60s → 120s，最多 3 次（`time.Sleep(duration * time.Second)` + 錯誤分類）
-  - [ ] 失敗分類處理：網路錯誤重試，邏輯錯誤停止
-  - [ ] 成功記錄：標記輪次已處理，等待合約自動化（內存緩存 currentRound）
+- [ ] 自動觸發 `drawWinner`
+  - [ ] 實現 `drawWinner` 交易構建邏輯
+  - [ ] 交易參數配置 (gas 費用約 0.1 TON)
+  - [ ] 使用私鑰自動簽署和發送交易
+  - [ ] 交易狀態追蹤和確認機制
 
 - [ ] 保障機制
-  - [ ] 餘額監控：定期檢查 owner 錢包餘額，< 1 TON 告警（每小時檢查一次，log + 可選 webhook）
-  - [ ] 超時處理：檢測 `drawInProgress` > 5分鐘，調用 `resetDrawStateIfTimeout`（每次狀態檢查時同時檢查超時）
-  - [ ] 重複防護：使用 `currentRound` 追蹤已處理輪次（檢查 processedRounds[currentRound] 是否已存在）
-  - [ ] 狀態恢復：服務重啟後狀態恢復（重新同步合約狀態）
-  - [ ] 健康檢查：實現 `/health` 端點用於監控（HTTP endpoint /health + Docker 健康檢查 + Kubernetes liveness probe）
+  - [ ] 交易失敗重試機制 (最多 3 次，指數退避)
+  - [ ] 網路連接異常處理和自動重連
+  - [ ] 錢包餘額不足警告和暫停機制
+  - [ ] 狀態不一致檢測和恢復邏輯
+  - [ ] 系統健康檢查和監控指標
+
 
 #### 測試
-- [ ] 基礎測試
-  - [ ] 核心功能單元測試：測試 API 客戶端、錢包管理、狀態檢查邏輯
-  - [ ] Mock 測試：使用 Mock TON 客戶端進行離線測試
-  - [ ] 異常情況測試：網路中斷、交易失敗、API 限速等場景
-  - [ ] 集成測試：與實際 testnet 合約的完整流程測試
+- [ ] 單元測試
+  - [ ] TON 客戶端連接和配置測試
+  - [ ] 錢包創建和私鑰管理測試
+  - [ ] 合約狀態查詢和緩存邏輯測試
+  - [ ] 狀態變化檢測邏輯測試
+  - [ ] 交易構建和簽名測試 (Mock 模式)
 
-- [ ] 容器化部署
-  - [ ] 完善 `Dockerfile.backend`：多階段構建、非 root 用戶、健康檢查
-  - [ ] 環境配置：`.env` 文件、Docker Compose 配置
-  - [ ] 容器測試：驗證容器啟動、日志輸出、資源使用
-  - [ ] 與合約連接驗證：確保容器內可正常調用合約 API
-  - [ ] 容器就緒探針：Docker 健康檢查 + Kubernetes liveness probe
+- [ ] 集成測試
+  - [ ] 與 testnet 合約的完整交互測試
+  - [ ] 實際 `drawWinner` 交易發送和確認測試
+  - [ ] 錯誤情況下的重試和恢復測試
+  - [ ] 長時間運行的穩定性測試
+
+- [ ] 異常情況測試
+  - [ ] 網路中斷和重連測試
+  - [ ] 合約狀態異常處理測試
+  - [ ] 錢包餘額不足場景測試
+  - [ ] 交易失敗和重試邏輯測試
+  - [ ] API 限速和背壓處理測試
 
 #### 部署
-- [ ] 基礎環境配置
-  - [ ] 測試網環境變數：`LOTTERY_CONTRACT_ADDRESS`, `NFT_CONTRACT_ADDRESS`, `WALLET_PRIVATE_KEY`
-  - [ ] API 配置：`TON_API_ENDPOINT`, `TON_API_KEY`（如需要）
-  - [ ] 監聽參數：`POLL_INTERVAL=30s`, `RETRY_MAX_ATTEMPTS=3`, `TIMEOUT_MINUTES=5`
-  - [ ] 日志配置：日志級別、輸出格式、日志文件路徑
+- [ ] 容器化配置
+  - [ ] 完善 `Dockerfile.backend` (multi-stage build)
+  - [ ] 創建 `.env.example` 環境變數模板
+  - [ ] 更新 `docker-compose.yml` 後端服務配置
+  - [ ] 配置健康檢查和重啟策略
 
-- [ ] 運行驗證
-  - [ ] 服務啟動檢查：確保進程正常啟動，無致命錯誤
-  - [ ] 狀態監聽驗證：驗證能正常查詢合約狀態，日志輸出正確
-  - [ ] 端到端測試：完整抽獎流程自動化測試（join → 滿員 → 自動 drawWinner）
-  - [ ] 長期運行測試：24小時穩定性測試，內存泄漏檢查
+- [ ] 生產部署準備
+  - [ ] 實現 graceful shutdown 機制
+  - [ ] 添加性能監控和日誌輸出
+  - [ ] 配置資源限制和安全設置
+  - [ ] 準備 Kubernetes 部署文件 (如果需要)
 
-#### 文檔
-- [ ] 確認 todos 是否有符合實作的過程
-- [ ] 更新 `docs/BackendREADME.md`
+#### 文檔和維護
+- [ ] 技術文檔
+  - [ ] 更新 `docs/BackendREADME.md` 詳細說明
+  - [ ] 添加架構圖和流程圖
+  - [ ] 創建故障排除指南
+  - [ ] 編寫 API 和配置參考文檔
+
+- [ ] 運維文檔
+  - [ ] 部署和配置指南
+  - [ ] 監控和告警設置說明
+  - [ ] 常見問題和解決方案
+  - [ ] 安全性檢查清單
 
 ---
 ### 前端 dApp（React + TonConnect）
