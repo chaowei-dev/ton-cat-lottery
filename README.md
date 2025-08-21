@@ -483,12 +483,10 @@ ton-cat-lottery/
 | ---- | ----------------------- | -------------------------- | ---------- |
 |  1   | 基礎容器化              | Docker + Docker Compose    | 建立容器化設定檔 |
 |  2   | GCP 帳號設定           | GCP Console + 手動設定      | 完成無法自動化的帳號層級設定 |
-|  3   | 基礎設施、微服務部署與 HTTPS 配置 | Terraform + GKE + cert-manager + Cloudflare DNS + HTTPS | 完成基礎設施，包含 GCP + GKE + SSL |
-|  4   | K8s 應用部署準備        | K8s + Artifact Registry | 手動驗證完整部署流程 |
-|  5   | 自動化部署              | GitHub Actions + GCP + OIDC | 自動化驗證和部署到 GCP |
-|  6   | 監控觀測體系            | Grafana + Prometheus + Alertmanager | 建立完整監控觀測體系 |
-
-架構:
+|  3   | 基礎設施自動化部署       | Terraform + GKE + cert-manager + Cloudflare DNS + HTTPS | 完成基礎設施，包含 GCP + GKE + SSL |
+|  4   | K8s 應用部署準備        | K8s + Artifact Registry + Ingress | 手動驗證完整部署流程 |
+|  5   | 自動化 CI/CD 流水線      | GitHub Actions + GCP + OIDC + 多環境管理 | 自動化驗證和部署到 GCP |
+|  6   | 監控觀測體系            | GCP Monitoring + 健康檢查 + 成本監控 | 建立完整監控觀測體系 |
 
 
 ---
