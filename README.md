@@ -488,33 +488,27 @@ ton-cat-lottery/
 |  5   | 自動化部署              | GitHub Actions + GCP + OIDC | 自動化驗證和部署到 GCP |
 |  6   | 監控觀測體系            | Grafana + Prometheus + Alertmanager | 建立完整監控觀測體系 |
 
+架構:
+
+
 ---
 #### 階段 1：基礎容器化
 
-**技術棧：Docker + Docker Compose**
+> 技術：Docker + Docker Compose
+
 **目標：建立容器化設定檔**
 
-- [x] **1. 撰寫 Dockerfile：**
-  - [x] 撰寫 `Dockerfile.backend`
+- [ ] **1. 撰寫 Dockerfile：**
+  - [ ] 撰寫 `Dockerfile.backend` (尚未開發完成，先暫停)
     - 後端為守護進程，故不需有對外的 API
   - [x] 撰寫 `Dockerfile.frontend`
     - 前端利用 `TON Connect SDKs` 取得各個合約的 response
   - [ ] 撰寫 `docker-compose.yml` 整合後端 / 前端
   - [ ] 撰寫 `.env` 檔案與 secret 管理
-  - [ ] 建立環境特定配置檔案
-    - [ ] `docker-compose.staging.yml` (較少資源限制，debug模式，開啟詳細日誌)
-    - [ ] `docker-compose.production.yml` (嚴格資源限制，優化模式，安全配置)
-    - [ ] `.env.staging` 環境變數檔案 (testnet 合約地址，debug參數)
-    - [ ] `.env.production` 環境變數檔案 (testnet 合約地址，生產參數)
-    - [ ] 配置檔案模板化：提取共同配置，避免重複
 
 - [ ] **2. 測試 Dockerfile**
   - [ ] 本地 Docker 環境驗證與測試
-  - [ ] 測試環境特定配置
-    - [ ] 驗證 staging 環境: `docker-compose -f docker-compose.yml -f docker-compose.staging.yml --env-file .env.staging up`
-    - [ ] 驗證 production 環境: `docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production up`
-    - [ ] 環境切換測試：確保不同環境可並行運行且互不干擾
-    - [ ] 資源配置驗證：staging 使用較少資源，production 使用完整資源配置
+  - [ ] 驗證部署：`docker-compose up --build`
 
 - [ ] **3. 映像優化與安全配置：**
   - [ ] 多階段建構優化：減少最終映像大小
@@ -574,11 +568,11 @@ ton-cat-lottery/
 
 >技術：Terraform + GKE + cert-manager + Cloudflare DNS + HTTPS
 
-**目標：完成基礎設施，包含 GCP + GKE(部署客戶界面前端和守護進程後端) + SSL(cloudflare + cert-manager)**
+**目標：使用 Terraform 建立 GKE 集群和基礎設施，並配置 cert-manager 自動管理 SSL 證書，實現單集群雙環境部署**
 
-前端架構：
+**架構設計（單 IP + 反向代理）**：
 ```
-Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (ClusterIP)
+Internet → Cloudflare DNS → 單一靜態 IP → GKE Ingress Controller → 不同 namespace Services
 ```
 
 
@@ -642,12 +636,12 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 - [ ] **2. 創建主要配置檔案：**
   - [ ] `main.tf` - 主要資源定義（GCP 基礎設施）
-    - [ ] 資源命名策略與成本優化
-      - [ ] GKE集群: 採用單集群 + Namespace隔離（雙集群成本為兩倍）
+    - [ ] 資源命名策略
+      - [ ] GKE集群: 採用單集群 + Namespace隔離
       - [ ] 集群名稱: `ton-cat-lottery-cluster`（環境通過namespace區分）
       - [ ] 其他資源環境變數化: `${var.project_id}-${var.environment}`
-      - [ ] **資源標籤策略**：統一標籤 (environment, project, cost-center) 便於成本追蹤
-      - [ ] **Autopilot 配置**：確保使用 GKE Autopilot 降低管理成本
+      - [ ] 資源標籤策略：統一標籤便於管理
+      - [ ] 使用 GKE Autopilot 降低管理成本
   - [ ] `variables.tf` - 變數定義
   - [ ] `outputs.tf` - 輸出值（叢集端點、IP 等）
   - [ ] `versions.tf` - Provider 版本鎖定
@@ -657,62 +651,62 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
     - 新增 Kubernetes Provider 配置（依賴 GKE 叢集）
   - [ ] `variables.tf` - 變數定義補齊
     - 基礎 GCP 變數
-    - 新增域名相關變數 (domain_name, cloudflare_email, cloudflare_api_token, letsencrypt_email)
+    - 新增域名和 SSL 相關變數 (domain_name, cloudflare_email, cloudflare_api_token, letsencrypt_email)
     - [ ] 環境變數擴充
       - [ ] `environment` 變數 (staging/production)
       - [ ] 環境特定域名變數 (staging_domain, production_domain)
       - [ ] **變數驗證**：加入 variable validation 確保環境值正確
       - [ ] **敏感變數標記**：API tokens 等敏感變數設為 sensitive = true
-  - [ ] `cert-manager.tf` - cert-manager Helm chart 和 Let's Encrypt ClusterIssuer
-  - [ ] `dns.tf` - Cloudflare DNS A 記錄自動配置
-    - [ ] 擴展DNS配置支援雙域名
-      - [ ] 主域名: `cat-lottery.chaowei-liu.com` (production)
-      - [ ] 子域名: `staging.cat-lottery.chaowei-liu.com` (staging)
-      - [ ] 兩套靜態IP分配對應不同環境
+  - [ ] `cert-manager.tf` - cert-manager Helm chart 和 Let's Encrypt ClusterIssuer (Cloudflare DNS-01)
+  - [ ] `dns.tf` - Cloudflare DNS 配置（雙域名指向單一靜態IP）
+      - [ ] 兩域名指向同一 GCP 靜態 IP：
+        - `cat-lottery.chaowei-liu.com` (prod)
+        - `dev.cat-lottery.chaowei-liu.com` (dev)
   - [ ] `terraform.tfvars` - 實際變數值
     - `cp terraform.tfvars.example terraform.tfvars`
-    - [ ] 建立環境特定變數檔案
-      - [ ] `terraform.tfvars.staging` (測試環境配置)
-      - [ ] `terraform.tfvars.production` (正式環境配置)
-      - [ ] 環境部署: `terraform apply -var-file="terraform.tfvars.staging"`
+    - [ ] 單一配置檔案支援多域名
+      - [ ] 主域名和子域名變數定義
+      - [ ] 單次部署: `terraform apply`
   - [ ] `backend.tf` – Remote State 設定（GCS）
   - [ ] GCS Bucket 建立與版本管理
     - `gsutil mb -p $PROJECT_ID -c standard -l asia-east1 gs://tfstate-ton-cat-lottery`
     - `gsutil versioning set on gs://tfstate-ton-cat-lottery`
     - [ ] **生命週期管理**：設定舊版本自動清理（保留30個版本）
     - [ ] **存取控制**：限制只有 Terraform SA 可存取
-  - [ ] 環境分離的State管理策略 ⭐ **高優先級**
-    - [ ] staging state: `gs://tfstate-ton-cat-lottery/staging/terraform.tfstate`
-    - [ ] production state: `gs://tfstate-ton-cat-lottery/production/terraform.tfstate`  
-    - [ ] 部署時指定state路徑: `terraform init -backend-config="prefix=staging"`
+  - [ ] 統一 State 管理策略
+    - [ ] 單一 state: `gs://tfstate-ton-cat-lottery/terraform.tfstate`
+    - [ ] 簡化部署: `terraform init`
     - [ ] **State 鎖定機制**：啟用 state locking 防止並發修改
   - [ ] Terraform 服務帳戶授權 ⭐ **高優先級**
     - 角色：`roles/storage.objectAdmin` ＋ `roles/storage.objectViewer`
     - [ ] **最小權限驗證**：確認SA只有必要的GCS和GCP資源權限
 
-- [ ] **3. 測試基礎 Terraform 流程（分階段部署）：**
+- [ ] **3. 測試基礎 Terraform 流程（分階段部署 - 避免依賴衝突）：**
   - [ ] **3-1. 基礎設施**：
-    - [ ] 環境部署順序: 先staging後production (降低風險)
-    - [ ] staging環境初始化: `terraform init -backend-config="prefix=staging"`
-    - [ ] staging部署: `terraform apply -var-file="terraform.tfvars.staging"`
-    - [ ] **驗證staging**: 確保 GKE 叢集正常運作：`kubectl get nodes`
-    - [ ] production環境初始化: `terraform init -backend-config="prefix=production"`  
-    - [ ] production部署: `terraform apply -var-file="terraform.tfvars.production"`
-    - [ ] **state隔離測試**: 兩環境可並行操作且互不影響
-    - [ ] **災難恢復驗證**: 測試從備份恢復 state 和資源
-    - [ ] **回滾機制測試**: 確保可以安全回退到前一個穩定狀態
+    - [ ] 初始化: `terraform init`
+    - [ ] **第一階段 - 核心基礎設施**: `terraform apply -target=google_project_service -target=google_container_cluster.main -target=google_compute_address.main -target=google_compute_network -target=google_compute_subnetwork`
+    - [ ] **驗證 GKE 就緒**: `kubectl get nodes` (確保叢集可連接)
+    - [ ] **等待 Load Balancer IP 分配**: 檢查靜態 IP 已綁定到 Load Balancer
+    
+  - [ ] **3-2. K8s 依賴資源**：
+    - [ ] **第二階段 - cert-manager**: `terraform apply -target=helm_release.cert_manager`
+    - [ ] **等待 cert-manager 就緒**: `kubectl get pods -n cert-manager` (所有 Pod Running)
+    - [ ] **第三階段 - ClusterIssuer**: `terraform apply -target=kubernetes_manifest.letsencrypt_issuer`
+    - [ ] **驗證 ClusterIssuer**: `kubectl get clusterissuer` (狀態 Ready)
 
-  - [ ] **3-2. SSL 和 DNS**：
-    - `terraform plan -target=helm_release.cert_manager` - 檢查 cert-manager 部署
-    - `terraform apply -target=helm_release.cert_manager` - 部署 cert-manager
-    - `terraform plan -target=kubernetes_manifest.letsencrypt_issuer` - 檢查 ClusterIssuer
-    - `terraform apply -target=kubernetes_manifest.letsencrypt_issuer` - 部署 ClusterIssuer
-    - `terraform plan -target=cloudflare_record.app_dns` - 檢查 DNS 記錄
-    - `terraform apply -target=cloudflare_record.app_dns` - 建立 DNS A 記錄
-  - [ ] **3-3. 完整驗證**：  
-    - `terraform plan` - 檢查完整部署計畫
-    - `terraform apply` - 執行完整部署
-    - **驗證**：確保所有資源正常運作且 HTTPS 可訪問
+  - [ ] **3-3. DNS 配置**：
+    - [ ] **第四階段 - DNS 記錄**: `terraform apply -target=cloudflare_record.prod_dns -target=cloudflare_record.dev_dns`
+    - [ ] **等待 DNS 傳播**: 5-30 分鐘，使用 `nslookup` 驗證兩域名解析到正確 IP
+    - [ ] **驗證 DNS 解析**:
+      ```bash
+      nslookup cat-lottery.chaowei-liu.com    # 應解析到靜態 IP
+      nslookup dev.cat-lottery.chaowei-liu.com # 應解析到相同 IP
+      ```
+
+  - [ ] **3-4. 完整驗證**：  
+    - [ ] **最終完整部署**: `terraform apply` (確保所有資源同步)
+    - [ ] **基礎設施驗證**：GKE 叢集、靜態 IP、DNS 記錄、cert-manager 全部就緒
+    - [ ] **為階段 4 做準備**：確保 K8s API 可訪問，DNS 已傳播
 
 
 - [ ] **4. 內容整理：**
@@ -722,6 +716,10 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
 
 ---
 #### 階段 4：K8s 應用部署準備（手動驗證一次）
+
+>技術：Kubernetes + Docker + Namespace Isolation + GKE Ingress + cert-manager
+
+**目標：在 GKE 集群上部署應用，使用 namespace 隔離實現開發和生產環境，配置統一 Ingress 處理 SSL 和域名路由**
 
 - [ ] **1. 準備階段：**
   - [ ] 確認 Terraform 基礎設施已部署完成
@@ -734,33 +732,47 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - 建構 backend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.backend -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest --push .`
   - 建構 frontend Docker Image (x86_64)：`docker buildx build --platform linux/amd64 -f docker/Dockerfile.frontend --target production -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:$(git rev-parse --short HEAD) -t asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/frontend:latest --push .`
   - **驗證映像**：確認映像架構正確：`docker manifest inspect asia-east1-docker.pkg.dev/PROJECT_ID/ton-cat-lottery/backend:latest`
-  - [ ] 建立環境特定映像標籤
-    - [ ] staging標籤: `backend:staging-{commit}`, `frontend:staging-{commit}`
-    - [ ] production標籤: `backend:production-{commit}`, `frontend:production-{commit}`
-    - [ ] 分支驅動策略: dev分支→staging, main分支→production
-    - [ ] **映像安全掃描**: 每次建構後自動掃描漏洞
-    - [ ] **映像簽名驗證**: 使用 Cosign 對映像進行數位簽名
-    - [ ] **建構快取優化**: 利用多階段建構和層級快取減少建構時間
+  - [ ] 統一映像標籤策略（通過 namespace 區分環境）
+    - [ ] 使用統一標籤: `backend:{commit}`, `frontend:{commit}`, `latest`
+    - [ ] 環境隔離通過 K8s namespace 實現，而非映像標籤
+    - [ ] 映像安全掃描: 每次建構後自動掃描漏洞
+    - [ ] 利用多階段建構和層級快取減少建構時間
 
-- [ ] **3. 構建 K8s 部署檔案：**
-  - 組織 `k8s/` 目錄結構（backend/, frontend/, config/）
-  - 創建 ConfigMap 管理環境變數（backend-config.yaml, frontend-config.yaml）
-  - 創建 Secret 管理敏感資訊（backend-secrets.yaml）
-  - 優化 backend Deployment YAML（資源限制、健康檢查、標籤策略）
-  - 優化 frontend Deployment YAML（資源限制、健康檢查、標籤策略）
-  - 重寫 backend Service YAML（ClusterIP，因為不需要外部訪問）
-  - 重寫 frontend Service YAML（ClusterIP）
-  - 創建 `k8s/ingress/` 目錄
-  - 創建 Ingress YAML（支援 HTTPS、域名、TLS 配置）
-  - 添加 NetworkPolicy YAML（網路安全隔離）
-  - [ ] 擴展K8s配置支援多環境
-    - [ ] 重組目錄: `k8s/staging/`, `k8s/production/`
-    - [ ] **namespace管理**: 每個環境目錄包含namespace.yaml定義
-    - [ ] 環境特定ConfigMap (不同合約地址、配置參數)
-    - [ ] 差異化資源配置 (staging較小limits, production適當requests)
-    - [ ] Ingress多域名路由 (staging.xxx.com → staging namespace)
-    - [ ] **資源配額管理**: 每個namespace設置ResourceQuota防止資源濫用
-    - [ ] **網路策略隔離**: 確保不同環境間網路完全隔離
+- [ ] **3. 構建 K8s 部署檔案（基於 namespace 隔離）：**
+  - 組織 `k8s/` 目錄結構：`namespaces/`, `dev/`, `prod/`, `ingress/`
+  - [ ] **namespace 配置**:
+    - [ ] `k8s/namespaces/dev.yaml` - 開發環境命名空間
+    - [ ] `k8s/namespaces/prod.yaml` - 生產環境命名空間
+  - [ ] **環境特定配置**:
+    - [ ] `k8s/dev/` - 開發環境專用配置（較小資源限制）
+    - [ ] `k8s/prod/` - 生產環境專用配置（適當資源請求）
+    - [ ] 創建 ConfigMap 管理環境變數（不同合約地址、配置參數）
+    - [ ] 創建 Secret 管理敏感資訊
+  - [ ] **共享資源配置（Ingress + Let's Encrypt 實現）**:
+    - [ ] 創建 `k8s/ingress/ingress.yaml`（支援 cert-manager 自動 SSL）
+      - [ ] **Ingress Controller 配置**: 使用 GKE 預設或 nginx-ingress
+        ```yaml
+        annotations:
+          kubernetes.io/ingress.class: "gce"  # 或 "nginx"
+          kubernetes.io/ingress.global-static-ip-name: "ton-cat-lottery-ip"
+          cert-manager.io/cluster-issuer: "letsencrypt-prod"
+          acme.cert-manager.io/http01-edit-in-place: "true"
+        ```
+      - [ ] **Let's Encrypt Certificate 配置**: cert-manager 自動管理 SSL 證書
+        ```yaml
+        tls:
+        - hosts:
+          - cat-lottery.chaowei-liu.com
+          - dev.cat-lottery.chaowei-liu.com
+          secretName: app-tls-secret
+        ```
+      - [ ] **Cloudflare DNS-01 Challenge**: 配置 cert-manager 使用 Cloudflare API 進行域名驗證
+      - [ ] **Host header 路由規則**: `cat-lottery.domain.com` → prod namespace, `dev.cat-lottery.domain.com` → dev namespace
+      - [ ] **整合 Terraform 靜態 IP**: 確保 Ingress 使用 Terraform 創建的靜態 IP 地址
+    - [ ] 添加 NetworkPolicy YAML（確保不同 namespace 間網路隔離）
+  - [ ] **資源管理**:
+    - [ ] **資源配額管理**: 每個 namespace 設置 ResourceQuota
+    - [ ] 差異化資源配置（dev 較小 limits，prod 適當 requests）
 
 - [ ] **4. 安全性和生產準備（生產部署前必須完成）：**
   - [ ] 移除硬編碼的測試值，使用 Secret 和 ConfigMap
@@ -769,47 +781,70 @@ Internet → Cloudflare DNS → Static IP → Ingress Controller → Services (C
   - [ ] 配置 Horizontal Pod Autoscaler (HPA)
   - [ ] 設定適當的 labels 和 annotations
   - [ ] **進階安全配置**：
-    - [ ] Pod Security Standards (PSS) 實施：restricted 模式
-    - [ ] Service Account 最小權限：為每個服務創建專用SA
-    - [ ] Secret 加密：啟用 etcd 加密和外部 Secret 管理
-    - [ ] 映像掃描：集成容器映像安全掃描
+    - [ ] Pod Security Standards (PSS) 實施
+    - [ ] Service Account 最小權限配置
+    - [ ] Secret 加密和外部管理
+    - [ ] 映像掃描集成
   - [ ] **生產就緒配置**：
-    - [ ] 健康檢查端點：liveness/readiness/startup probes
-    - [ ] 優雅關機：正確的 terminationGracePeriodSeconds
-    - [ ] 資源監控：requests/limits 基於實際使用量調整
+    - [ ] 健康檢查端點配置
+    - [ ] 優雅關機設置
+    - [ ] 資源監控和調整
 
-- [ ] **5. 手動測試一次完整部署流程（待 SSL 和 DNS 配置完成後）：**
+- [ ] **5. 手動測試完整部署流程（基於 namespace 隔離）：**
   - 取得 GKE 叢集憑證：`gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1`
-  - 創建命名空間：`kubectl create namespace ton-cat-lottery`
-  - 部署 ConfigMaps 和 Secrets：`kubectl apply -f k8s/config/`
-  - 手動部署 backend：`kubectl apply -f k8s/backend/`
-  - 手動部署 frontend：`kubectl apply -f k8s/frontend/`
-  - 部署 Ingress：`kubectl apply -f k8s/ingress/`（等待 Ingress YAML 創建完成）
-  - [ ] 擴展部署流程支援多環境
-    - [ ] **namespace自動創建**: `kubectl apply -f k8s/staging/namespace.yaml` (內含namespace定義)
-    - [ ] staging完整部署: `kubectl apply -f k8s/staging/` (包含namespace、config、apps)
-    - [ ] production完整部署: `kubectl apply -f k8s/production/` (包含namespace、config、apps)
-    - [ ] **部署順序**: namespace → configmap/secret → deployment → service → ingress
-    - [ ] **部署驗證腳本**: 自動化檢查部署是否成功的腳本
-    - [ ] **藍綠部署策略**: production 環境使用藍綠部署降低風險
-    - [ ] **回滾機制**: 快速回滾到前一個穩定版本的能力
+  - [ ] **namespace 部署**:
+    - [ ] 創建 namespaces：`kubectl apply -f k8s/namespaces/`
+  - [ ] **環境特定部署**:
+    - [ ] dev 環境部署: `kubectl apply -f k8s/dev/`
+    - [ ] prod 環境部署: `kubectl apply -f k8s/prod/`
+  - [ ] **共享資源部署（含 DNS 驗證等待）**:
+    - [ ] **前置條件檢查**: 確認 DNS 已從階段 3 傳播完成
+      ```bash
+      # 驗證 DNS 解析 - 必須成功後再繼續
+      nslookup cat-lottery.chaowei-liu.com
+      nslookup dev.cat-lottery.chaowei-liu.com
+      ```
+    - [ ] **配置 Cloudflare API Secret**: 創建包含 Cloudflare API Token 的 K8s Secret
+      ```bash
+      kubectl create secret generic cloudflare-api-token-secret \
+        --from-literal=api-token=YOUR_CLOUDFLARE_API_TOKEN \
+        -n cert-manager
+      ```
+    - [ ] **部署 Ingress**: `kubectl apply -f k8s/ingress/ingress.yaml`
+    - [ ] **等待 Let's Encrypt 證書獲取**: `kubectl get certificate app-tls-secret` (狀態變為 Ready)
+  - [ ] **部署驗證與等待機制**:
+    - [ ] **部署順序**: namespace → configmap/secret → deployment → service → ingress → certificate
+    - [ ] 等待機制: Let's Encrypt 證書獲取，通常需要 2-5 分鐘
+    - [ ] **驗證腳本**: 
+      ```bash
+      # 等待所有組件就緒
+      kubectl wait deployment/frontend --for=condition=Available --timeout=300s -n ton-cat-lottery-dev
+      kubectl wait deployment/frontend --for=condition=Available --timeout=300s -n ton-cat-lottery-prod
+      kubectl wait certificate/app-tls-secret --for=condition=Ready --timeout=600s
+      ```
+    - [ ] 回滾機制: 快速回滾到穩定版本
 
-- [ ] **6. 驗證應用（待完整部署後進行）：**
-  - 檢查所有 Pod 狀態為 Running：`kubectl get pods -n ton-cat-lottery`
-  - 檢查 Service 正常工作：`kubectl get svc -n ton-cat-lottery`
-  - 檢查 Ingress 取得外部 IP：`kubectl get ingress -n ton-cat-lottery`
-  - 測試內部服務連通性：`kubectl exec -it POD_NAME -- curl backend-service`
-  - 驗證應用可以透過 Ingress IP 訪問
-  - 驗證 DNS 解析：`nslookup your-domain.com`
-  - 測試 HTTPS 證書自動配置：`kubectl get certificate -n ton-cat-lottery`
-  - 測試完整 HTTPS 訪問：`curl -I https://your-domain.com`
-  - 檢查日誌和監控指標
-  - 測試 Pod 自動重啟和擴縮容
-  - 驗證網路策略生效（如有配置）
-  - [ ] 擴展驗證流程支援多環境
-    - [ ] staging環境檢查: `kubectl get pods -n ton-cat-lottery-staging`
-    - [ ] production環境檢查: `kubectl get pods -n ton-cat-lottery-production`
-    - [ ] 域名路由驗證: staging和production域名分別可正常訪問
+- [ ] **6. 驗證應用（基於 namespace 隔離）：**
+  - [ ] **dev 環境驗證**:
+    - [ ] 檢查 Pod 狀態：`kubectl get pods -n ton-cat-lottery-dev`
+    - [ ] 檢查 Service：`kubectl get svc -n ton-cat-lottery-dev`
+    - [ ] 測試 dev 域名：`curl -I https://dev.cat-lottery.yourdomain.com`
+  - [ ] **prod 環境驗證**:
+    - [ ] 檢查 Pod 狀態：`kubectl get pods -n ton-cat-lottery-prod`
+    - [ ] 檢查 Service：`kubectl get svc -n ton-cat-lottery-prod`
+    - [ ] 測試 prod 域名：`curl -I https://cat-lottery.yourdomain.com`
+  - [ ] **共享資源驗證（Ingress + Let's Encrypt Certificate）**:
+    - [ ] 檢查 Ingress 狀態：`kubectl get ingress` (確認 ADDRESS 欄位顯示靜態 IP)
+    - [ ] 檢查 Certificate 狀態：`kubectl get certificate app-tls-secret` (狀態應為 Ready)
+    - [ ] 檢查 cert-manager 日誌：`kubectl logs -n cert-manager deployment/cert-manager` (確認無錯誤)
+    - [ ] 驗證 SSL 證書有效性 (使用`openssl s_client -connect`)
+    - [ ] 驗證 DNS 解析一致性：兩域名應解析到相同 IP
+  - [ ] **網路隔離驗證**:
+    - [ ] 測試跨 namespace 連通性（應該被阻止）
+    - [ ] 驗證 NetworkPolicy 生效
+  - [ ] **基本功能驗證**:
+    - [ ] 檢查日誌和監控指標
+    - [ ] 測試 Pod 自動重啟和擴縮容
 
 - [ ] **7. 效能和監控驗證：**
   - 配置 Google Cloud Monitoring 集成
