@@ -716,7 +716,7 @@ Internet → Cloudflare DNS → 單一靜態IP → GKE Ingress (智能路由)
     - [ ] **RBAC準備**: 基本權限配置
 
 
-- [ ] **4. 災難恢復和文檔整理：**
+- [ ] **4. 災難恢復：**
 
   - [ ] **災難恢復策略** ⭐ **新增重要項目**:
     - [ ] **跨區域備份**: 設置 GCS bucket 跨區域複寫
@@ -730,12 +730,11 @@ Internet → Cloudflare DNS → 單一靜態IP → GKE Ingress (智能路由)
     - [ ] **資源標籤**: 確保所有資源有成本追蹤標籤
     - [ ] **預算告警**: 設置月度預算告警($50閾值)
 
-  - [ ] **文檔和工具整理**:
-    - [ ] 更新 `.gitignore` - terraform計劃檔案和敏感內容
-    - [ ] **模塊化文檔**: `terraform/README.md` 說明模組架構
-    - [ ] **快速參考**: 常用terraform指令備忘錄
-    - [ ] **故障排除**: 常見DNS/SSL/GKE問題解決方案
-    - [ ] 整理到 `docs/DevOpsREADME.md` 包含完整部署流程
+
+- [ ] **5. 內容整理：**
+  - [ ] 重新驗證這個階段的 todos
+  - [ ] 更新主目錄`.gitignore` - terraform 計劃檔案和敏感內容
+  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除(DNS/SSL/GKE)
 
 ---
 #### 階段 4：單一 Ingress 多環境部署架構
@@ -1001,7 +1000,7 @@ Pull Request → 創建 PR-specific Staging 環境 → 測試 → 自動清理
     - [ ] **Slack 整合**: (選用) 重要事件通知到 Slack 頻道
     - [ ] **狀態頁面**: (選用) 簡單的服務狀態頁面
 
-- [ ] **7. 測試、監控和文檔：**
+- [ ] **7. 測試、監控：**
 
   - [ ] **Pipeline 測試策略**:
     - [ ] **測試環境**: 使用 staging 環境進行 end-to-end 測試
@@ -1013,16 +1012,14 @@ Pull Request → 創建 PR-specific Staging 環境 → 測試 → 自動清理
     - [ ] **Pipeline 時間**: 設定 timeout 和效能指標 (CI<10min, Deploy<15min)
     - [ ] **資源使用**: Staging 環境資源監控和使用率分析
 
-  - [ ] **文檔和維護**:
-    - [ ] **Workflow 文檔**: `.github/README.md` 說明所有 workflows 用途
+- [ ] **8. 內容整理：**
+  - [ ] 重新驗證這個階段的 todos
+  - [ ] 更新主目錄`.gitignore` for CI/CD
+  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+    - [ ] **Workflow 文檔**: 說明所有 workflows 用途
     - [ ] **操作手冊**: 常用 CI/CD 操作 (deploy, rollback, cleanup)
     - [ ] **故障排除指南**: 常見 CI/CD 問題和解決方案
     - [ ] **安全稽核**: OIDC 設定和權限審查清單
-
-  - [ ] **整理到 DevOps 文檔**:
-    - [ ] 更新 `docs/DevOpsREADME.md` 為新 CI/CD 架構
-    - [ ] 包含完整的部署流程和維護指南
-    - [ ] CI/CD 效益分析: PR-based 環境 + 智能清理 + 成本優化
 
 ##### 階段 6：Monitoring
 
