@@ -107,6 +107,19 @@ go.work
 # Go workspace file and vendor directory
 # vendor/
 
+# Go binary files
+backend/backend
+backend/cmd/backend/backend
+
+# Go test coverage files
+*.cover
+coverage.out
+c.out
+
+# Go module cache (local development)
+# go.sum is usually committed
+go.work.sum
+
 # Claude code
 CLAUDE.md
 *.drawio.bkp
