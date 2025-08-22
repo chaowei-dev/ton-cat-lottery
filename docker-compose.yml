@@ -1,14 +1,33 @@
 # 🐳 TON Cat Lottery Docker Compose
 # 統一管理後端服務和前端應用
+
 services:
   # ================================
   # 後端服務（後端是守護進程，不提供 HTTP API）
+  # 暫時註解，等後端開發完成後再啟用
   # ================================
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    container_name: ton-cat-lottery-backend
+  # backend:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.backend
+  #   container_name: ton-cat-lottery-backend
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - NODE_ENV=production
+  #   restart: unless-stopped
+  #   # 後端會在完成後添加以下配置：
+  #   # volumes:
+  #   #   - ./logs:/app/logs
+  #   # healthcheck:
+  #   #   test: ["CMD", "ps", "aux", "|", "grep", "[b]ackend"]
+  #   #   interval: 30s
+  #   #   timeout: 10s
+  #   #   retries: 3
+  #   #   start_period: 10s
+  #   profiles:
+  #     - production
+  #     - development
 
   # ================================
   # 前端服務（前端直接用 TON SDK 與區塊鏈互動，不會經過後端）
@@ -17,16 +36,25 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.frontend
+      target: production
     container_name: ton-cat-lottery-frontend
     ports:
-      - '${FRONTEND_PORT:-3000}:80'  # 根據環境變數決定 port
+      - '${FRONTEND_PORT:-3000}:80'
     environment:
       - NODE_ENV=production
+      - VITE_LOTTERY_CONTRACT_ADDRESS=${LOTTERY_CONTRACT_ADDRESS}
+      - VITE_NFT_CONTRACT_ADDRESS=${NFT_CONTRACT_ADDRESS}
     restart: unless-stopped
+    volumes:
+      - nginx_cache:/var/cache/nginx
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:80/health']
+      test: ['CMD', 'curl', '-f', 'http://localhost:80/']
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+
+volumes:
+  nginx_cache:
+    driver: local
 

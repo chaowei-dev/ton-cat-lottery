@@ -94,6 +94,15 @@ Thumbs.db
 # Vite cache directory
 .vite/
 
+# Docker related files
+.docker/
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+*.pid
+containers/
+volumes/
+
 # Go specific files
 *.exe
 *.exe~

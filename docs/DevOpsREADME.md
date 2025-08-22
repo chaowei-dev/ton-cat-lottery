@@ -10,33 +10,31 @@
 ---
 ## Docker
 ### 架構
-- **backend**: Go 語言後端服務 (抽獎邏輯)
+- **backend**: Go 語言後端服務 (抽獎邏輯守護進程)
 - **frontend**: React + Vite 前端應用
-- **frontend-dev**: 前端開發服務 (可選)
-- **monitor**: Prometheus 監控服務 (可選)
 
 ### 簡介
-TON Cat Lottery 使用 Docker 容器化部署，提供一致的開發和生產環境。專案採用多服務架構，使用 Docker Compose 統一管理所有服務的啟動、網路和環境配置。
+TON Cat Lottery 使用 Docker 容器化部署，提供一致的生產環境。前端和後端服務獨立運行，通過區塊鏈進行交互，不需要內部網路通信。
 
 **主要特色：**
-- 多環境支援：生產、開發、監控環境
-- 熱重載：前端開發模式支援即時編輯
-- 網路隔離：所有服務運行在獨立的 Docker 網路中
+- 獨立服務部署：前端和後端各自獨立運行
 - 健康檢查：自動監控服務狀態
 - 環境變數管理：安全的配置管理
+- 多階段建構：優化映像大小和安全性
 
 ### 檔案結構
 ```
 ton-cat-lottery/
 ├── docker/
-│   ├── Dockerfile.backend      # Go 後端服務容器配置
-│   └── Dockerfile.frontend     # React 前端應用容器配置
-├── docker-compose.yml          # 服務編排配置
+│   ├── Dockerfile.backend     # Go 後端服務容器配置
+│   ├── Dockerfile.frontend    # React 前端應用容器配置
+│   └── nginx/
+│       └── default.conf       # Nginx 配置檔案
+├── docker-compose.yml         # 服務編排配置
 ├── .env.example               # 環境變數範例
-└── .env                       # 實際環境變數 (需自行建立)
+├── .env                       # 實際環境變數
+└── .dockerignore              # Docker 建構忽略規則
 ```
-
-
 
 ### 快速啟動
 **環境設定**
@@ -57,41 +55,74 @@ vim .env  # 或使用其他編輯器
 
 **指令**
 ```bash
-# 生產環境
-# 啟動後端和前端服務
+# 驗證配置語法
+docker-compose config
+
+# 啟動所有服務
 docker-compose up --build -d
-
-# 開發環境
-# 啟動開發服務 (前端熱重載)
-docker-compose --profile development up --build -d
-
-# 包含監控
-# 啟動所有服務包括 Prometheus 監控
-docker-compose --profile monitoring up --build -d
 ```
 
 **服務訪問**
 - **前端應用**: http://localhost:3000
-- **前端開發**: http://localhost:5173 (開發模式)
-- **後端服務**: http://localhost:8080
+- **後端服務**: 守護進程，無 HTTP 接口
+
+**完整測試流程**
+```bash
+# 1. 驗證配置
+docker-compose config
+
+# 2. 啟動服務
+docker-compose up --build -d
+
+# 3. 檢查服務狀態
+docker-compose ps
+
+# 4. 驗證服務健康
+curl -I http://localhost:3000
+docker inspect ton-cat-lottery-frontend --format='{{.State.Health.Status}}'
+docker inspect ton-cat-lottery-backend --format='{{.State.Status}}'
+
+# 5. 查看日誌 (可選)
+docker-compose logs frontend
+docker-compose logs backend
+
+# 6. 停止服務
+docker-compose down
+```
 
 ### 常用指令
+
+#### 測試與驗證
+```bash
+# 測試構建映像
+docker build -f docker/Dockerfile.frontend -t ton-cat-lottery-frontend:test .
+docker build -f docker/Dockerfile.backend -t ton-cat-lottery-backend:test .
+
+# 驗證配置語法
+docker-compose config
+
+# 檢查容器狀態
+docker inspect ton-cat-lottery-frontend --format='{{.State.Health.Status}}'
+docker inspect ton-cat-lottery-backend --format='{{.State.Status}}'
+```
+
+#### 服務管理
 ```bash
 # 查看服務狀態
 docker-compose ps
 
 # 查看服務日誌
 docker-compose logs -f
-docker-compose logs -f backend
 docker-compose logs -f frontend
+docker-compose logs -f backend
 
 # 進入容器
-docker-compose exec backend sh
 docker-compose exec frontend sh
+docker-compose exec backend sh
 
 # 重啟服務
-docker-compose restart backend
 docker-compose restart frontend
+docker-compose restart backend
 
 # 停止和清理
 docker-compose down
@@ -99,7 +130,7 @@ docker-compose down -v  # 刪除數據卷
 docker-compose down --rmi all  # 刪除鏡像
 
 # 重新構建
-docker-compose build --no-cache backend
+docker-compose build --no-cache
 docker-compose up --build -d
 ```
 
@@ -109,8 +140,6 @@ docker-compose up --build -d
 ```bash
 # 檢查埠是否被佔用
 lsof -i :3000
-lsof -i :8080
-lsof -i :5173
 
 # 終止佔用進程
 sudo kill -9 <PID>
@@ -122,8 +151,13 @@ docker stats
 #### 應用健康與可存取性檢查
 ```bash
 # 手動健康檢查
-curl -f http://localhost:3000/health
-curl -f http://localhost:5173/
+curl -f http://localhost:3000/
+
+# 檢查 HTTP 響應標頭
+curl -I http://localhost:3000
+
+# 驗證容器健康狀態
+docker inspect ton-cat-lottery-frontend --format='{{.State.Health.Status}}'
 ```
 
 #### 容器狀態與日誌排查
@@ -131,9 +165,17 @@ curl -f http://localhost:5173/
 # 檢查容器狀態
 docker-compose ps -a
 
+# 查看容器詳細狀態
+docker-compose ps frontend
+docker-compose ps backend
+
 # 查看容器啟動錯誤日誌
-docker-compose logs --tail=50 backend
 docker-compose logs --tail=50 frontend
+docker-compose logs --tail=50 backend
+
+# 檢查容器內部狀態
+docker inspect ton-cat-lottery-frontend
+docker inspect ton-cat-lottery-backend
 ```
 
 #### 環境變數與設定檢查
@@ -142,17 +184,25 @@ docker-compose logs --tail=50 frontend
 cat .env
 
 # 檢查容器內環境變數
+docker-compose exec frontend env | grep -E "(VITE_|NODE_ENV)"
 docker-compose exec backend env | grep -E "(TON|LOTTERY|NFT|WALLET)"
 
 # 驗證環境變數是否正確載入
 docker-compose config
 ```
 
-#### 容器間網路檢查
+#### 容器管理
 ```bash
-# 測試容器之間的連線
-docker-compose exec backend ping frontend
-docker-compose exec frontend ping backend
+# 重啟特定容器
+docker-compose restart frontend
+docker-compose restart backend
+
+# 查看容器狀態
+docker-compose ps frontend
+docker-compose ps backend
+
+# 檢查服務運行狀態
+docker stats ton-cat-lottery-frontend ton-cat-lottery-backend
 ```
 
 #### 清理與重建

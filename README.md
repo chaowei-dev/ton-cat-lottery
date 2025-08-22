@@ -501,23 +501,23 @@ ton-cat-lottery/
     - 後端為守護進程，故不需有對外的 API
   - [x] 撰寫 `Dockerfile.frontend`
     - 前端利用 `TON Connect SDKs` 取得各個合約的 response
-  - [ ] 撰寫 `docker-compose.yml` 整合後端 / 前端
-  - [ ] 撰寫 `.env` 檔案與 secret 管理
+  - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
+  - [x] 撰寫 `.env` 檔案與 secret 管理
 
-- [ ] **2. 測試 Dockerfile**
-  - [ ] 本地 Docker 環境驗證與測試
-  - [ ] 驗證部署：`docker-compose up --build`
+- [x] **2. 測試 Dockerfile**
+  - [x] 本地 Docker 環境驗證與測試
+  - [x] 驗證部署：`docker-compose up --build`
 
-- [ ] **3. 映像優化與安全配置：**
-  - [ ] 多階段建構優化：減少最終映像大小
-  - [ ] 非 root 用戶配置：增強容器安全性
-  - [ ] 健康檢查配置：實現容器自我監測
-  - [ ] .dockerignore 優化：排除不必要檔案，加速建構
+- [x] **3. 映像優化與安全配置：**
+  - [x] 多階段建構優化：減少最終映像大小
+  - [x] 非 root 用戶配置：增強容器安全性
+  - [x] 健康檢查配置：實現容器自我監測
+  - [x] .dockerignore 優化：排除不必要檔案，加速建構
 
-- [ ] **4. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for docker
-  - [ ] 整理內容到 `docs/DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+- [x] **4. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for docker
+  - [x] 整理內容到 `docs/DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 #### 階段 2：GCP 帳號設定
