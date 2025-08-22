@@ -232,7 +232,7 @@ TON Cat Lottery 使用 Google Cloud Platform (GCP) 作為雲端基礎設施平�
 ```bash
 # 1. 註冊 GCP 帳號並建立專案
 # - 前往 https://console.cloud.google.com/
-# - 建立新專案，例如：ton-cat-lottery-dev-2
+# - 建立新專案：ton-cat-lottery-dev-3
 # - 設定計費帳戶與預算告警 ($50/月開發限制)
 ```
 
@@ -270,25 +270,65 @@ gcloud config list
 
 #### 階段 4：Terraform 服務帳戶設定
 ```bash
-# 1. 建立服務帳戶 (透過 GCP Console)
-# - 前往 IAM & Admin > Service Accounts
-# - 建立服務帳戶：terraform-service-account
-# - 分配以下權限：
-#   * Project Editor
-#   * Kubernetes Engine Admin
-#   * Service Account Admin
+# 1. 建立 Terraform 服務帳戶
+gcloud iam service-accounts create terraform-service \
+  --display-name="Terraform Service Account" \
+  --description="Service account for Terraform infrastructure management"
 
-# 2. 下載服務帳戶金鑰
-# - 在服務帳戶詳情頁面建立新金鑰 (JSON 格式)
-# - 將金鑰檔案重新命名為 terraform-service-account-key.json
-# - 放置於專案根目錄
+# 2. 分配必要權限
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/editor"
 
-# 3. 啟用服務帳戶認證
-gcloud auth activate-service-account --key-file=terraform-service-account-key.json
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/container.admin"
 
-# 4. 驗證服務帳戶權限
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountAdmin"
+
+# 3. 建立和下載服務帳戶金鑰
+mkdir -p ~/.config/gcp-keys
+gcloud iam service-accounts keys create ~/.config/gcp-keys/terraform-service-account.json \
+  --iam-account=terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
+# 4. 設定安全的檔案權限
+chmod 600 ~/.config/gcp-keys/terraform-service-account.json
+
+# 5. 驗證服務帳戶認證
+gcloud auth activate-service-account --key-file ~/.config/gcp-keys/terraform-service-account.json
+gcloud projects list --filter="projectId:YOUR_PROJECT_ID"
+
+# 6. 切回個人帳戶 (日常開發使用)
+gcloud auth login --account=YOUR_EMAIL@gmail.com
+```
+
+#### 階段 5：安全性最佳實踐與預算管理
+```bash
+# 1. 服務帳戶金鑰安全存儲
+# - 金鑰檔案已設定 600 權限 (僅擁有者可讀寫)
+# - 存放在 ~/.config/gcp-keys/ (不納入版控)
+# - 建議每 90 天輪替一次
+
+# 2. 預算管理優化 (透過 GCP Console)
+# 前往 Billing → Budgets & Alerts 設定：
+# - 25% 閾值：通知告警
+# - 50% 閾值：電子郵件 + Slack 通知
+# - 75% 閾值：自動停止非關鍵服務
+# - 90% 閾值：全面停止服務
+
+# 3. API 服務啟用
+gcloud services enable \
+  cloudresourcemanager.googleapis.com \
+  container.googleapis.com \
+  compute.googleapis.com \
+  artifactregistry.googleapis.com \
+  iam.googleapis.com
+
+# 4. 驗證完整設定
+gcloud config list
 gcloud auth list
-gcloud projects get-iam-policy YOUR_PROJECT_ID
 ```
 
 ### 常用指令
@@ -394,19 +434,26 @@ gcloud projects get-iam-policy PROJECT_ID \
   --flatten="bindings[].members" \
   --filter="bindings.members:user:YOUR_EMAIL"
 
-# 問題：API 服務未啟用
+# 問題：API 服務未啟用 (常見於新專案)
 # 檢查必要 API 狀態
 gcloud services list --enabled --project=PROJECT_ID
 
+# 先切回個人帳戶啟用 API (Service Account 權限可能不足)
+gcloud auth login --account=YOUR_EMAIL@gmail.com
+gcloud config set project PROJECT_ID
+
 # 批次啟用所有必要 API
 gcloud services enable \
+  cloudresourcemanager.googleapis.com \
   container.googleapis.com \
   compute.googleapis.com \
   artifactregistry.googleapis.com \
-  cloudbuild.googleapis.com \
   iam.googleapis.com \
-  cloudresourcemanager.googleapis.com \
+  cloudbuild.googleapis.com \
   servicenetworking.googleapis.com
+
+# 再切回 Service Account 進行操作
+gcloud auth activate-service-account --key-file ~/.config/gcp-keys/terraform-service-account.json
 ```
 
 #### 服務帳戶問題

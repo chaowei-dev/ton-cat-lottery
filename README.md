@@ -530,36 +530,36 @@ ton-cat-lottery/
   - [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
   - [x] 建立專案 `ton-cat-lottery-dev-3`
   - [x] 設定計費帳戶與預算告警（$50/月 開發限制）
-  - [ ] **預算管理優化：**
-    - [ ] 設定多層級預算告警：25%、50%、75%、90% 閾值
-    - [ ] 環境別預算分配：staging(\$15/月), production(\$30/月), monitoring(\$5/月)
-    - [ ] 自動關機政策：staging 環境非工作時間自動停機
+  - [x] **預算管理優化：**
+    - [x] 設定多層級預算告警：25%、50%、75%、90% 閾值
+    - [x] 環境別預算分配：staging(\$15/月), production(\$30/月), monitoring(\$5/月)
+    - [x] 自動關機政策：staging 環境非工作時間自動停機
   
 - [x] **2. 本地開發工具安裝：**
   - [x] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
   - [x] 安裝 Terraform：`brew install terraform`
   - [x] 安裝 kubectl：`gcloud components install kubectl`
   - [x] 設定認證：`gcloud auth login`
-  - [ ] 檢查專案列表：`gcloud projects list`
-  - [ ] 設定專案：`gcloud config set project {PROJECT_NAME}`
+  - [x] 檢查專案列表：`gcloud projects list`
+  - [x] 設定專案：`gcloud config set project {PROJECT_NAME}`
   
-- [ ] **3. Terraform 服務帳戶設定：**
-  - [ ] 建立 Terraform 服務帳戶
-  - [ ] 分配 Terraform 服務帳戶必要權限：
+- [x] **3. Terraform 服務帳戶設定：**
+  - [x] 建立 Terraform 服務帳戶
+  - [x] 分配 Terraform 服務帳戶必要權限：
     - Project Editor
     - Kubernetes Engine Admin  
     - Service Account Admin
-  - [ ] 下載服務帳戶金鑰 JSON 檔案
-  - [ ] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
-  - [ ] **安全性最佳實踐優化：**
-    - [ ] 服務帳戶最小權限原則：檢視並精簡權限，移除不必要的 Project Editor
-    - [ ] 金鑰輪替計畫：設置定期輪替提醒（建議每90天）
-    - [ ] 金鑰安全存儲：確保本機金鑰檔案權限設為 600
+  - [x] 下載服務帳戶金鑰 JSON 檔案
+  - [x] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
+  - [x] **安全性最佳實踐優化：**
+    - [x] 服務帳戶最小權限原則：檢視並精簡權限，移除不必要的 Project Editor
+    - [x] 金鑰輪替計畫：設置定期輪替提醒（建議每90天）
+    - [x] 金鑰安全存儲：確保本機金鑰檔案權限設為 600
 
-- [ ] **4. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for GCP
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+- [x] **4. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄`.gitignore` for GCP
+  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
 
 ---
 #### 階段 3：模塊化基礎設施與智能路由 HTTPS 配置

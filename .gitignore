@@ -133,6 +133,13 @@ go.work.sum
 CLAUDE.md
 *.drawio.bkp
 
+# GCP service account keys and credentials
+*.json
+service-account-*.json
+terraform-service-account.json
+gcp-keys/
+.gcp/
+
 # Terraform files
 terraform*key.json
 

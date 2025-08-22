@@ -3,7 +3,7 @@
 # TON Cat Lottery - GCP OIDC Setup for GitHub Actions
 # 設定 Workload Identity Federation 讓 GitHub Actions 可以部署到 GCP
 
-PROJECT_ID="ton-cat-lottery-dev-2"
+PROJECT_ID="ton-cat-lottery-dev-3"
 SERVICE_ACCOUNT_NAME="gha-deploy"
 POOL_NAME="github-pool"
 PROVIDER_NAME="github-provider"
