@@ -50,9 +50,17 @@ USER lottery
 # 暴露端口
 EXPOSE 8080
 
-# 健康檢查 - 暫時停用，因為後端是守護進程不提供 HTTP API
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-#     CMD curl -f http://localhost:8080/health || exit 1
+# 創建健康檢查腳本 - 適用於 K8s 守護進程
+RUN echo '#!/bin/sh\npgrep -f "ton-cat-lottery-backend" > /dev/null || exit 1' > /app/health-check && \
+    chmod +x /app/health-check
+
+# 創建就緒檢查腳本
+RUN echo '#!/bin/sh\ntest -f /tmp/ready || exit 1' > /app/readiness-check && \
+    chmod +x /app/readiness-check
+
+# Docker 健康檢查 (用於 Docker Compose)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ["/app/health-check"]
 
 # 啟動命令
 CMD ["./ton-cat-lottery-backend"]
