@@ -496,18 +496,9 @@ ton-cat-lottery/
 
 **目標：建立完整的容器化開發環境**
 
-**核心特色**：
-- 前後端完整 Docker 化配置
-- 本地開發環境容器編排
-- 多階段建構和安全配置優化
-
 - [ ] **1. 撰寫 Dockerfile：**
   - [ ] 撰寫 `Dockerfile.backend` (必要 - 後續階段依賴)
-    - 後端為守護進程，故不需有對外的 API
-    - 實現健康檢查腳本和優雅關閉機制
-    - 包含 TON SDK 和必要的環境配置
   - [x] 撰寫 `Dockerfile.frontend`
-    - 前端利用 `TON Connect SDKs` 取得各個合約的 response
   - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
   - [x] 撰寫 `.env` 檔案與 secret 管理
 
@@ -522,28 +513,14 @@ ton-cat-lottery/
   - [x] .dockerignore 優化：排除不必要檔案，加速建構
 
 - [ ] **4. 容器驗證和優化：**
-  - [ ] **本地容器測試**:
-    ```bash
-    # 完整服務測試
-    docker-compose up --build
-    
-    # 個別容器測試
-    docker build -f docker/Dockerfile.backend -t tcl-backend .
-    docker build -f docker/Dockerfile.frontend -t tcl-frontend .
-    ```
-  - [ ] **容器安全和效能檢查**:
-    - [ ] 驗證非 root 用戶運行
-    - [ ] 檢查映像大小優化
-    - [ ] 確認健康檢查配置有效
-  - [ ] **環境變數配置驗證**:
-    - [ ] 測試 `.env` 文件載入
-    - [ ] 驗證前後端服務互動
-    - [ ] 確認容器間網路連通性
+  - [ ] 本地容器測試
+  - [ ] 容器安全和效能檢查
+  - [ ] 環境變數配置驗證
 
-- [x] **6. 內容整理：**
+- [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos
   - [x] 更新主目錄`.gitignore` for docker
-  - [x] 整理內容到 `docs/DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+  - [x] 整理內容到 `docs/DevOpsREADME.md`
 
 ---
 #### 階段 2：GCP 雲端設定
@@ -552,779 +529,154 @@ ton-cat-lottery/
 
 **目標：建立 GCP 專案基礎，配置容器映像庫和開發工具鏈**
 
-**核心特色**：
-- GCP 專案和計費管理
-- Artifact Registry 容器映像庫建立
-- 本地開發工具鏈配置完成
-- 現實化成本預算規劃 ($70/月)
+- [x] **1. GCP 帳號與計費設定**
+  - [x] 註冊 GCP 帳號並建立專案 `ton-cat-lottery-dev-3`
+  - [x] 設定計費帳戶與預算告警（$70/月開發限制）
+  - [x] 預算管理優化：多層級告警、環境別預算分配、成本優化策略
 
-- [x] **1. GCP 帳號與計費設定**（無法自動化的部分）：
-  - [x] 註冊 GCP 帳號（新用戶可獲得 $300 免費額度）
-  - [x] 建立專案 `ton-cat-lottery-dev-3`
-  - [x] 設定計費帳戶與預算告警（$70/月 開發限制）
-  - [x] **預算管理優化：**
-    - [x] 設定多層級預算告警：25%、50%、75%、90% 閾值
-    - [x] 環境別預算分配：staging(\$20/月), production(\$45/月), monitoring(\$5/月)
-    - [x] **成本分解明細**:
-      - [x] GKE Autopilot: ~$40-50/月 (雙環境共享)
-      - [x] Static IP: ~$3/月, DNS: ~$1/月, Secret Manager: ~$1/月
-      - [x] 成本優化: staging 環境資源限制為 production 的 40%
-    - [x] 自動關機政策：staging 環境非工作時間自動停機
-  
 - [x] **2. 本地開發工具安裝：**
-  - [x] 安裝 Google Cloud SDK：`brew install --cask gcloud-cli`
-  - [x] 安裝 Terraform：`brew install terraform`
-  - [x] 安裝 kubectl：`gcloud components install kubectl`
-  - [x] 設定認證：`gcloud auth login`
-  - [x] 檢查專案列表：`gcloud projects list`
-  - [x] 設定專案：`gcloud config set project {PROJECT_NAME}`
-  
+  - [x] 安裝 Google Cloud SDK、Terraform、kubectl
+  - [x] 設定認證和專案配置
+
 - [x] **3. Terraform 服務帳戶設定：**
   - [x] 建立 Terraform 服務帳戶
-  - [x] 分配 Terraform 服務帳戶必要權限：
-    - Project Editor
-    - Kubernetes Engine Admin  
-    - Service Account Admin
-  - [x] 下載服務帳戶金鑰 JSON 檔案
-  - [x] **驗證**：測試 `gcloud auth activate-service-account` 正常運作
-  - [x] **安全性最佳實踐優化：**
-    - [x] 服務帳戶最小權限原則：檢視並精簡權限，移除不必要的 Project Editor
-    - [x] 金鑰輪替計畫：設置定期輪替提醒（建議每90天）
-    - [x] 金鑰安全存儲：確保本機金鑰檔案權限設為 600
+  - [x] 分配必要權限（Project Editor、Kubernetes Engine Admin、Service Account Admin）
+  - [x] 下載服務帳戶金鑰 JSON 檔案並設定安全權限
+  - [x] 安全性最佳實踐優化
 
-- [ ] **4. Artifact Registry 容器映像庫設定：** (連接階段 1 和後續部署)
-  - [ ] **建立 Artifact Registry Repository**:
-    ```bash
-    gcloud artifacts repositories create tcl-repo \
-      --repository-format=docker \
-      --location=asia-east1 \
-      --description="TON Cat Lottery container images"
-    ```
-  - [ ] **配置 Docker 認證**:
-    ```bash
-    gcloud auth configure-docker asia-east1-docker.pkg.dev
-    ```
-  - [ ] **測試映像推送流程**:
-    ```bash
-    # 測試推送 (以 nginx 為例)
-    docker pull nginx:alpine
-    docker tag nginx:alpine asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/test:latest
-    docker push asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/test:latest
-    ```
-  - [ ] **驗證 Registry 運作**: `gcloud artifacts repositories describe tcl-repo --location=asia-east1`
-  - [ ] **清理測試映像**: `gcloud artifacts docker images delete asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/test:latest`
-  - [ ] **階段檢查點**: 確保可以成功推送映像到 Artifact Registry，為 Stage 3-4 做準備
+- [ ] **4. Artifact Registry 容器映像庫設定：**
+  - [ ] 建立 Artifact Registry Repository
+  - [ ] 配置 Docker 認證
+  - [ ] 測試映像推送流程
+  - [ ] 驗證 Registry 運作並清理測試映像
 
 - [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos
-  - [x] 更新主目錄`.gitignore` for GCP
-  - [x] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+  - [x] 更新主目錄 `.gitignore` for GCP
+  - [x] 整理內容到 `DevOpsREADME.md`
 
 ---
 #### 階段 3：Terraform 基礎設施設置
 
->技術：Terraform Modules + GKE Autopilot + cert-manager + Cloudflare DNS + Secret Manager
+> 技術：Terraform Modules + GKE Autopilot + cert-manager + Cloudflare DNS + Secret Manager
 
 **目標：建立模塊化雲端基礎設施，實現單一 Terraform 管理雙環境架構**
 
-**核心特色**：
-- 單一靜態 IP 智能路由雙域名
-- 模塊化 Terraform 架構設計
-- Secret Manager 混合管理策略
-- GKE Autopilot 成本優化配置
-
-**重要依賴**：此階段需要 Stage 2 完成的 Artifact Registry 和 GCP 專案設定
-
-**架構設計（單 Terraform 雙環境 + 智能路由）**：
-```
-Internet → Cloudflare DNS → 單一靜態IP → GKE Ingress (智能路由)
-├── cat-lottery.chaowei-liu.com → tcl-production namespace (永久)
-├── dev.cat-lottery.chaowei-liu.com → tcl-staging namespace (測試)
-└── 自動SSL證書管理 (雙域名證書)
-
-單一 Terraform 管理：
-├── 共享基礎設施: GKE集群、VPC、靜態IP、DNS記錄
-├── 隔離應用層: 不同 namespace、資源配額、網路策略
-└── 統一配置: 單一狀態文件、模組化管理
-```
-
 
 - [ ] **1. Terraform 模塊化架構設計：**
-
-  - [ ] **建立單一配置目錄結構**:
-    ```
-    terraform/
-    ├── modules/
-    │   ├── gke/           # GKE 集群模組
-    │   ├── networking/    # VPC 和網路模組  
-    │   ├── dns/          # Cloudflare DNS 模組
-    │   ├── ssl/          # cert-manager 模組
-    │   ├── namespaces/   # 雙環境 namespace 模組
-    │   ├── secrets/      # Secret Manager 模組
-    │   └── iam/          # 權限管理模組
-    ├── main.tf           # 模組組裝 (雙環境統一配置)
-    ├── variables.tf      # 全域變數
-    ├── outputs.tf        # 輸出定義
-    └── terraform.tfvars # 實際變數值
-    ```
-
-  - [ ] **GCP API 啟用清單**:
-    - [ ] `container.googleapis.com` - GKE API
-    - [ ] `compute.googleapis.com` - 計算和網路API
-    - [ ] `artifactregistry.googleapis.com` - 容器映像儲存（推薦）
-    - [ ] `secretmanager.googleapis.com` - Secret Manager API
-    - [ ] `iam.googleapis.com` - 權限管理API
-    - [ ] `cloudresourcemanager.googleapis.com` - 資源管理API
-    - [ ] `servicenetworking.googleapis.com` - VPC 連線API
-    - [ ] **移除不必要**: 不啟用 `cloudbuild.googleapis.com`（使用 GitHub Actions）
-
-  - [ ] **核心資源精簡清單**:
-    |         Resource Type              |     數量     |     用途     |
-    | ---------------------------------- | ----------- | ------------ |
-    | google_project_service             | 7個         | API 啟用 (含 Secret Manager) |
-    | google_container_cluster           | 1個         | GKE Autopilot 叢集 |
-    | google_compute_network             | 1個         | 主要VPC網路 |
-    | google_compute_subnetwork          | 1個         | GKE子網路 |
-    | google_compute_router              | 1個         | NAT 路由器 |
-    | google_compute_router_nat          | 1個         | NAT Gateway |
-    | google_artifact_registry_repository| 1個         | 容器映像庫 |
-    | google_secret_manager_secret       | 3個         | 應用敏感配置 |
-    | google_compute_address             | **1個**     | **單一靜態IP** |
-    | google_service_account             | 2個         | GKE + CI/CD SA |
-    | helm_release                       | 1個         | cert-manager |
-    | kubernetes_manifest                | 2個         | SSL ClusterIssuer |
-    | cloudflare_record                  | **2個**     | **主域名 + staging子域名** |
+  - [ ] 建立單一配置目錄結構
+  - [ ] GCP API 啟用清單（7個核心API）
+  - [ ] 核心資源精簡清單（單一靜態IP + 雙域名配置）
 
 - [ ] **2. 模塊化配置檔案建立：**
-
-  - [ ] **核心模組開發**:
-    - [ ] `modules/gke/main.tf` - GKE Autopilot 集群配置
-      - [ ] 統一命名: `tcl-cluster` (ton-cat-lottery)
-      - [ ] 啟用 Workload Identity 和 Network Policy
-      - [ ] 優化節點配置降低成本
-    - [ ] `modules/networking/main.tf` - 單一VPC + 子網路 + NAT
-      - [ ] VPC: `tcl-vpc`，單一子網路支援所有環境
-      - [ ] **單一靜態IP**: `tcl-ingress-ip`
-      - [ ] Cloud Router + NAT 配置
-    - [ ] `modules/dns/main.tf` - Cloudflare DNS 雙域名配置
-      - [ ] 主域名: `cat-lottery.chaowei-liu.com` → 靜態IP
-      - [ ] 測試域名: `dev.cat-lottery.chaowei-liu.com` → 同一靜態IP
-    - [ ] `modules/namespaces/main.tf` - 雙環境 namespace 管理
-      - [ ] Production namespace: `tcl-production` + ResourceQuota
-      - [ ] Staging namespace: `tcl-staging` + 較小 ResourceQuota
-      - [ ] NetworkPolicies: namespace 間隔離
-    - [ ] `modules/ssl/main.tf` - cert-manager + 雙域名證書
-      - [ ] Production ClusterIssuer: 主域名證書
-      - [ ] Staging ClusterIssuer: dev 子域名證書
-    - [ ] `modules/secrets/main.tf` - GCP Secret Manager 混合管理
-      - [ ] 建立空 Secret: `tcl-wallet-private-key` (後端錢包私鑰)
-      - [ ] 建立空 Secret: `tcl-lottery-contract-address` (TON 合約地址)
-      - [ ] 建立空 Secret: `tcl-cloudflare-api-token` (DNS 管理憑證)
-      - [ ] 混合管理策略: Terraform 建立空 Secret，手動填入值，K8s 直接引用
-    - [ ] `modules/iam/main.tf` - 最小權限服務帳戶
-      - [ ] GKE 節點服務帳戶
-      - [ ] CI/CD 部署服務帳戶（Workload Identity）
-      - [ ] 後端服務帳戶 + Secret Manager 存取權限
-
-  - [ ] **環境配置整合**:
-    - [ ] `main.tf` - 模組組裝和依賴管理
-    - [ ] `variables.tf` - 精簡變數定義
-      ```hcl
-      variable "project_id" { type = string }
-      variable "region" { default = "asia-east1" }
-      variable "domain_root" { default = "cat-lottery.chaowei-liu.com" }
-      variable "cloudflare_api_token" { sensitive = true }
-      variable "letsencrypt_email" { type = string }
-      
-      # 雙環境配置
-      variable "production_resources" {
-        default = { cpu = "2", memory = "4Gi" }
-      }
-      variable "staging_resources" {
-        default = { cpu = "0.5", memory = "1Gi" }
-      }
-      ```
-    - [ ] `outputs.tf` - 關鍵輸出（集群、IP、域名）
-    - [ ] `versions.tf` - Provider版本鎖定
-      - [ ] Google Provider >= 4.84
-      - [ ] Cloudflare Provider >= 4.15
-      - [ ] Kubernetes Provider (透過 GKE)
-      - [ ] Helm Provider (透過 GKE)
-
-  - [ ] **State 管理和安全**:
-    - [ ] `backend.tf` - 遠端狀態配置
-    - [ ] **GCS Bucket 設置**:
-      ```bash
-      gsutil mb -p $PROJECT_ID -c standard -l asia-east1 gs://tcl-tfstate-${PROJECT_ID}
-      gsutil versioning set on gs://tcl-tfstate-${PROJECT_ID}
-      gsutil lifecycle set lifecycle.json gs://tcl-tfstate-${PROJECT_ID}  # 30版本保留
-      ```
-    - [ ] **Terraform服務帳戶權限**:
-      - [ ] `roles/container.admin` - GKE 管理
-      - [ ] `roles/compute.networkAdmin` - 網路管理 
-      - [ ] `roles/secretmanager.admin` - Secret Manager 管理
-      - [ ] `roles/iam.serviceAccountAdmin` - SA 管理
-      - [ ] `roles/storage.objectAdmin` - State 管理
-      - [ ] **驗證最小權限原則**
+  - [ ] 核心模組開發（gke、networking、dns、ssl、namespaces、secrets、iam）
+  - [ ] 環境配置整合（main.tf、variables.tf、outputs.tf、versions.tf）
+  - [ ] State 管理和安全（backend.tf、GCS Bucket、Terraform 服務帳戶權限）
 
 - [ ] **3. 智能部署和驗證流程：**
-
-  - [ ] **模塊化部署策略**：
-    - [ ] **階段式部署**: `terraform apply -target=module.networking` 先建立網路
-    - [ ] **GKE部署**: `terraform apply -target=module.gke` 建立集群
-    - [ ] **完整部署**: `terraform apply` 部署DNS + SSL + IAM + Secret Manager
-    - [ ] **部署驗證**: 每階段都有驗證檢查點
-    - [ ] **階段檢查點**: 確認所有基礎設施就緒，為 Stage 4 應用部署做準備
-
-  - [ ] **基礎設施驗證**：
-    - [ ] **GKE 集群健康**: `kubectl get nodes -o wide`
-    - [ ] **單一靜態IP確認**: `gcloud compute addresses list --filter="name:tcl-ingress-ip"`
-    - [ ] **VPC 和子網路**: `gcloud compute networks list`
-    - [ ] **cert-manager就緒**: `kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=300s`
-
-  - [ ] **DNS 和 SSL 一鍵驗證**:
-    - [ ] **DNS 解析檢查**: 
-      ```bash
-      # 驗證雙域名指向同一IP
-      dig +short cat-lottery.chaowei-liu.com
-      dig +short dev.cat-lottery.chaowei-liu.com
-      ```
-    - [ ] **SSL 證書狀態**:
-      ```bash
-      # 檢查雙環境證書狀態
-      kubectl get certificates -A
-      # 等待證書就緒
-      kubectl wait certificate --all --for=condition=Ready --timeout=600s -A
-      ```
-    - [ ] **HTTPS 連接測試**:
-      ```bash
-      curl -I https://cat-lottery.chaowei-liu.com
-      curl -I https://dev.cat-lottery.chaowei-liu.com
-      ```
-
-  - [ ] **雙環境完整驗證**:
-    - [ ] **Namespace + ResourceQuota**: 
-      ```bash
-      kubectl get namespaces tcl-production tcl-staging
-      kubectl describe quota -n tcl-production
-      kubectl describe quota -n tcl-staging
-      ```
-    - [ ] **Secret Manager 混合管理驗證**:
-      ```bash
-      # 驗證 Secret Manager 空 secrets 建立成功
-      gcloud secrets list | grep tcl-
-      # 輸出應顯示: tcl-wallet-private-key, tcl-lottery-contract-address, tcl-cloudflare-api-token
-      
-      # 手動設置 Secret 值 (一次性操作)
-      echo "YOUR_WALLET_PRIVATE_KEY" | gcloud secrets versions add tcl-wallet-private-key --data-file=-
-      echo "YOUR_CONTRACT_ADDRESS" | gcloud secrets versions add tcl-lottery-contract-address --data-file=-
-      echo "YOUR_CLOUDFLARE_TOKEN" | gcloud secrets versions add tcl-cloudflare-api-token --data-file=-
-      
-      # 驗證 Workload Identity 配置
-      kubectl get serviceaccounts -n tcl-production
-      kubectl describe sa backend-sa -n tcl-production
-      ```
-    - [ ] **網路安全驗證**: 
-      ```bash
-      kubectl get networkpolicies -A
-      # 測試 namespace 間隔離
-      ```
+  - [ ] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
+  - [ ] 基礎設施驗證（GKE集群健康、靜態IP、VPC、cert-manager）
+  - [ ] DNS 和 SSL 一鍵驗證（解析檢查、證書狀態、HTTPS連接測試）
+  - [ ] 雙環境完整驗證（Namespace + ResourceQuota、Secret Manager、網路安全）
 
 
 - [ ] **4. 單一配置管理和成本優化：**
-
-  - [ ] **統一管理和安全配置**:
-    - [ ] **Terraform 狀態管理**: 確保 remote backend 使用 GCS + state locking
-    - [ ] **Secret 安全性**: 驗證敏感資料都在 Secret Manager，不在 Git
-    - [ ] **RBAC 權限檢查**: 確保每個環境的 ServiceAccount 都有最小權限
-    - [ ] **資源標籤策略**: 所有資源都有 environment, project, cost-center 標籤
-
-  - [ ] **成本優化和監控**:
-    - [ ] **資源使用監控**: 
-      ```bash
-      # 檢查各環境資源使用情況
-      kubectl top nodes
-      kubectl top pods -n tcl-production
-      kubectl top pods -n tcl-staging
-      ```
-    - [ ] **GCP 成本監控**: 設置月度預算告警 ($70 闾值)
-    - [ ] **資源標籤檢查**: 確保所有資源都有正確的 cost-tracking 標籤
-    - [ ] **測試環境節省**: 確認 staging 環境使用較少資源 (50% production)
-
+  - [ ] 統一管理和安全配置（Terraform 狀態管理、Secret 安全性、RBAC 權限檢查、資源標籤策略）
+  - [ ] 成本優化和監控（資源使用監控、GCP 成本監控、資源標籤檢查、測試環境節省）
 
 - [ ] **5. 內容整理：**
   - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` - terraform 計劃檔案和敏感內容
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：
-    - [ ] 單一 Terraform 雙環境架構說明
-    - [ ] 環境隔離策略 (namespace + ResourceQuota + NetworkPolicy + Secret Manager)
-    - [ ] TON 合約整合和後端配置說明
-    - [ ] 成本優化和資源共享策略
-    - [ ] 故障排除指南 (DNS/SSL/GKE/Secret Manager/環境切換)
+  - [ ] 更新主目錄 `.gitignore` - terraform 計劃檔案和敏感內容
+  - [ ] 整理內容到 `DevOpsREADME.md`
 
 ---
 #### 階段 4：Kubernetes 應用部署
 
->技術：Kustomize + Docker Images + Ingress 路由 + 守護進程配置
+> 技術：Kustomize + Docker Images + Ingress 路由 + 守護進程配置
 
 **目標：實現雙環境應用層部署，專門優化後端守護進程配置**
 
-**核心特色**：
-- 簡化 Kustomize 配置（base + 簡單 overlays）
-- 後端守護進程專門配置（無 Service，exec 健康檢查）
-- 前後端差異化部署策略
-- 本地到生產環境驗證流程
-
-**重要依賴**：此階段需要 Stage 1 的 Dockerfile.backend 和 Stage 3 的基礎設施完成
-
-**架構設計（單 Ingress + 雙環境應用層）**：
-```
-單一 GKE Ingress (tcl-ingress-ip) + 雙環境應用部署
-├── cat-lottery.chaowei-liu.com → tcl-production namespace
-│   ├── frontend-deployment (replicas: 2) → React dApp
-│   └── backend-deployment (replicas: 2) → Go 自動抽獎服務
-├── dev.cat-lottery.chaowei-liu.com → tcl-staging namespace  
-│   ├── frontend-deployment (replicas: 1) → 測試版本
-│   └── backend-deployment (replicas: 1) → 測試配置
-└── 應用配置: Secret Manager + ConfigMaps + Service Accounts
-```
-
 - [ ] **1. 環境準備和驗證：**
-
-  - [ ] **基礎設施確認** (依賴階段3完成):
-    - [ ] **GKE 集群健康**: `kubectl get nodes -o wide` (確認所有節點 Ready)
-    - [ ] **單一靜態IP**: `gcloud compute addresses describe tcl-ingress-ip --region=asia-east1`
-    - [ ] **Artifact Registry**: `gcloud artifacts repositories describe tcl-repo --location=asia-east1`
-    - [ ] **SSL證書狀態**: `kubectl get certificates -A` (確認 production + staging 都 Ready)
-    - [ ] **雙環境 DNS 確認**: 
-      ```bash
-      dig +short cat-lottery.chaowei-liu.com
-      dig +short dev.cat-lottery.chaowei-liu.com
-      ```
-    - [ ] **Secret Manager 混合管理驗證**: 
-      ```bash
-      # 確認 Secret Manager 資源和值存在
-      gcloud secrets list | grep tcl-
-      gcloud secrets versions list tcl-wallet-private-key --limit=1
-      gcloud secrets versions list tcl-lottery-contract-address --limit=1
-      ```
-  
-  - [ ] **基礎工具準備**:
-    - [ ] **Docker + GCP 設置**: 
-      ```bash
-      docker buildx create --use --name tcl-builder
-      gcloud auth configure-docker asia-east1-docker.pkg.dev
-      gcloud container clusters get-credentials tcl-cluster --region asia-east1
-      ```
-    - [ ] **雙環境 namespace 確認**: `kubectl get ns tcl-production tcl-staging`
+  - [ ] 基礎設施確認（GKE集群健康、靜態IP、Artifact Registry、SSL證書、DNS）
+  - [ ] Secret Manager 混合管理驗證
+  - [ ] 基礎工具準備（Docker + GCP 設置、雙環境 namespace 確認）
 
 - [ ] **2. 精簡 Docker 映像策略：**
-
-  - [ ] **統一映像標籤策略**:
-    ```bash
-    # 只使用 commit hash，不使用 latest 標籤
-    COMMIT_SHA=$(git rev-parse --short HEAD)
-    BACKEND_IMAGE="asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/backend:$COMMIT_SHA"
-    FRONTEND_IMAGE="asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/frontend:$COMMIT_SHA"
-    ```
-
-  - [ ] **精簡映像建構**:
-    - [ ] **Backend 映像**: 
-      ```bash
-      docker buildx build --platform linux/amd64 \
-        -f docker/Dockerfile.backend \
-        -t $BACKEND_IMAGE \
-        --push .
-      ```
-    - [ ] **Frontend 映像**:
-      ```bash
-      docker buildx build --platform linux/amd64 \
-        -f docker/Dockerfile.frontend --target production \
-        -t $FRONTEND_IMAGE \
-        --push .
-      ```
-    - [ ] **映像驗證**: `docker manifest inspect $BACKEND_IMAGE`
-  
-  - [ ] **映像基礎優化**:
-    - [ ] **多階段建構**: 確保 Dockerfile 使用多階段減少映像大小
-    - [ ] **基礎安全**: 非 root 用戶運行，移除不必要套件
+  - [ ] 統一映像標籤策略（只使用 commit hash，不使用 latest 標籤）
+  - [ ] 精簡映像建構（Backend 映像、Frontend 映像、映像驗證）
+  - [ ] 映像基礎優化（多階段建構、基礎安全）
 
 - [ ] **3. 建立 K8s 雙環境部署檔案：**
-  - 組織 `k8s/` 目錄結構：`base/`, `production/`, `staging/`, `ingress/`
-  - [ ] **共用基礎配置**:
-    - [ ] `k8s/base/configmap-template.yaml` - 基礎環境變數模板
-    - [ ] `k8s/base/frontend-service.yaml` - Frontend Service (對外暴露)
-    - [ ] `k8s/base/frontend-deployment.yaml` - Frontend Deployment 模板
-    - [ ] `k8s/base/backend-deployment.yaml` - Backend Deployment 模板 (守護進程，無 Service)
-  - [ ] **後端守護進程配置**:
-    - [ ] **無對外 Service**: 後端不需要 K8s Service，僅作為內部守護進程運行
-    - [ ] **專門健康檢查**:
-      ```yaml
-      # Backend Deployment 健康檢查配置
-      livenessProbe:
-        exec:
-          command: ["/app/health-check"]  # 檢查後端進程是否運行
-        initialDelaySeconds: 30
-        periodSeconds: 60
-      readinessProbe:
-        exec:
-          command: ["/app/readiness-check"]  # 檢查服務初始化完成
-        initialDelaySeconds: 15
-        periodSeconds: 30
-      # 注意: health-check 和 readiness-check 腳本已在 Dockerfile.backend 中創建
-      ```
-    - [ ] **TON 合約監聽配置**:
-      ```yaml
-      env:
-        - name: WALLET_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: WALLET_PRIVATE_KEY
-        - name: LOTTERY_CONTRACT_ADDRESS
-          valueFrom:
-            secretKeyRef:
-              name: backend-secrets
-              key: LOTTERY_CONTRACT_ADDRESS
-        - name: TON_NETWORK
-          value: "testnet"  # 或 mainnet
-        - name: TON_API_ENDPOINT
-          value: "https://testnet.toncenter.com/api/v2/jsonRPC"
-        - name: LOG_LEVEL
-          value: "info"
-        - name: LOG_FORMAT
-          value: "json"  # 結構化日誌
-      ```
-  - [ ] **Kustomize 雙環境配置**:
-    - [ ] **Production 環境**:
-      - [ ] `k8s/production/kustomization.yaml` - 簡單 overlay，引用 base + 環境變數
-      - [ ] `k8s/production/replicas.yaml` - 直接定義 replicas: 2
-      - [ ] `k8s/production/resources.yaml` - 直接定義生產資源限制
-      - [ ] `k8s/production/configmap.yaml` - 生產專用環境變數 (TON_NETWORK: mainnet)
-    - [ ] **Staging 環境**:
-      - [ ] `k8s/staging/kustomization.yaml` - 簡單 overlay，引用 base + 環境變數
-      - [ ] `k8s/staging/replicas.yaml` - 直接定義 replicas: 1
-      - [ ] `k8s/staging/resources.yaml` - 直接定義測試資源限制
-      - [ ] `k8s/staging/configmap.yaml` - 測試專用環境變數 (TON_NETWORK: testnet)
-    - [ ] **配置特點**:
-      - [ ] 使用簡單的 overlay 結構，避免複雜 patches
-      - [ ] 維持環境一致性和可讀性  
-      - [ ] 易於理解和維護的檔案結構
-  - [ ] **單一 Ingress 雙域名配置**:
-    - [ ] **統一 Ingress**: `k8s/ingress/tcl-ingress.yaml`
-      - [ ] 使用階段 3 建立的單一靜態IP: `tcl-ingress-ip`
-      - [ ] 雙域名路由:
-        - `cat-lottery.chaowei-liu.com` → `tcl-production` namespace
-        - `dev.cat-lottery.chaowei-liu.com` → `tcl-staging` namespace
-      - [ ] SSL 證書: `production-tls` + `staging-tls` (已在階段 3 建立)
-  - [ ] **Secret Manager 混合管理整合**:
-    - [ ] `k8s/base/secrets.yaml` - 直接引用 GCP Secret Manager
-    - [ ] 使用階段 3 建立的 Secret Manager 資源（已手動填入值）:
-      - `tcl-wallet-private-key` → K8s Secret: `backend-secrets.WALLET_PRIVATE_KEY`
-      - `tcl-lottery-contract-address` → K8s Secret: `backend-secrets.LOTTERY_CONTRACT_ADDRESS`
-      - `tcl-cloudflare-api-token` → 僅 Terraform 和 CI/CD 使用
-    - [ ] **K8s Secret 配置範例**:
-      ```yaml
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: backend-secrets
-      type: Opaque
-      stringData:
-        # 這些值透過 Workload Identity 從 GCP Secret Manager 取得
-        WALLET_PRIVATE_KEY: "secret://projects/PROJECT_ID/secrets/tcl-wallet-private-key/versions/latest"
-        LOTTERY_CONTRACT_ADDRESS: "secret://projects/PROJECT_ID/secrets/tcl-lottery-contract-address/versions/latest"
-      ```
+  - [ ] 組織 `k8s/` 目錄結構（base、production、staging、ingress）
+  - [ ] 共用基礎配置（configmap、frontend/backend deployment、service）
+  - [ ] 後端守護進程配置（無對外 Service、專門健康檢查、TON 合約監聽配置）
+  - [ ] Kustomize 雙環境配置（Production 和 Staging 環境 overlay）
+  - [ ] 單一 Ingress 雙域名配置
+  - [ ] Secret Manager 混合管理整合
 
 - [ ] **4. 應用安全和生產配置：**
-  - [ ] **基礎安全配置**:
-    - [ ] Secret Manager 混合管理: 確保敏感資料透過 Workload Identity 存取
-    - [ ] Pod Security Context: 非 root 用戶運行
-    - [ ] Resource Limits: 適當的 CPU/Memory 限制
-    - [ ] Service Account: 最小權限原則
-  - [ ] **基本生產功能**:
-    - [ ] **前後端差異化健康檢查**:
-      - [ ] Frontend: HTTP health checks (`:3000/health`)
-      - [ ] Backend: 守護進程專用 exec health checks (TON 連接狀態)
-    - [ ] **結構化日誌配置**:
-      - [ ] Backend: JSON 格式日誌輸出，包含合約監聽事件和錢包操作記錄
-      - [ ] 日誌等級設定: info (production), debug (staging)
-    - [ ] Graceful Shutdown: 適當的 terminationGracePeriodSeconds (Backend: 60s for TON transaction completion)
-    - [ ] 環境標籤: 統一標籤策略 (env, app, version, service-type)
+  - [ ] 基礎安全配置（Secret Manager、Pod Security Context、Resource Limits、Service Account）
+  - [ ] 基本生產功能（前後端差異化健康檢查、結構化日誌配置、Graceful Shutdown、環境標籤）
 
 - [ ] **5. 本地 K8s 部署驗證** (可選):
-  - [ ] **本地 Kubernetes 測試環境** (推薦在正式部署前驗證):
-    ```bash
-    # 安裝並設定 kind (輕量級選項)
-    brew install kind
-    kind create cluster --name tcl-local
-    
-    # 在本地集群測試 K8s 配置
-    kubectl apply -k k8s/staging/ --context kind-tcl-local
-    kubectl get pods,svc --context kind-tcl-local
-    ```
-  - [ ] **配置一致性驗證**:
-    - [ ] 比較 Docker Compose 和 K8s 的環境變數配置
-    - [ ] 測試健康檢查在不同環境的一致性
-    - [ ] 驗證後端守護進程配置正確
-  - [ ] **本地部署測試**:
-    - [ ] 驗證容器在 K8s 環境中正常運行
-    - [ ] 測試 Secret 和 ConfigMap 掛載
-    - [ ] 確認資源配置和限制有效
+  - [ ] 本地 Kubernetes 測試環境（kind 集群設置）
+  - [ ] 配置一致性驗證
+  - [ ] 本地部署測試
 
 - [ ] **6. 雙環境部署和驗證：**
-  - [ ] **部署前檢查** (依賴階段 3):
-    - [ ] GKE 集群狀態: `kubectl get nodes`
-    - [ ] Namespaces 存在: `kubectl get ns tcl-production tcl-staging` 
-    - [ ] SSL 證書就緒: `kubectl get certificates -A`
-  - [ ] **雙環境一鍵部署**:
-    - [ ] **Production 部署**: `kubectl apply -k k8s/production/`
-    - [ ] **Staging 部署**: `kubectl apply -k k8s/staging/`
-    - [ ] **統一 Ingress 部署**: `kubectl apply -f k8s/ingress/tcl-ingress.yaml`
-  - [ ] **部署狀態驗證**:
-    - [ ] **應用狀態檢查**:
-      ```bash
-      # 等待雙環境應用就緒
-      kubectl wait deployment --all --for=condition=Available --timeout=300s -n tcl-production
-      kubectl wait deployment --all --for=condition=Available --timeout=300s -n tcl-staging
-      ```
-    - [ ] **服務連通性測試**:
-      ```bash
-      # 測試內部服務
-      kubectl get svc -n tcl-production
-      kubectl get svc -n tcl-staging
-      ```
-  - [ ] **雙環境完整驗證**:
-    - [ ] **外部訪問測試**:
-      ```bash
-      # 測試雙域名 HTTPS 連接
-      curl -I https://cat-lottery.chaowei-liu.com
-      curl -I https://dev.cat-lottery.chaowei-liu.com
-      ```
-    - [ ] **應用功能驗證**:
-      ```bash
-      # 檢查前端 dApp 頁面加載
-      curl -s https://cat-lottery.chaowei-liu.com | grep -i "ton cat lottery"
-      curl -s https://dev.cat-lottery.chaowei-liu.com | grep -i "ton cat lottery"
-      ```
-    - [ ] **後端守護進程驗證**: 
-      ```bash
-      # 檢查後端部署狀態 (無 Service，僅 Deployment)
-      kubectl get deployments -l app=backend -n tcl-production
-      kubectl get deployments -l app=backend -n tcl-staging
-      
-      # 驗證後端健康檢查
-      kubectl describe pod -l app=backend -n tcl-production | grep -A 5 "Liveness\|Readiness"
-      
-      # 檢查 TON 合約監聽日誌 (結構化 JSON 格式)
-      kubectl logs -l app=backend -n tcl-production --tail=50 | jq '.'
-      
-      # 驗證錢包私鑰和合約地址環境變數已正確載入
-      kubectl exec -it $(kubectl get pod -l app=backend -n tcl-production -o name) -- env | grep -E "(WALLET_|LOTTERY_|TON_)"
-      ```
+  - [ ] 部署前檢查（GKE集群狀態、Namespaces、SSL證書）
+  - [ ] 雙環境一鍵部署（Production、Staging、統一 Ingress）
+  - [ ] 部署狀態驗證（應用狀態檢查、服務連通性測試）
+  - [ ] 雙環境完整驗證（外部訪問測試、應用功能驗證、後端守護進程驗證）
 
-- [ ] **7. Staging 環境模板驗證（手動測試動態流程）：**
-  - [ ] **模擬 CI/CD 創建 Staging**:
-    - [ ] 使用模板創建 staging namespace：`envsubst < k8s/staging-template/namespace-template.yaml | kubectl apply -f -`
-    - [ ] 部署 Staging 應用：`envsubst < k8s/staging-template/ | kubectl apply -f -`
-    - [ ] 部署 Staging Ingress：`envsubst < k8s/ingress/staging-ingress-template.yaml | kubectl apply -f -`
-  - [ ] **Staging 環境驗證**:
-    - [ ] 檢查 Staging Pod：`kubectl get pods -n ton-cat-lottery-staging`
-    - [ ] 測試 Staging 域名：`curl -I https://dev.cat-lottery.chaowei-liu.com`
-    - [ ] 驗證 Staging 使用靜態IP-2
-  - [ ] **模擬 CI/CD 清理 Staging**:
-    - [ ] 刪除 Staging 環境：`kubectl delete namespace ton-cat-lottery-staging`
-    - [ ] 刪除 Staging Ingress：`kubectl delete ingress staging-ingress`
+- [ ] **7. 效能和監控驗證：**
+  - [ ] 配置 Google Cloud Monitoring 集成
+  - [ ] 設定日誌收集和查詢
+  - [ ] 測試應用在負載下的表現
+  - [ ] 驗證 HPA 自動擴縮容功能
 
-- [ ] **8. 效能和監控驗證：**
-  - 配置 Google Cloud Monitoring 集成
-  - 設定日誌收集和查詢
-  - 測試應用在負載下的表現
-  - 驗證 HPA 自動擴縮容功能
-
-- [ ] **9. 內容整理：**
+- [ ] **8. 內容整理：**
   - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for k8s
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：
-    - [ ] Kustomize 雙環境架構說明
-    - [ ] Secret Manager 整合指南
-    - [ ] 容器配置到 K8s 部署銜接指南
-    - [ ] 雙環境部署和驗證流程
-    - [ ] TON 合約整合和監控說明
-    - [ ] 故障排除指南
+  - [ ] 更新主目錄 `.gitignore` for k8s
+  - [ ] 整理內容到 `DevOpsREADME.md`
 
 ---
 
 #### 階段 5：CI/CD 自動化流程
 
->技術：GitHub Actions + GCP OIDC + Workload Identity + 自動化部署
+> 技術：GitHub Actions + GCP OIDC + Workload Identity + 自動化部署
 
 **目標：建立完整的 CI/CD 流水線，實現安全的無金鑰部署**
 
-**核心特色**：
-- GitHub OIDC 取代傳統 Service Account 金鑰
-- 雙環境自動化部署流程
-- 品質關卡和安全掃描整合
-- 自動回滾和錯誤處理機制
-
-**重要依賴**：此階段需要 Stage 4 的 K8s 配置和 Stage 3 的 IAM 設定完成
-
-**CI/CD 架構設計（簡化雙環境流程）**：
-```
-代碼提交流程：
-PR 建立 → CI 測試 (代碼品質 + 安全掃描) → 自動部署到 Staging
-│
-└── PR 合併 → 自動部署到 Production
-
-環境管理：
-├── Staging (dev.cat-lottery.chaowei-liu.com)
-│   ├── PR 建立時自動部署最新代碼
-│   └── 用於功能測試和驗證
-└── Production (cat-lottery.chaowei-liu.com)
-    ├── main 分支合併時自動部署
-    └── 滾動更新 + 自動回滾
-```
-
 - [ ] **1. 基礎 CI/CD 準備：**
-  - [ ] **GitHub 儲存庫設定**:
-    - [ ] 建立 `.github/workflows/` 目錄結構
-    - [ ] 設定基本分支保護 (main 分支需 PR)
-  - [ ] **GCP OIDC 手動設定** (詳細步驟，替代傳統 Service Account Key):
-    - [ ] **建立 Workload Identity Pool**:
-      ```bash
-      # 建立 Workload Identity Pool
-      gcloud iam workload-identity-pools create "github-pool" \
-        --project="$PROJECT_ID" \
-        --location="global" \
-        --display-name="GitHub Actions Pool"
-      
-      # 建立 Provider
-      gcloud iam workload-identity-pools providers create-oidc "github-provider" \
-        --project="$PROJECT_ID" \
-        --location="global" \
-        --workload-identity-pool="github-pool" \
-        --display-name="GitHub provider" \
-        --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
-        --issuer-uri="https://token.actions.githubusercontent.com"
-      ```
-    - [ ] **建立部署用 Service Account**:
-      ```bash
-      # 建立 Service Account
-      gcloud iam service-accounts create gha-deploy \
-        --display-name="GitHub Actions Deploy"
-      
-      # 綁定必要權限
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:gha-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-        --role="roles/container.developer"
-      
-      gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member="serviceAccount:gha-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-        --role="roles/artifactregistry.writer"
-      
-      # 綁定 Workload Identity
-      gcloud iam service-accounts add-iam-policy-binding \
-        --role roles/iam.workloadIdentityUser \
-        --member "principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/YOUR_GITHUB_USERNAME/ton-cat-lottery" \
-        gha-deploy@$PROJECT_ID.iam.gserviceaccount.com
-      ```
-    - [ ] **設定 GitHub Secrets** (在 Repository Settings → Secrets):
-      ```bash
-      # 必要 Secrets
-      GCP_PROJECT_ID: ton-cat-lottery-dev-3
-      GCP_WIF_PROVIDER: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-      
-      # 選用 Secrets (如果使用 Cloudflare DNS)
-      CLOUDFLARE_API_TOKEN: your-api-token
-      CLOUDFLARE_ZONE_ID: your-zone-id
-      APP_DOMAIN: cat-lottery.chaowei-liu.com
-      ```
-    - [ ] **驗證 OIDC 設定**:
-      ```bash
-      # 檢查 Workload Identity Pool
-      gcloud iam workload-identity-pools describe github-pool --location=global
-      
-      # 檢查 Service Account 權限
-      gcloud projects get-iam-policy $PROJECT_ID --flatten="bindings[].members" --filter="bindings.members:gha-deploy@"
-      ```
-    - [ ] **詳細設定指南**: 參考 `docs/OIDC-SETUP.md`
+  - [ ] GitHub 儲存庫設定（workflows 目錄、分支保護）
+  - [ ] GCP OIDC 手動設定（Workload Identity Pool、Service Account、GitHub Secrets）
+  - [ ] 驗證 OIDC 設定
 
-- [ ] **2. 品質關卡 CI Pipeline (`ci.yml`)：**
+- [ ] **2. 品質關卡 CI Pipeline：**
+  - [ ] 三層品質驗證（代碼品質、安全掃描、Docker 驗證）
+  - [ ] 品質閾值和失敗處理
 
-  - [ ] **觸發條件**: PR 建立和更新時觸發品質檢查
-  - [ ] **三層品質驗證**:
-    - [ ] **代碼品質**: 智能合約測試(100%覆蓋) + 前端建構測試 + Go後端測試
-    - [ ] **安全掃描**: npm audit + Go 依賴漏洞掃描 + 代碼靜態分析
-    - [ ] **Docker 驗證**: backend/frontend 映像建構測試 (不推送到 registry)
-  - [ ] **品質閾值**: 所有測試通過 + 無高風險漏洞 + CI時間<10分鐘
-  - [ ] **失敗處理**: PR comment 通知 + 自動重試機制
-  
-- [ ] **4. Production 部署 (`production-deploy.yml`) - 穩定釋出：**
+- [ ] **3. Production 部署流程：**
+  - [ ] 安全措施和映像建構
+  - [ ] 滾動更新和部署驗證
 
-  - [ ] **Production 部署觸發**:
-    ```yaml
-    name: Production Deployment
-    on:
-      push:
-        branches: [main]
-      workflow_dispatch:  # 手動觸發選項
-    ```
+- [ ] **4. 智能環境清理：**
+  - [ ] 多種清理觸發機制（PR關閉、定時清理、手動清理）
+  - [ ] 安全措施和日誌記錄
 
-  - [ ] **部署流程**:
-    - [ ] **安全措施**: GitHub Environment 保護 + 人工審批 (選用)
-    - [ ] **映像建構**: 使用 GitHub Actions cache 加速 Docker 建構
-    - [ ] **滾動更新**: `kubectl set image` + `kubectl rollout status` 確保零停機
-    - [ ] **映像標籤**: 只使用 commit hash (例: `backend:abc123f`)
-    - [ ] **部署驗證**: 滾動更新狀態檢查 + 煙霧測試 + 健康檢查
-    - [ ] **成功通知**: GitHub Notification
-  
-- [ ] **5. 智能環境清理 (`cleanup-staging.yml`) - 資源優化：**
+- [ ] **5. 錯誤處理和回滾機制：**
+  - [ ] 自動回滾策略
+  - [ ] 通知和監控系統
 
-  - [ ] **多種清理觸發機制**:
-    - [ ] **PR 關閉**: 自動清理對應的 staging 環境
-    - [ ] **定時清理**: 每日凌晨2點清理過期環境 (TTL: 7天)
-    - [ ] **手動清理**: workflow_dispatch 支持手動管理
-  - [ ] **清理策略**:
-    - [ ] **特定PR**: 刪除 `tcl-staging-pr{number}` namespace
-    - [ ] **過期環境**: 檢查 namespace 創建時間，清理 >7天的環境
-    - [ ] **批量清理**: 手動觸發清理所有 staging 環境
-  - [ ] **安全措施**: 只清理 `tcl-staging-*` namespace，保護 production
-  - [ ] **日誌記錄**: 詳細記錄清理過程和結果
+- [ ] **6. 測試和監控：**
+  - [ ] Pipeline 測試策略
+  - [ ] 效能和成本監控
 
-- [ ] **6. 錯誤處理和回滾機制：**
-
-  - [ ] **自動回滾策略**:
-    - [ ] **失敗檢查**: Production 部署失敗時觸發回滾
-    - [ ] **回滾邏輯**: 使用 `kubectl rollout undo` 回滾到前一個成功版本
-    - [ ] **健康檢查**: 回滾後驗證服務正常運作
-    - [ ] **安全限制**: 只在有前一版本時執行回滾
-
-  - [ ] **通知和監控系統**:
-    - [ ] **失敗通知**: 自動在GitHub創建 issue，標記為 high-priority
-    - [ ] **成功通知**: GitHub Notification + PR comment
-    - [ ] **Slack 整合**: (選用) 重要事件通知到 Slack 頻道
-    - [ ] **狀態頁面**: (選用) 簡單的服務狀態頁面
-
-- [ ] **7. 測試、監控：**
-
-  - [ ] **Pipeline 測試策略**:
-    - [ ] **測試環境**: 使用 staging 環境進行 end-to-end 測試
-    - [ ] **自動化測試**: PR workflow 測試 + Production 部署測試
-    - [ ] **回滾測試**: 模擬部署失敗測試回滾機制
-
-  - [ ] **效能和成本監控**:
-    - [ ] **GitHub Actions 成本**: 監控 minutes 使用量和成本
-    - [ ] **Pipeline 時間**: 設定 timeout 和效能指標 (CI<10min, Deploy<15min)
-    - [ ] **資源使用**: Staging 環境資源監控和使用率分析
-
-- [ ] **8. 內容整理：**
+- [ ] **7. 內容整理：**
   - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for CI/CD
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
-    - [ ] **Workflow 文檔**: 說明所有 workflows 用途
-    - [ ] **操作手冊**: 常用 CI/CD 操作 (deploy, rollback, cleanup)
-    - [ ] **故障排除指南**: 常見 CI/CD 問題和解決方案
-    - [ ] **安全稽核**: OIDC 設定和權限審查清單
+  - [ ] 更新主目錄 `.gitignore` for CI/CD
+  - [ ] 整理內容到 `DevOpsREADME.md`
 
 #### 階段 6：基礎監控體系
 
@@ -1332,22 +684,13 @@ PR 建立 → CI 測試 (代碼品質 + 安全掃描) → 自動部署到 Stagin
 
 **目標：實現輕量化服務監控，適合 Side Project 的最小可行監控方案**
 
-**核心特色**：
-- GCP 內建監控服務整合
-- K8s 原生健康檢查機制
-- 成本預算告警和資源監控
-- 結構化日誌和故障排除
-
-**重要依賴**：此階段建立在 Stage 4 的健康檢查配置基礎上
-
 - [ ] **1. 基礎監控設置：**
-  - [ ] 使用 GCP Cloud Monitoring（免費額度內）+ 簡單 Grafana
-  - [ ] 或直接使用 GCP 內建監控儀表板
+  - [ ] 使用 GCP Cloud Monitoring（免費額度內）或簡單 Grafana
   - [ ] 驗證基本的 Pod 和服務狀態可見性
 
 - [ ] **2. 基本健康檢查：**  
   - [ ] 驗證 Stage 4 已配置的健康檢查機制運作正常
-  - [ ] 前端 HTTP 健康檢查和後端 exec 健康檢查狀態監控
+  - [ ] 前後端差異化健康檢查狀態監控
   - [ ] 確認 Pod 重啟和恢復機制正常運作
 
 - [ ] **3. 基本成本監控：**
@@ -1355,7 +698,7 @@ PR 建立 → CI 測試 (代碼品質 + 安全掃描) → 自動部署到 Stagin
   - [ ] 檢查 GKE Autopilot 資源使用是否合理
   - [ ] 可配置 Slack 通知（選用）
 
-- [ ] **4. 簡單日誌查看：**
+- [ ] **4. 日誌管理：**
   - [ ] 確保應用日誌輸出到 stdout/stderr  
   - [ ] 使用 `kubectl logs` 查看日誌
   - [ ] 可選擇使用 GCP Cloud Logging 進行日誌保存
@@ -1366,8 +709,8 @@ PR 建立 → CI 測試 (代碼品質 + 安全掃描) → 自動部署到 Stagin
 
 - [ ] **6. 內容整理：**
   - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄`.gitignore` for monitoring
-  - [ ] 整理內容到 `DevOpsREADME.md` 中，包含：架構 + 簡介 + 檔案結構 + 快速部署 + 常用指令 + 故障排除
+  - [ ] 更新主目錄 `.gitignore` for monitoring
+  - [ ] 整理內容到 `DevOpsREADME.md`
 
 ### 整理 Documentations
 - [ ] 整理 Contracts 的 `README.md`
