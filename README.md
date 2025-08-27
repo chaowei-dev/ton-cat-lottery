@@ -678,7 +678,7 @@ ton-cat-lottery/
   - [ ] 更新主目錄 `.gitignore` for CI/CD
   - [ ] 整理內容到 `DevOpsREADME.md`
 
-#### 階段 6：基礎監控體系
+#### 階段 6：Monitoring 監控
 
 > 技術：GCP Cloud Monitoring + 健康檢查 + 成本告警
 
