@@ -2,10 +2,11 @@
 
 ## 目錄
 - [Docker](#docker)
-- [GCP-設定](#gcp-設定)
+- [GCP 設定](#gcp-設定)
 - [Terraform](#terraform)
 - [k8s GKE](#k8s-gke)
 - [GitHub Action (CI/CD)](#github-action-cicd)
+- [Monitoring (Prometheus + Grafana)](#monitoring-prometheus--grafana)
 
 ---
 ## Docker
@@ -47,6 +48,7 @@ ton-cat-lottery/
 # 0. 前置檢查
 docker --version && docker-compose --version  # 確認工具已安裝
 ls docker/Dockerfile.frontend  # 確認前端 Dockerfile 存在
+ls docker/Dockerfile.backend   # 確認後端 Dockerfile 存在
 
 # 1. 設定環境變數
 cp .env.example .env
@@ -109,6 +111,19 @@ echo "Testing .env file:" && source .env && echo "✓ Environment loaded"
 docker-compose down -v --remove-orphans
 docker system prune -a
 docker-compose up --build -d
+
+# 容器驗證和優化
+# 容器安全檢查
+docker scan $(docker-compose ps -q backend) 2>/dev/null || echo "⚠️ Docker scan not available"
+docker inspect $(docker-compose ps -q backend) | grep -E '"User":|"SecurityOpt":|"ReadonlyRootfs":'
+
+# 效能檢查
+docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+docker system df  # 檢查 Docker 空間使用
+
+# 環境變數配置驗證
+docker-compose exec backend env | grep -E "(TON_|WALLET_|LOTTERY_)" || echo "ℹ️ Backend env vars not configured yet"
+docker-compose exec frontend env | grep -E "(VITE_|NODE_)" | head -5
 ```
 
 ---
@@ -863,130 +878,6 @@ kubectl get events -n tcl-production --watch
 ```
 
 ---
-## 基礎監控體系
-### 簡介
-TON Cat Lottery 採用輕量化監控方案，適合 Side Project 的最小可行監控。主要依賴 GCP 內建服務和 Kubernetes 原生健康檢查機制，實現成本可控的基礎監控體系。
-
-**主要特色：**
-- GCP Cloud Monitoring 整合（免費額度內使用）
-- Kubernetes 原生健康檢查機制
-- 成本預算告警和資源監控
-- 結構化日誌和故障排除
-- Email 告警通知系統
-
-### 快速啟動
-```bash
-# 1. 基礎監控設置
-kubectl top nodes
-kubectl top pods --all-namespaces
-kubectl get pods -o wide --all-namespaces
-
-# 2. 健康檢查驗證
-kubectl describe pod -l app=frontend -n tcl-production | grep -A 5 "Liveness\|Readiness"
-curl -f http://frontend-service.tcl-production.svc.cluster.local/
-kubectl exec -n tcl-production deployment/backend -- /app/health-check
-
-# 3. 成本監控 (GCP Console)
-# 訪問: https://console.cloud.google.com/billing/budgets
-# 設定月度預算: $70, 告警: 50%/75%/90%/100%
-kubectl top pods -n tcl-production
-```
-
-### 日誌管理
-```bash
-# 應用日誌
-kubectl logs -n tcl-production deployment/frontend --tail=50
-kubectl logs -f -n tcl-production -l app=backend --tail=100
-
-# 系統事件
-kubectl get events -n tcl-production --sort-by=.metadata.creationTimestamp
-
-# GCP Cloud Logging (選用)
-# 訪問: https://console.cloud.google.com/logs
-# 查詢: resource.type="k8s_container" AND resource.labels.namespace_name="tcl-production"
-```
-
-### 告警設置
-```bash
-# GCP Console 設定
-# Monitoring → Alerting → Create Policy
-# Billing → Budgets → Create Budget
-
-# Pod 狀態告警條件:
-# - Pod 重啟次數 > 5 times/hour
-# - Memory 使用率 > 80%
-# - CPU 使用率 > 90%
-
-# Slack 通知 (選用)
-curl -X POST -H 'Content-type: application/json' \
-  --data '{"text":"Test alert from TON Cat Lottery"}' \
-  YOUR_SLACK_WEBHOOK_URL
-```
-
-### 常用指令
-```bash
-# 監控檢查
-kubectl cluster-info
-kubectl top nodes
-kubectl top pods --all-namespaces --sort-by=cpu
-kubectl get events --field-selector type=Warning --all-namespaces
-kubectl get pods -o wide --all-namespaces
-
-# 日誌查詢
-kubectl logs -l app=frontend -n tcl-production --tail=100
-kubectl logs -l app=backend -n tcl-production --follow
-kubectl logs -l app=backend -n tcl-production | grep -i error
-kubectl describe pod POD_NAME -n tcl-production | grep -A 10 "Last State"
-```
-
-### 故障排除
-
-#### 常見監控問題
-```bash
-# 問題：metrics-server 無法正常運作
-# 檢查 metrics-server 狀態
-kubectl get pods -n kube-system | grep metrics-server
-kubectl logs -n kube-system deployment/metrics-server
-
-# 問題：健康檢查失敗
-# 檢查健康檢查配置
-kubectl describe pod POD_NAME -n tcl-production | grep -A 5 "Liveness\|Readiness"
-
-# 手動測試健康檢查
-kubectl exec -n tcl-production POD_NAME -- /app/health-check
-curl -f http://SERVICE_NAME.NAMESPACE.svc.cluster.local/health
-
-# 問題：日誌無法查看
-# 檢查 Pod 狀態
-kubectl get pods -n tcl-production
-kubectl describe pod POD_NAME -n tcl-production
-
-# 檢查容器日誌驅動
-kubectl logs POD_NAME -n tcl-production --previous
-```
-
-#### 成本監控問題
-```bash
-# 問題：成本預算告警未收到
-# 檢查計費帳戶設定
-gcloud beta billing accounts list
-gcloud beta billing budgets list --billing-account=BILLING_ACCOUNT_ID
-
-# 檢查告警策略
-gcloud alpha monitoring policies list
-
-# 問題：資源使用率過高
-# 分析資源使用狀況
-kubectl describe nodes | grep -A 5 "Allocated resources"
-kubectl top pods --sort-by=cpu --all-namespaces
-kubectl top pods --sort-by=memory --all-namespaces
-
-# 調整資源配置
-kubectl edit deployment backend -n tcl-production
-kubectl edit deployment frontend -n tcl-production
-```
-
----
 ## GitHub Action (CI/CD)
 ### 簡介
 TON Cat Lottery 使用 GitHub Actions 實現完全自動化的 CI/CD 流程，採用 Workload Identity Federation (OIDC) 進行安全的 GCP 認證。系統支援程式碼品質檢查、自動化測試、Docker 映像建構與推送，以及 GKE 應用程式部署。
@@ -1119,17 +1010,17 @@ gh secret set PROJECT_ID --body "your-project-id"
 ```
 
 ---
-## Monitoring 監控
+## Monitoring (Prometheus + Grafana)
 
 ### 簡介
 
-採用 **Prometheus + Grafana + AlertManager** 監控技術棧，為 TON Cat Lottery 提供系統監控、可視化 Dashboard 和告警功能。
+採用 **Prometheus + Grafana + AlertManager** 監控技術棧，為 TON Cat Lottery 提供完整的系統監控、可視化 Dashboard 和告警功能。
 
 **技術特色：**
 - **Prometheus**：指標收集和存儲
 - **Grafana**：可視化 Dashboard
 - **AlertManager**：告警管理和通知
-- **面試展示**：展示 DevOps 監控技能
+- **展示 DevOps 監控技能**：完整監控體系實現
 
 ---
 

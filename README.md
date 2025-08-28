@@ -486,7 +486,7 @@ ton-cat-lottery/
 |  3   | 模塊化基礎設施           | Terraform + GKE Autopilot + Secret Manager | 建立單一 Terraform 雙環境基礎架構 |
 |  4   | Kubernetes 應用部署     | Kustomize + Ingress + 守護進程配置 | 實現雙環境應用層部署 |
 |  5   | CI/CD 自動化流程        | GitHub Actions + OIDC + 雙環境管理 | 建立完整自動化部署流水線 |
-|  6   | 基礎監控體系            | GCP Monitoring + 健康檢查 + 告警 | 實現輕量化服務監控 |
+|  6   | Prometheus + Grafana 監控體系 | Prometheus + Grafana + AlertManager | 建立完整監控可視化體系 |
 
 
 ---
@@ -513,9 +513,9 @@ ton-cat-lottery/
   - [x] .dockerignore 優化：排除不必要檔案，加速建構
 
 - [ ] **4. 容器驗證和優化：**
-  - [ ] 本地容器測試
-  - [ ] 容器安全和效能檢查
-  - [ ] 環境變數配置驗證
+  - [ ] 本地容器測試（docker-compose ps 狀態檢查）
+  - [ ] 容器安全和效能檢查（docker scan、docker stats、安全配置驗證）
+  - [ ] 環境變數配置驗證（前後端環境變數正確載入）
 
 - [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos
@@ -545,9 +545,9 @@ ton-cat-lottery/
   - [x] 安全性最佳實踐優化
 
 - [ ] **4. Artifact Registry 容器映像庫設定：**
-  - [ ] 建立 Artifact Registry Repository
-  - [ ] 配置 Docker 認證
-  - [ ] 測試映像推送流程
+  - [ ] 建立 Artifact Registry Repository (`tcl-repo`, location: `asia-east1`)
+  - [ ] 配置 Docker 認證 (`gcloud auth configure-docker asia-east1-docker.pkg.dev`)
+  - [ ] 測試映像推送流程 (`hello-world` 映像測試)
   - [ ] 驗證 Registry 運作並清理測試映像
 
 - [x] **5. 內容整理：**
@@ -569,10 +569,10 @@ ton-cat-lottery/
   - [ ] 核心資源精簡清單（單一靜態IP + 雙域名配置）
 
 - [ ] **2. 模塊化配置檔案建立：**
-  - [ ] 核心模組開發（gke、networking、dns、ssl、namespaces、secrets、iam、monitoring）
-  - [ ] 環境配置整合（main.tf、variables.tf、outputs.tf、versions.tf）
+  - [ ] 核心模組開發（networking、gke、dns、ssl、namespaces、secrets、iam、monitoring）
+  - [ ] 環境配置整合（main.tf、variables.tf、outputs.tf、providers.tf）
   - [ ] State 管理和安全（backend.tf、GCS Bucket、Terraform 服務帳戶權限）
-  - [ ] Monitoring 基礎設施準備（namespace、storage、RBAC、DNS 子域名）
+  - [ ] Monitoring 基礎設施準備（namespace、storage、RBAC 權限、DNS 子域名）
 
 - [ ] **3. 智能部署和驗證流程：**
   - [ ] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
@@ -609,11 +609,11 @@ ton-cat-lottery/
   - [ ] 映像基礎優化（多階段建構、基礎安全）
 
 - [ ] **3. 建立 K8s 雙環境部署檔案：**
-  - [ ] 組織 `k8s/` 目錄結構（base、production、staging、ingress）
-  - [ ] 共用基礎配置（configmap、frontend/backend deployment、service）
-  - [ ] 後端守護進程配置（無對外 Service、專門健康檢查、TON 合約監聽配置）
-  - [ ] Kustomize 雙環境配置（Production 和 Staging 環境 overlay）
-  - [ ] 單一 Ingress 雙域名配置
+  - [ ] 組織 `k8s/` 目錄結構（base、overlays/production、overlays/staging、ingress）
+  - [ ] 共用基礎配置（namespace、frontend deployment + service、backend deployment + configmap）
+  - [ ] 後端守護進程配置（**無對外 Service**、專門健康檢查 `/app/health-check`、TON 合約監聽配置）
+  - [ ] Kustomize 雙環境配置（Production 和 Staging 環境 overlay、replica 和 resource patches）
+  - [ ] 單一 Ingress 雙域名配置（cat-lottery.chaowei-liu.com + dev.cat-lottery.chaowei-liu.com）
   - [ ] Secret Manager 混合管理整合
 
 - [ ] **4. 應用安全和生產配置：**
@@ -651,9 +651,10 @@ ton-cat-lottery/
 **目標：建立完整的 CI/CD 流水線，實現安全的無金鑰部署**
 
 - [ ] **1. 基礎 CI/CD 準備：**
-  - [ ] GitHub 儲存庫設定（workflows 目錄、分支保護）
-  - [ ] GCP OIDC 手動設定（Workload Identity Pool、Service Account、GitHub Secrets）
-  - [ ] 驗證 OIDC 設定
+  - [ ] GitHub 儲存庫設定（`.github/workflows/` 目錄、分支保護）
+  - [ ] GCP OIDC 設定（執行 `setup-gcp-oidc.sh` 建立 `github-pool` 和 `gha-deploy` 服務帳戶）
+  - [ ] GitHub Secrets 配置（`GCP_WIF_PROVIDER`、`GCP_SERVICE_ACCOUNT`、`PROJECT_ID`）
+  - [ ] 驗證 OIDC 設定（`gcloud iam workload-identity-pools list`）
 
 - [ ] **2. 品質關卡 CI Pipeline：**
   - [ ] 三層品質驗證（代碼品質、安全掃描、Docker 驗證）
@@ -680,7 +681,7 @@ ton-cat-lottery/
   - [ ] 更新主目錄 `.gitignore` for CI/CD
   - [ ] 整理內容到 `DevOpsREADME.md`
 
-#### 階段 6：Prometheus + Grafana 監控體系
+#### 階段 6：Monitoring (Prometheus + Grafana)
 
 > 技術：Prometheus + Grafana + AlertManager
 
@@ -712,6 +713,11 @@ ton-cat-lottery/
   - [ ] 驗證指標採集和 Dashboard 顯示
   - [ ] 測試告警觸發和通知功能
   - [ ] 優化告警規則和閾值設定
+
+- [ ] **6. 內容整理：**
+  - [ ] 重新驗證這個階段的 todos
+  - [ ] 更新主目錄 `.gitignore` for monitoring
+  - [ ] 整理內容到 `DevOpsREADME.md`
 
 ### 整理 Documentations
 - [ ] 整理 Contracts 的 `README.md`
