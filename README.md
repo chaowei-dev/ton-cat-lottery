@@ -512,10 +512,10 @@ ton-cat-lottery/
   - [x] 健康檢查配置：實現容器自我監測
   - [x] .dockerignore 優化：排除不必要檔案，加速建構
 
-- [ ] **4. 容器驗證和優化：**
-  - [ ] 本地容器測試（docker-compose ps 狀態檢查）
-  - [ ] 容器安全和效能檢查（docker scan、docker stats、安全配置驗證）
-  - [ ] 環境變數配置驗證（前後端環境變數正確載入）
+- [x] **4. 容器驗證和優化：**
+  - [x] 本地容器測試（docker-compose ps 狀態檢查）
+  - [x] 容器安全和效能檢查（docker scan、docker stats、安全配置驗證）
+  - [x] 環境變數配置驗證（前後端環境變數正確載入）
 
 - [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos

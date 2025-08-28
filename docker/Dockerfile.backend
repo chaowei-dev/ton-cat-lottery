@@ -4,7 +4,7 @@
 # ================================
 # 構建階段
 # ================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.19-alpine AS builder
 
 # 設置工作目錄
 WORKDIR /app
@@ -50,8 +50,8 @@ USER lottery
 # 暴露端口
 EXPOSE 8080
 
-# 創建健康檢查腳本 - 適用於 K8s 守護進程
-RUN echo '#!/bin/sh\npgrep -f "ton-cat-lottery-backend" > /dev/null || exit 1' > /app/health-check && \
+# 創建健康檢查腳本 - HTTP 端點檢查
+RUN echo '#!/bin/sh\ncurl -f http://localhost:8080/health || exit 1' > /app/health-check && \
     chmod +x /app/health-check
 
 # 創建就緒檢查腳本
