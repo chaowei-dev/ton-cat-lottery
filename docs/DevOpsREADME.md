@@ -161,23 +161,6 @@ GCP Project (ton-cat-lottery-dev-3)
 服務帳戶 → terraform → 基礎設施資源
 ```
 
-### 檔案結構
-```
-~/.config/gcp-keys/
-└── terraform-service-account.json  # 服務帳戶金鑰 (權限600)
-
-~/.config/gcloud/
-├── configurations/                  # gcloud 配置
-├── credentials                      # 使用者認證快取
-└── access_tokens                   # 訪問令牌快取
-
-project-root/
-├── .env                           # GCP專案變數
-├── .gcloudignore                  # 上傳排除檔案
-└── terraform/
-    └── terraform-service-account-key.json  # 服務帳戶金鑰備份
-```
-
 ### 快速啟動
 ```bash
 # 1. 安裝工具
@@ -187,36 +170,37 @@ gcloud components install kubectl
 
 # 2. GCP 認證與專案設定
 gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project ton-cat-lottery-dev-3
 
 # 3. 建立 Terraform 服務帳戶
 gcloud iam service-accounts create terraform-service --display-name="Terraform Service Account"
 
 # 4. 分配權限
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com" --role="roles/editor"
-gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com" --role="roles/container.admin"
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-3 --member="serviceAccount:terraform-service@ton-cat-lottery-dev-3.iam.gserviceaccount.com" --role="roles/editor"
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-3 --member="serviceAccount:terraform-service@ton-cat-lottery-dev-3.iam.gserviceaccount.com" --role="roles/container.admin"
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-3 --member="serviceAccount:terraform-service@ton-cat-lottery-dev-3.iam.gserviceaccount.com" --role="roles/iam.serviceAccountAdmin"
 
 # 5. 下載金鑰
 mkdir -p ~/.config/gcp-keys
-gcloud iam service-accounts keys create ~/.config/gcp-keys/terraform-service-account.json --iam-account=terraform-service@YOUR_PROJECT_ID.iam.gserviceaccount.com
+gcloud iam service-accounts keys create ~/.config/gcp-keys/terraform-service-account.json --iam-account=terraform-service@ton-cat-lottery-dev-3.iam.gserviceaccount.com
 chmod 600 ~/.config/gcp-keys/terraform-service-account.json
 
-# 6. 建立 Artifact Registry
+# 6. 啟用必要 API 服務
+gcloud services enable cloudresourcemanager.googleapis.com container.googleapis.com compute.googleapis.com artifactregistry.googleapis.com iam.googleapis.com
+
+# 7. 建立 Artifact Registry
 gcloud artifacts repositories create tcl-repo --repository-format=docker --location=asia-east1
 gcloud auth configure-docker asia-east1-docker.pkg.dev
 
-# 6.1. 測試 Artifact Registry
+# 8. 測試 Registry 功能
 docker pull hello-world:latest
-docker tag hello-world:latest asia-east1-docker.pkg.dev/YOUR_PROJECT_ID/tcl-repo/test:latest
-docker push asia-east1-docker.pkg.dev/YOUR_PROJECT_ID/tcl-repo/test:latest
+docker tag hello-world:latest asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/test:latest
+docker push asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/test:latest
 echo "✅ Registry test successful"
 
-# 6.2. 清理測試映像
-gcloud artifacts docker images delete asia-east1-docker.pkg.dev/YOUR_PROJECT_ID/tcl-repo/test:latest --quiet
-docker rmi asia-east1-docker.pkg.dev/YOUR_PROJECT_ID/tcl-repo/test:latest hello-world:latest
-
-# 7. 啟用必要 API
-gcloud services enable cloudresourcemanager.googleapis.com container.googleapis.com compute.googleapis.com artifactregistry.googleapis.com iam.googleapis.com
+# 9. 清理測試映像
+gcloud artifacts docker images delete asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/test:latest --quiet
+docker rmi asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/test:latest hello-world:latest
 ```
 
 #### 階段 5：安全性最佳實踐與預算管理
@@ -233,17 +217,13 @@ gcloud services enable cloudresourcemanager.googleapis.com container.googleapis.
 # - 75% 閾值：自動停止非關鍵服務
 # - 90% 閾值：全面停止服務
 
-# 3. API 服務啟用
-gcloud services enable \
-  cloudresourcemanager.googleapis.com \
-  container.googleapis.com \
-  compute.googleapis.com \
-  artifactregistry.googleapis.com \
-  iam.googleapis.com
+# 3. 驗證 API 服務狀態
+gcloud services list --enabled --filter="name:(cloudresourcemanager|container|compute|artifactregistry|iam)" --format="table(name)"
 
 # 4. 驗證完整設定
 gcloud config list
 gcloud auth list
+gcloud artifacts repositories list --location=asia-east1
 ```
 
 ### 常用指令

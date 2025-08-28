@@ -544,11 +544,11 @@ ton-cat-lottery/
   - [x] 下載服務帳戶金鑰 JSON 檔案並設定安全權限
   - [x] 安全性最佳實踐優化
 
-- [ ] **4. Artifact Registry 容器映像庫設定：**
-  - [ ] 建立 Artifact Registry Repository (`tcl-repo`, location: `asia-east1`)
-  - [ ] 配置 Docker 認證 (`gcloud auth configure-docker asia-east1-docker.pkg.dev`)
-  - [ ] 測試映像推送流程 (`hello-world` 映像測試)
-  - [ ] 驗證 Registry 運作並清理測試映像
+- [x] **4. Artifact Registry 容器映像庫設定：**
+  - [x] 建立 Artifact Registry Repository (`tcl-repo`, location: `asia-east1`)
+  - [x] 配置 Docker 認證 (`gcloud auth configure-docker asia-east1-docker.pkg.dev`)
+  - [x] 測試映像推送流程 (`hello-world` 映像測試)
+  - [x] 驗證 Registry 運作並清理測試映像
 
 - [x] **5. 內容整理：**
   - [x] 重新驗證這個階段的 todos
