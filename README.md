@@ -569,15 +569,17 @@ ton-cat-lottery/
   - [ ] 核心資源精簡清單（單一靜態IP + 雙域名配置）
 
 - [ ] **2. 模塊化配置檔案建立：**
-  - [ ] 核心模組開發（gke、networking、dns、ssl、namespaces、secrets、iam）
+  - [ ] 核心模組開發（gke、networking、dns、ssl、namespaces、secrets、iam、monitoring）
   - [ ] 環境配置整合（main.tf、variables.tf、outputs.tf、versions.tf）
   - [ ] State 管理和安全（backend.tf、GCS Bucket、Terraform 服務帳戶權限）
+  - [ ] Monitoring 基礎設施準備（namespace、storage、RBAC、DNS 子域名）
 
 - [ ] **3. 智能部署和驗證流程：**
   - [ ] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
   - [ ] 基礎設施驗證（GKE集群健康、靜態IP、VPC、cert-manager）
   - [ ] DNS 和 SSL 一鍵驗證（解析檢查、證書狀態、HTTPS連接測試）
   - [ ] 雙環境完整驗證（Namespace + ResourceQuota、Secret Manager、網路安全）
+  - [ ] Monitoring 基礎設施驗證（namespace、storage、RBAC 權限）
 
 
 - [ ] **4. 單一配置管理和成本優化：**
@@ -678,39 +680,38 @@ ton-cat-lottery/
   - [ ] 更新主目錄 `.gitignore` for CI/CD
   - [ ] 整理內容到 `DevOpsREADME.md`
 
-#### 階段 6：Monitoring 監控
+#### 階段 6：Prometheus + Grafana 監控體系
 
-> 技術：GCP Cloud Monitoring + 健康檢查 + 成本告警
+> 技術：Prometheus + Grafana + AlertManager
 
-**目標：實現輕量化服務監控，適合 Side Project 的最小可行監控方案**
+**目標：建立完整的監控可視化體系，展示 DevOps 監控技能**
 
-- [ ] **1. 基礎監控設置：**
-  - [ ] 使用 GCP Cloud Monitoring（免費額度內）或簡單 Grafana
-  - [ ] 驗證基本的 Pod 和服務狀態可見性
+- [ ] **1. 監控基礎設施更新（Terraform）：**
+  - [ ] 更新 Terraform monitoring 模組配置
+  - [ ] 部署 monitoring namespace 和存儲資源
+  - [ ] 配置 RBAC 權限和 DNS 記錄
+  - [ ] 驗證基礎設施就緒
 
-- [ ] **2. 基本健康檢查：**  
-  - [ ] 驗證 Stage 4 已配置的健康檢查機制運作正常
-  - [ ] 前後端差異化健康檢查狀態監控
-  - [ ] 確認 Pod 重啟和恢復機制正常運作
+- [ ] **2. Prometheus 部署和配置：**
+  - [ ] 部署 Prometheus Server 到 K8s 集群
+  - [ ] 配置 kube-state-metrics 和 node-exporter
+  - [ ] 實現應用 `/metrics` 端點暴露
 
-- [ ] **3. 基本成本監控：**
-  - [ ] 設置 GCP 預算告警（月度成本超過閾值）
-  - [ ] 檢查 GKE Autopilot 資源使用是否合理
-  - [ ] 可配置 Slack 通知（選用）
+- [ ] **3. Grafana Dashboard 建立：**
+  - [ ] 部署 Grafana 並配置 Prometheus 數據源
+  - [ ] 建立系統 Dashboard（CPU、Memory、Pod 狀態）
+  - [ ] 建立應用 Dashboard（前後端服務監控）
+  - [ ] 建立 TON 業務 Dashboard（抽獎狀態、交易監控）
 
-- [ ] **4. 日誌管理：**
-  - [ ] 確保應用日誌輸出到 stdout/stderr  
-  - [ ] 使用 `kubectl logs` 查看日誌
-  - [ ] 可選擇使用 GCP Cloud Logging 進行日誌保存
+- [ ] **4. AlertManager 告警配置：**
+  - [ ] 部署 AlertManager 並設定告警規則
+  - [ ] 配置關鍵指標告警（服務下線、資源異常）
+  - [ ] 實現郵件通知機制
 
-- [ ] **5. 基礎告警設置：**
-  - [ ] Email 通知服務異常和成本超標告警
-  - [ ] 驗證告警通知功能正常運作
-
-- [ ] **6. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄 `.gitignore` for monitoring
-  - [ ] 整理內容到 `DevOpsREADME.md`
+- [ ] **5. 監控驗證和調優：**
+  - [ ] 驗證指標採集和 Dashboard 顯示
+  - [ ] 測試告警觸發和通知功能
+  - [ ] 優化告警規則和閾值設定
 
 ### 整理 Documentations
 - [ ] 整理 Contracts 的 `README.md`

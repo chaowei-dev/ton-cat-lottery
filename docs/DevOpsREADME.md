@@ -381,10 +381,17 @@ Terraform State
 ├── nginx-ingress (流量路由)
 ├── Namespaces
 │   ├── tcl-production
-│   └── tcl-staging  
+│   ├── tcl-staging
+│   └── monitoring (Prometheus + Grafana + AlertManager)
+├── Persistent Storage
+│   ├── prometheus-storage (時序數據庫)
+│   └── grafana-storage (Dashboard 配置)
+├── RBAC 權限
+│   └── monitoring-rbac (Prometheus 讀取 K8s API)
 └── DNS Records
     ├── cat-lottery.chaowei-liu.com → Production
-    └── dev.cat-lottery.chaowei-liu.com → Staging
+    ├── dev.cat-lottery.chaowei-liu.com → Staging
+    └── monitoring.cat-lottery.chaowei-liu.com → Grafana (可選)
 ```
 
 ### 檔案結構
@@ -410,7 +417,11 @@ terraform/
     ├── ssl/                     # cert-manager 配置
     ├── namespaces/              # K8s Namespace 配置
     ├── secrets/                 # Secret Manager 配置
-    └── iam/                     # IAM 權限配置
+    ├── iam/                     # IAM 權限配置
+    └── monitoring/              # Monitoring 基礎設施配置
+        ├── main.tf              # Monitoring namespace 和存儲
+        ├── variables.tf         # Storage size、DNS 配置
+        └── outputs.tf           # Monitoring 資源資訊
 ```
 
 ### 快速啟動
@@ -476,8 +487,13 @@ kubectl get certificates -A  # SSL 證書狀態
 dig $(terraform output -raw domain_name)  # DNS 解析檢查
 curl -I https://$(terraform output -raw domain_name)  # HTTPS 連接測試
 
-# 6. 雙環境完整驗證
-kubectl get namespaces | grep -E "(tcl-production|tcl-staging)"
+# 6. Monitoring 基礎設施驗證
+kubectl get namespace monitoring  # Monitoring namespace
+kubectl get pvc -n monitoring  # 持久化存儲
+kubectl auth can-i get nodes --as=system:serviceaccount:monitoring:prometheus  # RBAC 權限
+
+# 7. 雙環境完整驗證
+kubectl get namespaces | grep -E "(tcl-production|tcl-staging|monitoring)"
 kubectl get resourcequota -A
 ```
 
@@ -1105,3 +1121,171 @@ gh secret set PROJECT_ID --body "your-project-id"
 ---
 ## Monitoring 監控
 
+### 簡介
+
+採用 **Prometheus + Grafana + AlertManager** 監控技術棧，為 TON Cat Lottery 提供系統監控、可視化 Dashboard 和告警功能。
+
+**技術特色：**
+- **Prometheus**：指標收集和存儲
+- **Grafana**：可視化 Dashboard
+- **AlertManager**：告警管理和通知
+- **面試展示**：展示 DevOps 監控技能
+
+---
+
+### 架構
+
+```
+Grafana Dashboard ← PromQL → Prometheus Server
+                                    ↑
+                            Metrics Collection
+                    ┌─────────────┬─────────────┐
+                    │             │             │
+              kube-state-   node-exporter   App Metrics
+               metrics                      (/metrics)
+                    │             │             │
+               K8s Cluster     Node Info    Frontend/Backend
+
+AlertManager ← Alert Rules ← Prometheus
+     ↓
+Email/Slack Notifications
+```
+
+---
+
+### 檔案結構
+
+```bash
+k8s/monitoring/
+├── prometheus/
+│   ├── deployment.yaml     # Prometheus server
+│   ├── configmap.yaml      # 配置和採集規則
+│   └── service.yaml        # Service
+├── grafana/
+│   ├── deployment.yaml     # Grafana server
+│   ├── service.yaml        # Service
+│   └── dashboards/         # Dashboard JSON 檔案
+├── alertmanager/
+│   ├── deployment.yaml     # AlertManager
+│   └── configmap.yaml      # 告警規則
+└── exporters/
+    ├── kube-state-metrics.yaml
+    └── node-exporter.yaml
+```
+
+---
+
+### 快速開始/設定
+
+#### 1. 更新 Terraform 基礎設施
+
+```bash
+# 更新 Terraform 配置加入 monitoring 模組
+cd terraform/
+terraform plan -target=module.monitoring
+terraform apply -target=module.monitoring
+
+# 驗證基礎設施
+kubectl get namespace monitoring
+kubectl get pvc -n monitoring
+```
+
+#### 2. 部署監控服務
+
+```bash
+# 部署 Prometheus + Grafana + AlertManager
+kubectl apply -f k8s/monitoring/
+
+# 檢查狀態
+kubectl get pods -n monitoring
+```
+
+#### 3. 訪問 Grafana
+
+```bash
+# Port-forward 進行本地訪問
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+
+# 瀏覽器打開 http://localhost:3000
+# 默認帳號: admin/admin
+```
+
+#### 4. 配置 Dashboard
+
+1. **導入 Dashboard**：Grafana → Import → 上傳 JSON 檔案
+2. **配置數據源**：Prometheus URL: `http://prometheus:9090`
+3. **驗證指標**：確認圖表顯示數據
+
+#### 5. 應用指標整合
+
+**Backend 指標暴露：**
+```go
+// main.go
+import "github.com/prometheus/client_golang/prometheus/promhttp"
+
+func main() {
+    http.Handle("/metrics", promhttp.Handler())
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+**自定義業務指標：**
+```go
+var lotteryParticipants = prometheus.NewGauge(prometheus.GaugeOpts{
+    Name: "ton_lottery_participants_total",
+    Help: "Current lottery participants",
+})
+
+func init() {
+    prometheus.MustRegister(lotteryParticipants)
+}
+```
+
+---
+
+### 故障排除
+
+#### Terraform 基礎設施問題
+```bash
+# 檢查 monitoring namespace 是否建立
+kubectl get namespace monitoring
+
+# 檢查 PVC 是否正常
+kubectl get pvc -n monitoring
+kubectl describe pvc prometheus-storage -n monitoring
+
+# 檢查 RBAC 權限
+kubectl auth can-i get nodes --as=system:serviceaccount:monitoring:prometheus
+kubectl get clusterrolebinding | grep monitoring
+```
+
+#### Prometheus 指標採集問題
+```bash
+# 檢查 targets 狀態
+kubectl port-forward svc/prometheus 9090:9090
+# 訪問 localhost:9090/targets
+
+# 驗證應用 /metrics 端點
+kubectl exec -it <pod> -- curl localhost:8080/metrics
+```
+
+#### Grafana Dashboard 無數據
+```bash
+# 測試 Prometheus 連接
+# Grafana → Configuration → Data Sources → Test
+
+# 手動查詢指標
+# localhost:9090/graph → 輸入 PromQL 查詢
+```
+
+#### AlertManager 告警不發送
+```bash
+# 檢查告警規則
+kubectl port-forward svc/prometheus 9090:9090
+# 訪問 localhost:9090/alerts
+
+# 檢查 AlertManager 狀態
+kubectl logs -n monitoring deployment/alertmanager
+```
+
+---
