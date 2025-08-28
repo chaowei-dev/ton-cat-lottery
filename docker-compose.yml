@@ -3,31 +3,32 @@
 
 services:
   # ================================
-  # 後端服務（後端是守護進程，不提供 HTTP API）
-  # 暫時註解，等後端開發完成後再啟用
+  # 後端服務（基礎HTTP服務，準備用於DevOps流程）
   # ================================
-  # backend:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/Dockerfile.backend
-  #   container_name: ton-cat-lottery-backend
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     - NODE_ENV=production
-  #   restart: unless-stopped
-  #   # 後端會在完成後添加以下配置：
-  #   # volumes:
-  #   #   - ./logs:/app/logs
-  #   # healthcheck:
-  #   #   test: ["CMD", "ps", "aux", "|", "grep", "[b]ackend"]
-  #   #   interval: 30s
-  #   #   timeout: 10s
-  #   #   retries: 3
-  #   #   start_period: 10s
-  #   profiles:
-  #     - production
-  #     - development
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: ton-cat-lottery-backend
+    ports:
+      - '${BACKEND_PORT:-8080}:8080'
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+      - LOTTERY_CONTRACT_ADDRESS=${LOTTERY_CONTRACT_ADDRESS}
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      - WALLET_MNEMONIC=${WALLET_MNEMONIC}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - production
+      - development
 
   # ================================
   # 前端服務（前端直接用 TON SDK 與區塊鏈互動，不會經過後端）

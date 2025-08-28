@@ -496,8 +496,8 @@ ton-cat-lottery/
 
 **目標：建立完整的容器化開發環境**
 
-- [ ] **1. 撰寫 Dockerfile：**
-  - [ ] 撰寫 `Dockerfile.backend` (必要 - 後續階段依賴)
+- [x] **1. 撰寫 Dockerfile：**
+  - [x] 撰寫 `Dockerfile.backend`
   - [x] 撰寫 `Dockerfile.frontend`
   - [x] 撰寫 `docker-compose.yml` 整合後端 / 前端
   - [x] 撰寫 `.env` 檔案與 secret 管理
