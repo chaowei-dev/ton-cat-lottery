@@ -392,47 +392,31 @@ Terraform State
 ### 檔案結構
 ```
 terraform/
-├── main.tf                      # 主要配置整合 ✅
-├── backend.tf                   # 狀態管理 (GCS Bucket) ✅
-├── providers.tf                 # Provider 配置 ✅
-├── variables.tf                 # 變數定義 ✅
-├── outputs.tf                   # 輸出值 ✅
-├── terraform.tfvars.example     # 環境變數範例 ✅
-├── terraform.tfvars             # 實際變數值 (不納入版控) ✅
-├── DEPLOYMENT.md                # 部署指南 ✅
-└── modules/                     # 模塊化架構 ✅
-    ├── networking/              # VPC + Static IP + Firewall ✅
+├── main.tf                      # 主要配置整合
+├── backend.tf                   # 狀態管理 (GCS Bucket)
+├── providers.tf                 # Provider 配置
+├── variables.tf                 # 變數定義
+├── outputs.tf                   # 輸出值
+├── terraform.tfvars.example     # 環境變數範例
+├── terraform.tfvars             # 實際變數值 (不納入版控)
+├── DEPLOYMENT.md                # 部署指南
+└── modules/                     # 模塊化架構
+    ├── networking/              # VPC + Static IP + Firewall
     │   ├── main.tf, variables.tf, outputs.tf
-    ├── gke/                     # GKE Autopilot 集群 ✅
+    ├── gke/                     # GKE Autopilot 集群
     │   ├── main.tf, variables.tf, outputs.tf
-    ├── dns/                     # Cloudflare DNS 雙域名 ✅
+    ├── dns/                     # Cloudflare DNS 雙域名
     │   ├── main.tf, variables.tf, outputs.tf, provider.tf
-    ├── ssl/                     # cert-manager + nginx-ingress ✅
+    ├── ssl/                     # cert-manager + nginx-ingress
     │   ├── main.tf, variables.tf, outputs.tf
-    ├── namespaces/              # 雙環境 + 資源配額 ✅
+    ├── namespaces/              # 雙環境 + 資源配額
     │   ├── main.tf, variables.tf, outputs.tf
-    ├── secrets/                 # Secret Manager ✅
+    ├── secrets/                 # Secret Manager
     │   ├── main.tf, variables.tf, outputs.tf
-    ├── iam/                     # Service Accounts + RBAC ✅
+    ├── iam/                     # Service Accounts + RBAC
     │   ├── main.tf, variables.tf, outputs.tf
-    └── monitoring/              # 監控基礎設施 ✅
+    └── monitoring/              # 監控基礎設施
         ├── main.tf, variables.tf, outputs.tf
-```
-
-**實施狀態**: ✅ 已完成 (30個 .tf 檔案)
-
-### 快速啟動
-#### 階段 1：環境準備
-```bash
-# 1. 確保 GCP 服務帳戶已設定
-gcloud auth activate-service-account --key-file=terraform-service-account-key.json
-
-# 2. 複製並設定環境變數
-cd terraform/
-cp terraform.tfvars.example terraform.tfvars
-
-# 3. 編輯 terraform.tfvars，填入必要配置
-vim terraform.tfvars
 ```
 
 ### 快速啟動
@@ -473,17 +457,17 @@ curl -X GET "https://api.cloudflare.com/client/v4/zones/${cloudflare_zone_id}" \
   -H "Content-Type: application/json" | jq '.success'  # 應該返回 true
 
 # 3. 階段式部署
-# 階段 3a: 網路基礎設施
-terraform apply -target=module.networking
-echo "✅ Networking deployed"
+# 階段 3a: 網路基礎設施（VPC、防火牆、IAM 權限）
+terraform apply -target=module.networking -target=module.iam
 
-# 階段 3b: IAM + GKE 集群
-terraform apply -target=module.iam -target=module.gke
-echo "✅ IAM and GKE cluster deployed"
+# 階段 3b: GKE 集群（依賴網路和 IAM）
+terraform apply -target=module.gke
 
-# 階段 3c: 完整部署
+# 階段 3c: DNS 和 SSL 設置（依賴 Static IP）
+terraform apply -target=module.dns -target=module.ssl
+
+# 階段 3d: 完整基礎設施部署（namespaces、secrets、monitoring）
 terraform apply
-echo "✅ Full infrastructure deployed"
 
 # 4. 獲取 GKE 憑證並驗證
 gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region $(terraform output -raw region)
@@ -674,6 +658,19 @@ k8s/
 ```
 
 ### 快速啟動
+#### 0. 基礎設施部署（必要前置步驟）
+```bash
+# 先執行 Terraform 基礎設施部署（參考 Terraform 章節）
+cd terraform/ && terraform apply
+
+# 確認基礎設施已部署
+terraform output cluster_endpoint
+terraform output static_ip_address
+
+# 取得 GKE 憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+```
+
 #### 1. 環境準備和驗證
 ```bash
 # 基礎設施確認
@@ -1060,17 +1057,16 @@ k8s/monitoring/
 
 ### 快速開始/設定
 
-#### 1. 更新 Terraform 基礎設施
+#### 1. 基礎設施確認（必要前置步驟）
 
 ```bash
-# 更新 Terraform 配置加入 monitoring 模組
+# 先確認 Terraform 基礎設施已部署（參考 Terraform 章節）
 cd terraform/
-terraform plan -target=module.monitoring
-terraform apply -target=module.monitoring
+terraform output monitoring_namespace
+terraform output prometheus_storage_class
 
-# 驗證基礎設施
-kubectl get namespace monitoring
-kubectl get pvc -n monitoring
+# 取得集群憑證
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
 ```
 
 #### 2. 部署監控服務
