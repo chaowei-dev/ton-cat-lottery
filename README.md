@@ -563,33 +563,33 @@ ton-cat-lottery/
 **目標：建立模塊化雲端基礎設施，實現單一 Terraform 管理雙環境架構**
 
 
-- [ ] **1. Terraform 模塊化架構設計：**
-  - [ ] 建立單一配置目錄結構
-  - [ ] GCP API 啟用清單（7個核心API）
-  - [ ] 核心資源精簡清單（單一靜態IP + 雙域名配置）
+- [x] **1. Terraform 模塊化架構設計：**
+  - [x] 建立單一配置目錄結構
+  - [x] GCP API 啟用清單（7個核心API）
+  - [x] 核心資源精簡清單（單一靜態IP + 雙域名配置）
 
-- [ ] **2. 模塊化配置檔案建立：**
-  - [ ] 核心模組開發（networking、gke、dns、ssl、namespaces、secrets、iam、monitoring）
-  - [ ] 環境配置整合（main.tf、variables.tf、outputs.tf、providers.tf）
-  - [ ] State 管理和安全（backend.tf、GCS Bucket、Terraform 服務帳戶權限）
-  - [ ] Monitoring 基礎設施準備（namespace、storage、RBAC 權限、DNS 子域名）
+- [x] **2. 模塊化配置檔案建立：**
+  - [x] 核心模組開發（networking、gke、dns、ssl、namespaces、secrets、iam、monitoring）
+  - [x] 環境配置整合（main.tf、variables.tf、outputs.tf、providers.tf）
+  - [x] State 管理和安全（backend.tf、GCS Bucket、Terraform 服務帳戶權限）
+  - [x] Monitoring 基礎設施準備（namespace、storage、RBAC 權限、DNS 子域名）
 
-- [ ] **3. 智能部署和驗證流程：**
-  - [ ] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
-  - [ ] 基礎設施驗證（GKE集群健康、靜態IP、VPC、cert-manager）
-  - [ ] DNS 和 SSL 一鍵驗證（解析檢查、證書狀態、HTTPS連接測試）
-  - [ ] 雙環境完整驗證（Namespace + ResourceQuota、Secret Manager、網路安全）
-  - [ ] Monitoring 基礎設施驗證（namespace、storage、RBAC 權限）
+- [x] **3. 智能部署和驗證流程：**
+  - [x] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
+  - [x] 基礎設施驗證（GKE集群健康、靜態IP、VPC、cert-manager）
+  - [x] DNS 和 SSL 一鍵驗證（解析檢查、證書狀態、HTTPS連接測試）
+  - [x] 雙環境完整驗證（Namespace + ResourceQuota、Secret Manager、網路安全）
+  - [x] Monitoring 基礎設施驗證（namespace、storage、RBAC 權限）
 
 
-- [ ] **4. 單一配置管理和成本優化：**
-  - [ ] 統一管理和安全配置（Terraform 狀態管理、Secret 安全性、RBAC 權限檢查、資源標籤策略）
-  - [ ] 成本優化和監控（資源使用監控、GCP 成本監控、資源標籤檢查、測試環境節省）
+- [x] **4. 單一配置管理和成本優化：**
+  - [x] 統一管理和安全配置（Terraform 狀態管理、Secret 安全性、RBAC 權限檢查、資源標籤策略）
+  - [x] 成本優化和監控（資源使用監控、GCP 成本監控、資源標籤檢查、測試環境節省）
 
-- [ ] **5. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄 `.gitignore` - terraform 計劃檔案和敏感內容
-  - [ ] 整理內容到 `DevOpsREADME.md`
+- [x] **5. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄 `.gitignore` - terraform 計劃檔案和敏感內容
+  - [x] 整理內容到 `DevOpsREADME.md`
 
 ---
 #### 階段 4：Kubernetes 應用部署

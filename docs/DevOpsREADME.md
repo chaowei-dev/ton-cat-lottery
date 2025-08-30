@@ -392,32 +392,34 @@ Terraform State
 ### 檔案結構
 ```
 terraform/
-├── main.tf                      # 主要配置整合
-├── backend.tf                   # 狀態管理 (GCS Bucket)
-├── providers.tf                 # Provider 配置
-├── variables.tf                 # 變數定義
-├── outputs.tf                   # 輸出值
-├── terraform.tfvars.example     # 環境變數範例
-├── terraform.tfvars             # 實際變數值 (不納入版控)
-└── modules/                     # 模塊化架構
-    ├── networking/              # VPC 和網路配置
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
-    ├── gke/                     # GKE 集群配置
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
-    ├── dns/                     # Cloudflare DNS 配置
-    ├── ssl/                     # cert-manager 配置
-    ├── namespaces/              # K8s Namespace 配置
-    ├── secrets/                 # Secret Manager 配置
-    ├── iam/                     # IAM 權限配置
-    └── monitoring/              # Monitoring 基礎設施配置
-        ├── main.tf              # Monitoring namespace 和存儲
-        ├── variables.tf         # Storage size、DNS 配置
-        └── outputs.tf           # Monitoring 資源資訊
+├── main.tf                      # 主要配置整合 ✅
+├── backend.tf                   # 狀態管理 (GCS Bucket) ✅
+├── providers.tf                 # Provider 配置 ✅
+├── variables.tf                 # 變數定義 ✅
+├── outputs.tf                   # 輸出值 ✅
+├── terraform.tfvars.example     # 環境變數範例 ✅
+├── terraform.tfvars             # 實際變數值 (不納入版控) ✅
+├── DEPLOYMENT.md                # 部署指南 ✅
+└── modules/                     # 模塊化架構 ✅
+    ├── networking/              # VPC + Static IP + Firewall ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    ├── gke/                     # GKE Autopilot 集群 ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    ├── dns/                     # Cloudflare DNS 雙域名 ✅
+    │   ├── main.tf, variables.tf, outputs.tf, provider.tf
+    ├── ssl/                     # cert-manager + nginx-ingress ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    ├── namespaces/              # 雙環境 + 資源配額 ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    ├── secrets/                 # Secret Manager ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    ├── iam/                     # Service Accounts + RBAC ✅
+    │   ├── main.tf, variables.tf, outputs.tf
+    └── monitoring/              # 監控基礎設施 ✅
+        ├── main.tf, variables.tf, outputs.tf
 ```
+
+**實施狀態**: ✅ 已完成 (30個 .tf 檔案)
 
 ### 快速啟動
 #### 階段 1：環境準備
@@ -451,23 +453,33 @@ letsencrypt_email    = "your-email@example.com"
 
 #### 階段式部署流程
 ```bash
+# 0. 前置檢查：確保 GCP 認證
+gcloud auth list  # 確認已登入
+gcloud config get-value project  # 確認專案為 ton-cat-lottery-dev-3
+gcloud auth activate-service-account --key-file ~/.config/gcp-keys/terraform-service-account.json
+
 # 1. 環境準備
 cd terraform/
 cp terraform.tfvars.example terraform.tfvars
-vim terraform.tfvars  # 編輯必要設定
+vim terraform.tfvars  # 編輯必要設定：domain_name, cloudflare_api_token, cloudflare_zone_id
 
 # 2. 初始化和狀態管理設定
 terraform init
 terraform validate
+
+# 2a. 可選：測試 Cloudflare API 連接
+curl -X GET "https://api.cloudflare.com/client/v4/zones/${cloudflare_zone_id}" \
+  -H "Authorization: Bearer ${cloudflare_api_token}" \
+  -H "Content-Type: application/json" | jq '.success'  # 應該返回 true
 
 # 3. 階段式部署
 # 階段 3a: 網路基礎設施
 terraform apply -target=module.networking
 echo "✅ Networking deployed"
 
-# 階段 3b: GKE 集群
-terraform apply -target=module.gke
-echo "✅ GKE cluster deployed"
+# 階段 3b: IAM + GKE 集群
+terraform apply -target=module.iam -target=module.gke
+echo "✅ IAM and GKE cluster deployed"
 
 # 階段 3c: 完整部署
 terraform apply
