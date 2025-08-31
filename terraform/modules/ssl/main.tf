@@ -17,7 +17,6 @@ resource "helm_release" "cert_manager" {
     value = "cert-manager"
   }
 
-  # Wait for cert-manager to be ready
   wait = true
   timeout = 600
 }
@@ -108,7 +107,6 @@ resource "helm_release" "nginx_ingress" {
     value = "External"
   }
 
-  # Enable SSL passthrough for cert-manager ACME challenges
   set {
     name  = "controller.extraArgs.enable-ssl-passthrough"
     value = "true"

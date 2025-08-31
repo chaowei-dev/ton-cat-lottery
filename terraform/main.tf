@@ -37,6 +37,7 @@ module "iam" {
   source = "./modules/iam"
   
   project_id = var.project_id
+  enable_workload_identity = false  # Will be enabled after GKE cluster exists
   
   resource_labels = var.resource_labels
 }
@@ -57,8 +58,9 @@ module "dns" {
   depends_on = [module.networking]
 }
 
-# SSL Module
+# SSL Module - conditional deployment
 module "ssl" {
+  count  = var.enable_k8s_resources ? 1 : 0
   source = "./modules/ssl"
   
   domain_name        = var.domain_name

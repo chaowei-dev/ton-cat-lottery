@@ -43,9 +43,9 @@ resource "google_project_iam_member" "gha_sa_roles" {
   member  = "serviceAccount:${google_service_account.gha_sa.email}"
 }
 
-# Workload Identity binding for applications
-resource "google_service_account_iam_member" "workload_identity_binding" {
-  service_account_id = google_service_account.gke_sa.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[default/default]"
-}
+# Workload Identity binding - moved to post-deployment manual step
+# This requires GKE cluster to exist first, so it's configured manually after deployment:
+# kubectl annotate serviceaccount default iam.gke.io/gcp-service-account=gke-service-account@PROJECT_ID.iam.gserviceaccount.com
+# gcloud iam service-accounts add-iam-policy-binding gke-service-account@PROJECT_ID.iam.gserviceaccount.com \
+#   --role roles/iam.workloadIdentityUser \
+#   --member "serviceAccount:PROJECT_ID.svc.id.goog[default/default]"

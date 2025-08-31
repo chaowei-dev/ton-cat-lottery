@@ -8,3 +8,9 @@ variable "resource_labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_workload_identity" {
+  description = "Enable Workload Identity binding (requires GKE cluster to exist)"
+  type        = bool
+  default     = false
+}

@@ -562,6 +562,7 @@ ton-cat-lottery/
 
 **目標：建立模塊化雲端基礎設施，實現單一 Terraform 管理雙環境架構**
 
+- 文檔參考: `docs/DevOpsREADME.md` ## Terraform
 
 - [x] **1. Terraform 模塊化架構設計：**
   - [x] 建立單一配置目錄結構
@@ -575,7 +576,8 @@ ton-cat-lottery/
   - [x] Monitoring 基礎設施準備（namespace、storage、RBAC 權限、DNS 子域名）
 
 - [x] **3. 智能部署和驗證流程：**
-  - [x] 模塊化部署策略（階段式部署：networking → gke → 完整部署）
+  - [x] 模塊化部署策略（階段式部署：networking → gke → kubectl配置 → k8s資源）
+  - [x] 依賴關係修正（kubernetes provider 在集群就緒後才執行）
   - [x] 基礎設施驗證（GKE集群健康、靜態IP、VPC、cert-manager）
   - [x] DNS 和 SSL 一鍵驗證（解析檢查、證書狀態、HTTPS連接測試）
   - [x] 雙環境完整驗證（Namespace + ResourceQuota、Secret Manager、網路安全）
@@ -599,6 +601,7 @@ ton-cat-lottery/
 **目標：實現雙環境應用層部署，專門優化後端守護進程配置**
 
 - [ ] **1. 環境準備和驗證：**
+  - [ ] 檢查 Terraform 階段式部署（networking → gke → kubectl配置 → k8s資源）
   - [ ] 基礎設施確認（GKE集群健康、靜態IP、Artifact Registry、SSL證書、DNS）
   - [ ] Secret Manager 混合管理驗證
   - [ ] 基礎工具準備（Docker + GCP 設置、雙環境 namespace 確認）

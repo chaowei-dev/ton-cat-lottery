@@ -347,9 +347,25 @@ gcloud auth login
 
 
 ---
-## Terraform
+## Terraform 基礎設施
 ### 簡介
-TON Cat Lottery 使用 Terraform 作為基礎設施即代碼 (Infrastructure as Code) 工具，自動化管理 GCP 雲端資源。透過 Terraform 可以一鍵部署完整的 Kubernetes 集群、網路架構、SSL 憑證和 DNS 配置。
+通過 Terraform 部署：
+
+1. **GCP 基礎資源**：
+    - VPC 網路、子網路、防火牆規則
+    - GKE Autopilot 集群
+    - 靜態 IP 地址
+    - IAM 服務帳戶和權限
+
+2. **DNS & SSL**：
+    - Cloudflare DNS 記錄
+    - Let's Encrypt SSL 證書管理
+
+3. **K8s 基礎服務**：
+    - cert-manager (SSL 證書自動化)
+    - nginx-ingress (流量入口)
+    - namespaces (環境隔離)
+    - 資源配額和網路策略
 
 **主要特色：**
 - 完全自動化的基礎設施部署
@@ -421,6 +437,28 @@ terraform/
 
 ### 快速啟動
 
+#### 部署架構說明
+Terraform 管理所有基礎設施，包括通過 **Helm Provider** 部署複雜的 K8s 應用：
+
+```
+Terraform (基礎設施即代碼)
+├── GCP Resources (VPC, GKE, DNS, IAM...)  
+└── Helm Provider → 部署複雜的 K8s 應用
+    ├── cert-manager (SSL 證書自動化)
+    └── nginx-ingress (流量入口控制器)
+```
+
+**重要概念：**
+- 你**不需要**手動執行 `helm install`
+- Terraform 使用 `helm_release` 資源自動管理 Helm charts
+- 所有部署都通過 `terraform apply` 完成
+- Helm 只是 Terraform 用來部署複雜 K8s 應用的工具
+
+**部署策略說明：**
+- **cert-manager, nginx-ingress** → 使用 Helm Provider (複雜第三方應用)
+- **namespaces, RBAC, 存儲** → 使用純 Kubernetes 資源 (自定義配置)
+- **API 依賴** → Secret Manager API 需要手動啟用：`gcloud services enable secretmanager.googleapis.com`
+
 #### 必填變數設定
 ```hcl
 # terraform.tfvars
@@ -436,56 +474,93 @@ letsencrypt_email    = "your-email@example.com"
 ```
 
 #### 階段式部署流程
+###### 0. 前置檢查：確保 GCP 認證
 ```bash
-# 0. 前置檢查：確保 GCP 認證
-gcloud auth list  # 確認已登入
-gcloud config get-value project  # 確認專案為 ton-cat-lottery-dev-3
+gcloud auth list
+gcloud config get-value project
 gcloud auth activate-service-account --key-file ~/.config/gcp-keys/terraform-service-account.json
+```
 
-# 1. 環境準備
-cd terraform/
+###### 1. 環境準備
+```bash
+# 編輯必要設定：domain_name, cloudflare_api_token, cloudflare_zone_id
 cp terraform.tfvars.example terraform.tfvars
-vim terraform.tfvars  # 編輯必要設定：domain_name, cloudflare_api_token, cloudflare_zone_id
+vim terraform.tfvars  
+```
 
-# 2. 初始化和狀態管理設定
-terraform init
-terraform validate
+######  2. 初始化和狀態管理設定
+```bash
+terraform init  # (下載 providers 和模組)
+terraform validate  # (驗證配置語法)
+```
 
-# 2a. 可選：測試 Cloudflare API 連接
-curl -X GET "https://api.cloudflare.com/client/v4/zones/${cloudflare_zone_id}" \
-  -H "Authorization: Bearer ${cloudflare_api_token}" \
-  -H "Content-Type: application/json" | jq '.success'  # 應該返回 true
+######  3. 階段式部署（使用變數控制，解決 K8s 資源依賴問題）
+```bash
+# 階段 3a: 基礎設施部署（創建 GKE 集群和基礎設施，不含 K8s 資源)
+terraform apply -var="enable_k8s_resources=false" -auto-approve
 
-# 3. 階段式部署
-# 階段 3a: 網路基礎設施（VPC、防火牆、IAM 權限）
-terraform apply -target=module.networking -target=module.iam
-
-# 階段 3b: GKE 集群（依賴網路和 IAM）
-terraform apply -target=module.gke
-
-# 階段 3c: DNS 和 SSL 設置（依賴 Static IP）
-terraform apply -target=module.dns -target=module.ssl
-
-# 階段 3d: 完整基礎設施部署（namespaces、secrets、monitoring）
-terraform apply
-
-# 4. 獲取 GKE 憑證並驗證
+# 階段 3b: 配置 kubectl 連接 (配置本地 kubectl)
 gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region $(terraform output -raw region)
 
-# 5. 基礎設施驗證
-kubectl get nodes  # GKE 集群健康
-kubectl get certificates -A  # SSL 證書狀態
-dig $(terraform output -raw domain_name)  # DNS 解析檢查
-curl -I https://$(terraform output -raw domain_name)  # HTTPS 連接測試
+# 階段 3c: 啟用 K8s 資源部署 (部署 cert-manager, nginx-ingress, SSL 等)
+# 注意：首次執行可能因為 cert-manager CRDs 未就緒而失敗，這是正常的
+terraform apply -var="enable_k8s_resources=true" -auto-approve
 
-# 6. Monitoring 基礎設施驗證
-kubectl get namespace monitoring  # Monitoring namespace
-kubectl get pvc -n monitoring  # 持久化存儲
-kubectl auth can-i get nodes --as=system:serviceaccount:monitoring:prometheus  # RBAC 權限
+# 階段 3d: 解決常見部署問題
+# 如果遇到 Secret Manager API 錯誤，先啟用 API：
+gcloud services enable secretmanager.googleapis.com --project=$(terraform output -raw project_id)
 
-# 7. 雙環境完整驗證
+# 如果 cert-manager CRDs 錯誤，可以分步驟部署：
+terraform apply -target="module.ssl[0].helm_release.cert_manager" -var="enable_k8s_resources=true" -auto-approve
+# 等待 cert-manager pods 運行後，再執行完整部署：
+terraform apply -var="enable_k8s_resources=true" -auto-approve
+```
+
+###### 4. 基礎設施驗證
+```bash
+# 4a. GKE 集群健康檢查
+kubectl get nodes  
+# 預期結果：Autopilot 模式顯示 "No resources found" 是正常的
+
+# 4b. Namespace 檢查 (應該看到 3 個 namespace)
 kubectl get namespaces | grep -E "(tcl-production|tcl-staging|monitoring)"
-kubectl get resourcequota -A
+# 預期結果：
+# tcl-production   Active   Xm
+# tcl-staging      Active   Xm  
+# monitoring       Active   Xm
+
+# 4c. cert-manager 狀態 (3 個 pods 都應該是 Running)
+kubectl get pods -n cert-manager
+# 預期結果：
+# cert-manager-xxx            1/1   Running   0   Xm
+# cert-manager-cainjector-xxx 1/1   Running   0   Xm
+# cert-manager-webhook-xxx    1/1   Running   0   Xm
+
+# 4d. nginx-ingress 狀態 (1 個 controller pod 應該是 Running)
+kubectl get pods -n ingress-nginx
+# 預期結果：
+# ingress-nginx-controller-xxx   1/1   Running   0   Xm
+
+# 4e. SSL 證書狀態 (應該看到 production-tls 和 staging-tls)
+kubectl get certificates -A
+# 預期結果：
+# tcl-production   production-tls   True    production-tls   Xm    (初始為 False 是正常的，等待驗證)
+# tcl-staging      staging-tls      True    staging-tls      Xm    (需要 LoadBalancer IP 就緒)
+
+# 4f. DNS 解析檢查 (應該解析到靜態 IP)
+dig $(terraform output -raw domain_name) +short
+# 預期結果：34.95.126.115 (或你的靜態 IP)
+
+# 4g. 靜態 IP 和 LoadBalancer 檢查
+terraform output static_ip
+kubectl get svc -n ingress-nginx
+# 預期結果：
+# nginx-ingress-controller LoadBalancer IP 應該從 <pending> 變為靜態 IP
+# SSL 證書在 LoadBalancer 就緒後會自動變為 True 狀態
+
+# 4h. 完整部署狀態檢查
+kubectl get all -A | grep -E "(cert-manager|ingress-nginx)"
+# 所有 pods 都應該是 Running 狀態
 ```
 
 ### 常用指令
@@ -524,6 +599,24 @@ curl -I https://$(terraform output -raw domain_name)
 ```
 
 ### 故障排除
+#### 常見部署問題
+```bash
+# 問題：cert-manager CRDs 不存在
+# 原因：kubernetes_manifest 在 cert-manager 完成安裝前執行
+# 解決方案：分步驟部署
+terraform apply -target="module.ssl[0].helm_release.cert_manager" -var="enable_k8s_resources=true"
+terraform apply -var="enable_k8s_resources=true"
+
+# 問題：Secret Manager API 未啟用
+# 解決方案：
+gcloud services enable secretmanager.googleapis.com --project=PROJECT_ID
+
+# 問題：kubernetes provider 連接錯誤
+# 解決方案：確保 kubectl 已配置
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region $(terraform output -raw region)
+```
+
+#### 一般故障排除
 ```bash
 # 初始化失敗
 rm -rf .terraform .terraform.lock.hcl
@@ -539,33 +632,33 @@ terraform import google_compute_network.vpc projects/PROJECT_ID/global/networks/
 gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region $(terraform output -raw region)
 kubectl cluster-info
 
-# SSL 憑證問題
+# SSL 證書問題排除
 kubectl logs -n cert-manager deployment/cert-manager
 kubectl describe clusterissuer letsencrypt-prod
 
-# 檢查憑證申請狀態
-kubectl get certificaterequests --all-namespaces
-kubectl describe certificate YOUR_CERTIFICATE -n YOUR_NAMESPACE
+# 檢查證書申請狀態（初始為 False 是正常的）
+kubectl get certificates -A
+kubectl describe certificate production-tls -n tcl-production
 
-# 手動觸發憑證續期
-kubectl delete certificate YOUR_CERTIFICATE -n YOUR_NAMESPACE
-# 重新套用 ingress 設定
+# LoadBalancer IP pending 問題
+kubectl get svc -n ingress-nginx
+# 等待 GCP 分配 LoadBalancer IP，SSL 證書會自動變為 Ready
 ```
 
 #### DNS 配置問題
 ```bash
 # 問題：DNS 記錄未生效
 # 檢查 Cloudflare DNS 記錄
-dig @8.8.8.8 your-domain.com
-nslookup your-domain.com
+dig @8.8.8.8 $(terraform output -raw domain_name)
+nslookup $(terraform output -raw domain_name)
 
 # 檢查 DNS 傳播狀態
-curl -s "https://dns.google/resolve?name=your-domain.com&type=A" | jq
+curl -s "https://dns.google/resolve?name=$(terraform output -raw domain_name)&type=A" | jq
 
 # 問題：SSL 證書無效
-# 檢查證書狀態
-curl -vI https://your-domain.com
-openssl s_client -connect your-domain.com:443 -servername your-domain.com
+# 檢查證書狀態（需要等待 LoadBalancer IP 分配完成）
+curl -vI https://$(terraform output -raw domain_name)
+openssl s_client -connect $(terraform output -raw domain_name):443
 ```
 
 #### 狀態檔案問題
@@ -618,8 +711,10 @@ TON Cat Lottery 使用 Google Kubernetes Engine (GKE) Autopilot 作為容器編�
 ### 架構
 ```
 Internet → Cloudflare DNS → Static IP → nginx-ingress → Services
-                                                      ├── frontend-service (React dApp)
-                                                      └── backend-service (Go Daemon)
+                                                      └── frontend-service (React dApp)
+                                                      
+                                     K8s Cluster (內部)
+                                                      └── backend-deployment (Go Daemon, 無 Service)
 ```
 
 **雙環境架構：**
@@ -834,9 +929,8 @@ kubectl logs POD_NAME -n tcl-production
 gcloud container images list --repository=asia-east1-docker.pkg.dev/PROJECT_ID/tcl-repo
 
 # 服務連接問題
-kubectl get svc -n tcl-production
-kubectl get endpoints backend-service -n tcl-production
-kubectl exec -it deployment/frontend -n tcl-production -- curl -v http://backend-service
+kubectl get svc -n tcl-production  # 只會看到 frontend-service
+# 注意：後端守護進程無 Service，無法透過服務發現訪問
 
 # Ingress 和 SSL 問題
 kubectl get ingress -n tcl-production

@@ -37,6 +37,9 @@ enable_monitoring       = true                          # (optional) Enable moni
 prometheus_storage_size = "10Gi"                        # (optional) Prometheus storage size
 grafana_storage_size    = "5Gi"                         # (optional) Grafana storage size
 
+# Deployment Stage Control
+enable_k8s_resources = false                            # (optional) Enable K8s SSL resources - set false for initial deploy
+
 # Resource Labels (optional)
 resource_labels = {
   project     = "ton-cat-lottery"

@@ -109,6 +109,13 @@ variable "enable_monitoring" {
   default     = true
 }
 
+# Deployment Stage Control
+variable "enable_k8s_resources" {
+  description = "Enable Kubernetes resources deployment (SSL, certificates)"
+  type        = bool
+  default     = false
+}
+
 variable "prometheus_storage_size" {
   description = "Prometheus storage size"
   type        = string
