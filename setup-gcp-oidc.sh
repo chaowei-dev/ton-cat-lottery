@@ -105,6 +105,7 @@ REQUIRED_ROLES=(
     "roles/artifactregistry.writer"      # Artifact Registry 推送
     "roles/storage.admin"                # GCS bucket 管理 (Terraform state)
     "roles/serviceusage.serviceUsageConsumer"  # 服務使用權限
+    "roles/iam.serviceAccountTokenCreator"     # Service Account token 生成權限
 )
 
 for role in "${REQUIRED_ROLES[@]}"; do
