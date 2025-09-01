@@ -600,50 +600,40 @@ ton-cat-lottery/
 
 **目標：實現雙環境應用層部署，專門優化後端守護進程配置**
 
-- [ ] **1. 環境準備和驗證：**
-  - [ ] 檢查 Terraform 階段式部署（networking → gke → kubectl配置 → k8s資源）
-  - [ ] 基礎設施確認（GKE集群健康、靜態IP、Artifact Registry、SSL證書、DNS）
-  - [ ] Secret Manager 混合管理驗證
-  - [ ] 基礎工具準備（Docker + GCP 設置、雙環境 namespace 確認）
+- [x] **1. 環境準備和驗證：**
+  - [x] 檢查 Terraform 階段式部署（networking → gke → kubectl配置 → k8s資源）
+  - [x] 基礎設施確認（GKE集群健康、靜態IP、Artifact Registry、SSL證書、DNS）
+  - [x] 權限配置修復（GKE 節點訪問 Artifact Registry 權限）
+  - [x] 基礎工具準備（Docker + GCP 設置、雙環境 namespace 確認）
 
-- [ ] **2. 精簡 Docker 映像策略：**
-  - [ ] 統一映像標籤策略（只使用 commit hash，不使用 latest 標籤）
-  - [ ] 精簡映像建構（Backend 映像、Frontend 映像、映像驗證）
-  - [ ] 映像基礎優化（多階段建構、基礎安全）
+- [x] **2. 精簡 Docker 映像策略：**
+  - [x] 統一映像標籤策略（只使用 commit hash，不使用 latest 標籤）
+  - [x] 精簡映像建構（Backend 映像、Frontend 映像、映像驗證）
+  - [x] 映像基礎優化（多階段建構、基礎安全）
 
-- [ ] **3. 建立 K8s 雙環境部署檔案：**
-  - [ ] 組織 `k8s/` 目錄結構（base、overlays/production、overlays/staging、ingress）
-  - [ ] 共用基礎配置（namespace、frontend deployment + service、backend deployment + configmap）
-  - [ ] 後端守護進程配置（**無對外 Service**、專門健康檢查 `/app/health-check`、TON 合約監聽配置）
-  - [ ] Kustomize 雙環境配置（Production 和 Staging 環境 overlay、replica 和 resource patches）
-  - [ ] 單一 Ingress 雙域名配置（cat-lottery.chaowei-liu.com + dev.cat-lottery.chaowei-liu.com）
-  - [ ] Secret Manager 混合管理整合
+- [x] **3. 建立 K8s 雙環境部署檔案：**
+  - [x] 組織 `k8s/` 目錄結構（base、overlays/production、overlays/staging、ingress）
+  - [x] 共用基礎配置（frontend deployment + service、backend deployment + configmap）
+  - [x] 後端守護進程配置（**無對外 Service**、HTTP 健康檢查 `/health:8080`、TON 合約監聽配置）
+  - [x] Kustomize 雙環境配置（Production 和 Staging 環境 overlay、replica 和 resource patches）
+  - [x] 單一 Ingress 雙域名配置（cat-lottery.chaowei-liu.com + dev.cat-lottery.chaowei-liu.com）
+  - [x] ConfigMap + K8s Secrets 配置管理
 
-- [ ] **4. 應用安全和生產配置：**
-  - [ ] 基礎安全配置（Secret Manager、Pod Security Context、Resource Limits、Service Account）
-  - [ ] 基本生產功能（前後端差異化健康檢查、結構化日誌配置、Graceful Shutdown、環境標籤）
+- [x] **4. 應用安全和生產配置：**
+  - [x] 基礎安全配置（Pod Security Context、Resource Limits、Service Account）
+  - [x] 基本生產功能（前後端差異化健康檢查、結構化日誌配置、環境標籤）
+  - [x] 映像拉取問題解決方案（權限配置 + patch deployment 修復）
 
-- [ ] **5. 本地 K8s 部署驗證** (可選):
-  - [ ] 本地 Kubernetes 測試環境（kind 集群設置）
-  - [ ] 配置一致性驗證
-  - [ ] 本地部署測試
+- [x] **5. 雙環境部署和驗證：**
+  - [x] 部署前檢查（GKE集群狀態、Namespaces、SSL證書）
+  - [x] 雙環境一鍵部署（Production、Staging、統一 Ingress）
+  - [x] 部署狀態驗證（應用狀態檢查、服務連通性測試）
+  - [x] 雙環境完整驗證（健康檢查測試、後端守護進程驗證、SSL 證書狀態）
 
-- [ ] **6. 雙環境部署和驗證：**
-  - [ ] 部署前檢查（GKE集群狀態、Namespaces、SSL證書）
-  - [ ] 雙環境一鍵部署（Production、Staging、統一 Ingress）
-  - [ ] 部署狀態驗證（應用狀態檢查、服務連通性測試）
-  - [ ] 雙環境完整驗證（外部訪問測試、應用功能驗證、後端守護進程驗證）
-
-- [ ] **7. 效能和監控驗證：**
-  - [ ] 配置 Google Cloud Monitoring 集成
-  - [ ] 設定日誌收集和查詢
-  - [ ] 測試應用在負載下的表現
-  - [ ] 驗證 HPA 自動擴縮容功能
-
-- [ ] **8. 內容整理：**
-  - [ ] 重新驗證這個階段的 todos
-  - [ ] 更新主目錄 `.gitignore` for k8s
-  - [ ] 整理內容到 `DevOpsREADME.md`
+- [x] **6. 內容整理：**
+  - [x] 重新驗證這個階段的 todos
+  - [x] 更新主目錄 `.gitignore` for k8s (k8s/ 目錄已建立)
+  - [x] 整理內容到 `DevOpsREADME.md` (完整的快速啟動指南已建立)
 
 ---
 

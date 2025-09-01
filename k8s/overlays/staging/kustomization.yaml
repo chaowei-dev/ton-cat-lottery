@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tcl-staging
+
+resources:
+  - ../../base
+
+patchesStrategicMerge:
+  - replica-patch.yaml
+
+commonLabels:
+  environment: staging
+  deployment.kubernetes.io/environment: staging
+
+images:
+  - name: frontend-placeholder
+    newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/frontend
+    newTag: 0daa3ee
+  - name: backend-placeholder
+    newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/backend
+    newTag: 0daa3ee
+
+configMapGenerator:
+  - name: ton-contract-config
+    literals:
+      - contract-address=EQD4FPq-PRDieyQKkizFTRtSDyucUIqrj0v_zXJmqaDp6_0t  # Testnet contract (placeholder)

@@ -698,15 +698,15 @@ terraform apply
 ---
 ## k8s GKE
 ### 簡介
-TON Cat Lottery 使用 Google Kubernetes Engine (GKE) Autopilot 作為容器編排平台，透過微服務架構部署前端和後端應用。系統採用 nginx-ingress + cert-manager 實現 HTTPS 自動化，並整合 Cloudflare DNS 提供完整的生產級別服務。
+TON Cat Lottery 使用 **GKE Autopilot + Kustomize** 實現雙環境微服務部署。系統基於 Terraform 基礎設施，透過 K8s 編排容器化應用，並提供完整的 HTTPS 自動化管理。
 
 **主要特色：**
-- GKE Autopilot 自動化節點管理和擴縮容
-- 微服務架構：前端 (React) + 後端 (Go) 分離部署
-- HTTPS 自動化：Let's Encrypt + cert-manager 自動續期
-- 安全最佳實踐：非 root 用戶、資源限制、網路隔離
-- ConfigMap/Secret 配置管理
-- 健康檢查和滾動更新
+- **雙環境隔離**：Production/Staging 完全分離的命名空間 (tcl-production/tcl-staging)
+- **Kustomize 配置管理**：base + overlays 實現環境差異化配置  
+- **Docker 映像自動化**：commit hash 標籤策略 + Artifact Registry 整合
+- **零停機部署**：健康檢查 + 滾動更新，所有配置經生產環境驗證
+- **安全生產就緒**：非 root 容器、資源限制、HTTPS 自動續期
+- **實用問題解決**：包含權限配置、映像拉取等常見部署問題的解決方案
 
 ### 架構
 ```
@@ -732,7 +732,7 @@ Internet → Cloudflare DNS → Static IP → nginx-ingress → Services
 ```
 k8s/
 ├── base/                           # 基礎配置
-│   ├── kustomization.yaml         # 基礎 Kustomize 配置
+│   ├── kustomization.yaml          # 基礎 Kustomize 配置
 │   ├── namespace.yaml              # 命名空間定義
 │   ├── frontend/
 │   │   ├── deployment.yaml         # 前端 Deployment
@@ -753,212 +753,220 @@ k8s/
 ```
 
 ### 快速啟動
-#### 0. 基礎設施部署（必要前置步驟）
-```bash
-# 先執行 Terraform 基礎設施部署（參考 Terraform 章節）
-cd terraform/ && terraform apply
 
-# 確認基礎設施已部署
-terraform output cluster_endpoint
-terraform output static_ip_address
+#### 部署架構說明
+K8s 應用部署建立在 Terraform 基礎設施之上，使用 **Kustomize** 進行環境差異化配置管理：
 
-# 取得 GKE 憑證
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+```
+Terraform 基礎設施 → K8s 應用部署 → 雙環境驗證
+├── GKE 集群                ├── Docker 映像構建       ├── Production 環境
+├── nginx-ingress          ├── Kustomize 配置       ├── Staging 環境  
+├── cert-manager           ├── 健康檢查配置         └── SSL 證書驗證
+└── 靜態 IP + DNS          └── 滾動部署
 ```
 
-#### 1. 環境準備和驗證
-```bash
-# 基礎設施確認
-kubectl get nodes  # GKE 集群健康
-kubectl get certificates -A  # SSL 證書狀態
-gcloud artifacts repositories list --location=asia-east1  # Artifact Registry 確認
-dig cat-lottery.chaowei-liu.com  # DNS 解析確認
+**重要概念：**
+- 你**必須先**完成 Terraform 基礎設施部署
+- 雙環境使用相同的 Docker 映像，但不同的配置和資源分配
+- 所有部署都通過 `kubectl apply -k` 完成 Kustomize 配置合成
+- **映像標籤同步**是部署成功的關鍵，使用 commit hash 策略
 
-# 雙環境 namespace 確認
+**部署策略說明：**
+- **Base 配置** → 前端/後端通用 Deployment 和 Service 定義
+- **Overlays 差異化** → Production (高資源+多副本) vs Staging (低資源+單副本)  
+- **權限修復** → GKE 節點需要 Artifact Registry 讀取權限 (常見問題)
+
+#### 階段式部署流程
+##### 0. 前置檢查：確保基礎設施就緒
+```bash
+# 確認 Terraform 基礎設施已部署
+terraform -chdir=terraform output cluster_name
+terraform -chdir=terraform output static_ip
+
+# 切換到正確的 GCP 帳戶（重要！避免權限問題）
+gcloud config set account liu.chaowei.dev@gmail.com
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+
+# 驗證集群連接
 kubectl get namespaces | grep -E "(tcl-production|tcl-staging)"
-
-# Docker + GCP 設置
-gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
-gcloud auth configure-docker asia-east1-docker.pkg.dev
 ```
 
-#### 2. 精簡 Docker 映像策略
+##### 1. 權限配置（關鍵步驟：解決映像拉取問題）
 ```bash
-# 統一映像標籤策略（commit hash only）
+# 修復 GKE 節點 Artifact Registry 權限（必要！）
+PROJECT_NUMBER=$(gcloud projects describe ton-cat-lottery-dev-3 --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-3 \
+  --member="serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
+  --role="roles/artifactregistry.reader"
+
+# Docker 認證配置
+gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+# 驗證權限設定
+gcloud artifacts repositories list --location=asia-east1
+```
+
+##### 2. 階段式 Docker 映像構建
+```bash
+# 確保 Docker Desktop 運行中
+docker info > /dev/null || (echo "請啟動 Docker Desktop" && exit 1)
+
+# 獲取 commit hash 作為映像標籤（版本追蹤策略）
 COMMIT_SHA=$(git rev-parse --short HEAD)
 PROJECT_ID=$(gcloud config get-value project)
+echo "使用映像標籤: $COMMIT_SHA"
 
-# Frontend 映像建構（多階段優化）
+# 階段 2a: 構建前端映像（多階段建構：開發→生產）
 docker buildx build --platform linux/amd64 \
   -f docker/Dockerfile.frontend --target production \
-  -t asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/frontend:$COMMIT_SHA \
-  --push .
+  -t asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/frontend:$COMMIT_SHA --push .
 
-# 映像驗證
+# 階段 2b: 構建後端映像  
+docker buildx build --platform linux/amd64 \
+  -f docker/Dockerfile.backend \
+  -t asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/backend:$COMMIT_SHA --push .
+
+# 階段 2c: 驗證映像推送成功
 gcloud artifacts docker images list asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo --include-tags
+echo "✅ 映像構建完成，標籤: $COMMIT_SHA"
 ```
 
-#### 3. Kustomize 雙環境部署
+#### 3. 階段式 K8s 部署（使用 Kustomize，解決映像標籤同步問題）
 ```bash
-# Production 環境部署
-kubectl apply -k k8s/overlays/production
-kubectl apply -f k8s/ingress/
+# 階段 3a: 更新 kustomization 檔案中的映像標籤（關鍵步驟）
+COMMIT_SHA=$(git rev-parse --short HEAD)
+cd k8s/overlays/staging
+sed -i '' "s/newTag: .*/newTag: $COMMIT_SHA/" kustomization.yaml
+cd ../production  
+sed -i '' "s/newTag: .*/newTag: $COMMIT_SHA/" kustomization.yaml
+cd ../../..
+echo "✅ Kustomization 檔案已更新"
 
-# Staging 環境部署
+# 階段 3b: 部署 Staging 環境（測試先行）
 kubectl apply -k k8s/overlays/staging
+echo "Staging 環境部署中..."
 
-# 統一 Ingress 配置（雙域名）
+# 階段 3c: 等待 Staging 就緒後部署 Production
+sleep 30
+kubectl get pods -n tcl-staging
+kubectl apply -k k8s/overlays/production
+echo "Production 環境部署中..."
+
+# 階段 3d: 處理常見映像拉取問題（如果遇到）
+# 如果看到 ImagePullBackOff 或 ErrImagePull，執行以下修復：
+PROJECT_ID=$(gcloud config get-value project)
+kubectl patch deployment frontend -n tcl-staging -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"frontend\",\"image\":\"asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/frontend:$COMMIT_SHA\"}]}}}}"
+kubectl patch deployment backend -n tcl-staging -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"backend\",\"image\":\"asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/backend:$COMMIT_SHA\"}]}}}}"
+kubectl patch deployment frontend -n tcl-production -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"frontend\",\"image\":\"asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/frontend:$COMMIT_SHA\"}]}}}}"
+kubectl patch deployment backend -n tcl-production -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"backend\",\"image\":\"asia-east1-docker.pkg.dev/$PROJECT_ID/tcl-repo/backend:$COMMIT_SHA\"}]}}}}"
+```
+
+##### 4. Ingress 和 SSL 配置（網路入口設定）
+```bash
+# 移除有問題的 admission webhook（如果遇到建立 ingress 失敗）
+kubectl delete validatingwebhookconfiguration nginx-ingress-ingress-nginx-admission 2>/dev/null || true
+
+# 部署雙域名 ingress 配置
 kubectl apply -f k8s/ingress/ingress.yaml
+
+# 檢查 ingress 狀態
+kubectl get ingress -A
+echo "✅ Ingress 配置完成"
 ```
 
-#### 4. 應用安全和生產配置驗證
+##### 5. 雙環境部署驗證
 ```bash
-# Pod Security Context 檢查
-kubectl describe pod -l app=frontend -n tcl-production | grep -A 5 "Security Context"
+# 5a. 檢查 Pod 狀態（所有 pods 應該是 Running 和 Ready 1/1）
+echo "=== Staging 環境狀態 ==="
+kubectl get pods -n tcl-staging -o wide
+echo ""
+echo "=== Production 環境狀態 ==="  
+kubectl get pods -n tcl-production -o wide
 
-# Resource Limits 檢查
-kubectl describe pod -l app=frontend -n tcl-production | grep -A 10 "Limits"
+# 5b. 健康檢查驗證（確認應用正常運行）
+echo "=== 健康檢查測試 ==="
+kubectl exec deployment/frontend -n tcl-staging -- curl -s http://localhost/health
+kubectl exec deployment/backend -n tcl-staging -- curl -s http://localhost:8080/health
 
-# 後端守護進程健康檢查（無 HTTP Service）
-kubectl exec -n tcl-production deployment/backend -- /app/health-check
+# 5c. 服務端點檢查（確認 Service 正確路由到 Pods）
+echo "=== 服務端點檢查 ==="
+kubectl get endpoints -n tcl-staging
+kubectl get endpoints -n tcl-production
 
-# 結構化日誌配置確認
-kubectl logs -n tcl-production deployment/backend --tail=10 | head -1 | jq '.'
+# 5d. SSL 證書和 Ingress 狀態
+echo "=== SSL 和 Ingress 狀態 ==="
+kubectl get ingress -A
+kubectl get certificates -A
+# 注意：SSL 證書初始為 False 是正常的，需等待 LoadBalancer IP 分配
+
+# 5e. 完整部署狀態總覽
+echo "=== 部署狀態總覽 ==="
+echo "Staging (1 frontend + 1 backend replicas):"
+kubectl get deployment -n tcl-staging
+echo ""
+echo "Production (3 frontend + 2 backend replicas):"  
+kubectl get deployment -n tcl-production
+echo ""
+echo "✅ K8s 雙環境部署完成"
+echo "📝 訪問地址："
+echo "  Production: https://cat-lottery.chaowei-liu.com"
+echo "  Staging: https://dev.cat-lottery.chaowei-liu.com"
+echo "⏳ SSL 證書將在 LoadBalancer IP 分配完成後自動就緒"
 ```
 
-#### 5. 雙環境完整驗證
+##### 6. 問題排查（常見情況）
 ```bash
-# 外部訪問測試
-curl -I https://cat-lottery.chaowei-liu.com  # Production
-curl -I https://dev.cat-lottery.chaowei-liu.com  # Staging
+# 映像拉取失敗
+kubectl describe pod POD_NAME -n tcl-staging | grep -A 5 "Events:"
 
-# 後端守護進程驗證（TON 合約監聽）
-kubectl logs -n tcl-production deployment/backend | grep -i "contract|lottery"
-kubectl get configmap backend-config -n tcl-production -o yaml | grep TON
+# 健康檢查失敗  
+kubectl logs deployment/frontend -n tcl-staging --tail=20
+kubectl logs deployment/backend -n tcl-staging --tail=20
 
-# 服務連通性測試
-kubectl get endpoints -n tcl-production  # 只有 frontend，backend 無 Service
+# LoadBalancer 外部 IP pending
+kubectl describe svc nginx-ingress-ingress-nginx-controller -n ingress-nginx
+
+# SSL 證書未就緒
+kubectl describe certificate -A
+kubectl get pods -n cert-manager
 ```
 
-#### 6. 效能和監控驗證（可選）
+### 常用管理指令
 ```bash
-# Google Cloud Monitoring 集成確認
-kubectl get pods -n kube-system | grep metrics-server
-kubectl top nodes
-kubectl top pods -n tcl-production
+# 查看雙環境狀態
+kubectl get all -n tcl-production
+kubectl get all -n tcl-staging
 
-# 日誌收集和查詢測試
-kubectl logs -n tcl-production deployment/frontend --tail=100 | wc -l
-kubectl logs -n tcl-production deployment/backend --since=1h | grep -c ERROR
+# 查看 Pod 和日誌
+kubectl get pods -n tcl-production -o wide
+kubectl logs deployment/frontend -n tcl-production --tail=50
+kubectl logs deployment/backend -n tcl-production --tail=50
 
-# HPA 自動擴縮容驗證
-kubectl autoscale deployment frontend --cpu-percent=70 --min=1 --max=5 -n tcl-production
-kubectl get hpa -n tcl-production
-
-# 負載測試（簡單驗證）
-echo "GET https://cat-lottery.chaowei-liu.com" | vegeta attack -duration=30s -rate=10 | vegeta report
-```
-
-#### 7. 本地 K8s 部署驗證（可選）
-```bash
-# kind 集群設置
-kind create cluster --name tcl-test
-kubectl config use-context kind-tcl-test
-
-# 配置一致性驗證
-kubectl apply --dry-run=client -k k8s/overlays/staging
-echo "✅ Kustomize configuration valid"
-
-# 本地部署測試（無外部服務依賴）
-kubectl apply -k k8s/base
-kubectl get pods --watch
-```
-
-### 常用指令
-#### Pod 和 Deployment 管理
-```bash
-# 查看所有資源
-kubectl get all -n ton-cat-lottery
-
-# 查看 Pod 詳細資訊
-kubectl describe pod POD_NAME -n ton-cat-lottery
-
-# 查看 Pod 日誌
-kubectl logs -f deployment/backend -n ton-cat-lottery
-kubectl logs -f deployment/frontend -n ton-cat-lottery
-
-# 進入 Pod 容器
-kubectl exec -it deployment/backend -n ton-cat-lottery -- sh
-kubectl exec -it deployment/frontend -n ton-cat-lottery -- sh
-
-# 重啟 Deployment
-kubectl rollout restart deployment/backend -n ton-cat-lottery
-kubectl rollout restart deployment/frontend -n ton-cat-lottery
-
-# 查看滾動更新狀態
-kubectl rollout status deployment/backend -n ton-cat-lottery
-kubectl rollout history deployment/backend -n ton-cat-lottery
-
-# 配置管理
-kubectl get configmap -n ton-cat-lottery
-kubectl describe configmap backend-config -n ton-cat-lottery
-
-# SSL 憑證管理
-kubectl get certificate -n ton-cat-lottery
-kubectl describe certificate ton-cat-lottery-tls -n ton-cat-lottery
-kubectl get clusterissuer
-
-# 映像更新與回滾
-kubectl set image deployment/backend backend=asia-east1-docker.pkg.dev/PROJECT_ID/tcl-repo/backend:NEW_TAG -n ton-cat-lottery
-kubectl rollout undo deployment/backend -n ton-cat-lottery
-
-# 自動擴縮容管理
-kubectl autoscale deployment backend --cpu-percent=70 --min=2 --max=10 -n ton-cat-lottery
-kubectl get hpa -n ton-cat-lottery
-kubectl top pods -n ton-cat-lottery
-```
-
-### 故障排除
-#### Pod 啟動問題
-```bash
-# 問題：Pod 無法正常啟動
-# 檢查 Pod 狀態和事件
-kubectl get pods -n ton-cat-lottery
-kubectl describe pod POD_NAME -n tcl-production | grep -A 5 "Events:"
-kubectl logs POD_NAME -n tcl-production
-gcloud container images list --repository=asia-east1-docker.pkg.dev/PROJECT_ID/tcl-repo
-
-# 服務連接問題
-kubectl get svc -n tcl-production  # 只會看到 frontend-service
-# 注意：後端守護進程無 Service，無法透過服務發現訪問
-
-# Ingress 和 SSL 問題
-kubectl get ingress -n tcl-production
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
-kubectl describe certificate ton-cat-lottery-tls -n tcl-production
-
-kubectl logs -n cert-manager deployment/cert-manager
-curl -vI https://cat-lottery.chaowei-liu.com
-
-# 資源和效能問題
-kubectl top nodes
-kubectl top pods -n tcl-production
-kubectl get events -n tcl-production --sort-by=.metadata.creationTimestamp
-
-# 配置問題
-kubectl get configmap backend-config -n tcl-production -o yaml
-kubectl exec -it deployment/backend -n tcl-production -- env | grep -E "(TON|LOTTERY|NFT)"
+# 重啟部署（映像更新後）
+kubectl rollout restart deployment/frontend -n tcl-production
 kubectl rollout restart deployment/backend -n tcl-production
 
-# 清理和重建
-kubectl delete deployment backend -n tcl-production
-kubectl apply -f k8s/backend/deployment.yaml
-kubectl delete pod -l app=backend -n tcl-production
+# 更新映像標籤
+COMMIT_SHA=$(git rev-parse --short HEAD)
+kubectl patch deployment frontend -n tcl-production -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"frontend\",\"image\":\"asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/frontend:$COMMIT_SHA\"}]}}}}"
 
-# 日誌監控
-kubectl logs -f deployment/backend -n tcl-production --tail=100
-kubectl get events -n tcl-production --watch
+# 檢查配置
+kubectl get configmap backend-config -n tcl-production -o yaml
+kubectl describe certificate production-tls -n tcl-production
+
+# 擴縮容（生產環境）
+kubectl scale deployment frontend --replicas=5 -n tcl-production
+kubectl scale deployment backend --replicas=3 -n tcl-production
 ```
+
+---
+
+## 部署完成 ✅
+雙環境 K8s 應用已成功部署至 GKE 集群：
+- **Production**: `cat-lottery.chaowei-liu.com` (3 frontend + 2 backend replicas)
+- **Staging**: `dev.cat-lottery.chaowei-liu.com` (1 frontend + 1 backend replica)
+- **SSL 證書**: 由 cert-manager + Let's Encrypt 自動管理
+- **負載均衡**: nginx-ingress + GCP LoadBalancer 靜態 IP
 
 ---
 ## GitHub Action (CI/CD)

@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ton-cat-lottery-ingress
+  namespace: tcl-production
+  labels:
+    app.kubernetes.io/name: ton-cat-lottery-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+spec:
+  tls:
+  - hosts:
+    - cat-lottery.chaowei-liu.com
+    secretName: production-tls
+  rules:
+  - host: cat-lottery.chaowei-liu.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ton-cat-lottery-staging-ingress
+  namespace: tcl-staging
+  labels:
+    app.kubernetes.io/name: ton-cat-lottery-staging-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+spec:
+  tls:
+  - hosts:
+    - dev.cat-lottery.chaowei-liu.com
+    secretName: staging-tls
+  rules:
+  - host: dev.cat-lottery.chaowei-liu.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
