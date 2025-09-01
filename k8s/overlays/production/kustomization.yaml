@@ -17,10 +17,10 @@ commonLabels:
 images:
   - name: frontend-placeholder
     newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/frontend
-    newTag: 0daa3ee
+    newTag: 8b089bf-25
   - name: backend-placeholder
     newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/backend
-    newTag: 0daa3ee
+    newTag: 8b089bf-25
 
 configMapGenerator:
   - name: ton-contract-config

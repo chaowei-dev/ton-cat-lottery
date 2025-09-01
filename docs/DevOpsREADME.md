@@ -1303,6 +1303,13 @@ gh secret list
 gcloud projects get-iam-policy ton-cat-lottery-dev-3 \
   --flatten="bindings[].members" \
   --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com"
+
+# 6. 修正常見權限問題：Service Account Token Creator
+# 錯誤：Permission 'iam.serviceAccounts.getAccessToken' denied
+# 解決：添加 serviceAccountTokenCreator 角色
+gcloud projects add-iam-policy-binding ton-cat-lottery-dev-3 \
+  --member="serviceAccount:gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
 ```
 
 ##### 問題：映像建構與推送失敗

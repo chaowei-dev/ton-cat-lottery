@@ -3,8 +3,10 @@ name: 🚀 Continuous Deployment
 on:
   push:
     branches: [ main ]  # Production部署
-  pull_request:
-    branches: [ main ]  # Staging部署
+  workflow_run:
+    workflows: ["🚀 Continuous Integration"]
+    types: [completed]
+    branches: [ main, dev ]  # CI 成功後觸發 CD
   workflow_dispatch:   # 手動觸發
     inputs:
       environment:
@@ -57,9 +59,22 @@ jobs:
         elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
           # main分支推送 -> Production
           TARGET_ENV="production"
-        elif [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
-          # PR到main -> Staging  
-          TARGET_ENV="staging"
+        elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+          # CI 成功後觸發 - 只在 CI 成功時部署
+          if [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then
+            if [ "${{ github.event.workflow_run.head_branch }}" = "main" ]; then
+              TARGET_ENV="production"
+            elif [ "${{ github.event.workflow_run.head_branch }}" = "dev" ]; then
+              TARGET_ENV="staging"  
+            else
+              # 其他分支的 CI 成功不觸發部署
+              TARGET_ENV="none"
+            fi
+          else
+            # CI 失敗時不部署
+            echo "⚠️ CI workflow failed, skipping deployment"
+            TARGET_ENV="none"
+          fi
         else
           # 其他情況不部署
           TARGET_ENV="none"
@@ -230,6 +245,11 @@ jobs:
     - name: 🔧 Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
       
+    - name: 🔌 Install GKE gcloud auth plugin
+      run: |
+        gcloud components install gke-gcloud-auth-plugin --quiet
+        echo "✅ GKE auth plugin installed"
+      
     - name: ⚙️ Configure kubectl
       run: |
         gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
@@ -255,8 +275,8 @@ jobs:
         # 更新 Kustomization 檔案中的映像標籤
         cd k8s/overlays/${{ needs.pre-deployment.outputs.target_env }}
         
-        # 更新 kustomization.yaml 中的映像標籤
-        sed -i "s/newTag: .*/newTag: $IMAGE_TAG/" kustomization.yaml
+        # 更新 kustomization.yaml 中的映像標籤（所有 newTag 行）
+        sed -i "s/newTag: .*/newTag: $IMAGE_TAG/g" kustomization.yaml
         
         echo "📝 Updated kustomization.yaml with new image tag:"
         cat kustomization.yaml | grep -A 5 -B 5 "newTag"
@@ -376,6 +396,14 @@ jobs:
       with:
         workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
         service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        
+    - name: 🔧 Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: 🔌 Install GKE gcloud auth plugin  
+      run: |
+        gcloud components install gke-gcloud-auth-plugin --quiet
+        echo "✅ GKE auth plugin installed"
         
     - name: ⚙️ Configure kubectl
       run: |
