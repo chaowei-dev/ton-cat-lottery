@@ -12,7 +12,7 @@ set -e  # 遇到錯誤立即退出
 
 # 配置變數
 PROJECT_ID="ton-cat-lottery-dev-3"
-GITHUB_REPO="chaowei-liu/ton-cat-lottery"
+GITHUB_REPO="chaowei-dev/ton-cat-lottery"
 SERVICE_ACCOUNT_NAME="gha-deploy"
 WORKLOAD_IDENTITY_POOL_NAME="github-pool" 
 WORKLOAD_IDENTITY_PROVIDER_NAME="github-provider"
