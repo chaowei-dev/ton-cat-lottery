@@ -53,7 +53,7 @@ jobs:
         cd frontend
         npm ci
         npm run lint || echo "⚠️ Frontend linting issues detected"
-        npm run type-check || echo "⚠️ TypeScript type issues detected"
+        npm run build || echo "⚠️ Frontend build/type-check issues detected"
         echo "✅ Frontend quality checks completed"
         
     # 後端代碼品質
@@ -121,24 +121,44 @@ jobs:
       run: |
         cd frontend  
         npm ci
-        npm test -- --watchAll=false || {
-          echo "❌ Frontend tests failed"
-          echo "::warning::Frontend tests need attention" 
-          exit 1
-        }
-        echo "✅ Frontend tests passed"
+        # Check if test script exists, otherwise run build verification
+        if npm run | grep -q "test"; then
+          npm test -- --watchAll=false || {
+            echo "❌ Frontend tests failed"
+            echo "::warning::Frontend tests need attention" 
+            exit 1
+          }
+        else
+          echo "ℹ️ No test script found, running build verification instead"
+          npm run build || {
+            echo "❌ Frontend build verification failed"
+            echo "::warning::Frontend build needs attention"
+            exit 1
+          }
+        fi
+        echo "✅ Frontend tests/build verification passed"
         
     # 後端測試
     - name: 🧪 Backend Tests
       if: matrix.component == 'backend'
       run: |
         cd backend
-        go test -v ./... || {
-          echo "❌ Backend tests failed"
-          echo "::warning::Backend tests need attention"
-          exit 1  
-        }
-        echo "✅ Backend tests passed"
+        # Check if there are any test files
+        if find . -name "*_test.go" | grep -q .; then
+          go test -v ./... || {
+            echo "❌ Backend tests failed"
+            echo "::warning::Backend tests need attention"
+            exit 1  
+          }
+        else
+          echo "ℹ️ No test files found, running build verification instead"
+          go build ./... || {
+            echo "❌ Backend build verification failed"
+            echo "::warning::Backend build needs attention"
+            exit 1
+          }
+        fi
+        echo "✅ Backend tests/build verification passed"
 
   # =============================================================================
   # 🔒 安全掃描

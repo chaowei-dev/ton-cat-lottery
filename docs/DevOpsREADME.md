@@ -1241,8 +1241,8 @@ kubectl rollout undo deployment/backend -n tcl-production
 # 1. 智能合約編譯失敗
 cd contracts && npm ci && npm run build
 
-# 2. 前端 linting 或 type-check 失敗
-cd frontend && npm ci && npm run lint && npm run type-check
+# 2. 前端 linting 或 build 失敗
+cd frontend && npm ci && npm run lint && npm run build
 
 # 3. 後端代碼格式問題
 cd backend && go fmt ./... && go vet ./...
@@ -1258,11 +1258,11 @@ docker build -f docker/Dockerfile.backend .
 # 智能合約測試
 cd contracts && npm test
 
-# 前端測試
-cd frontend && npm test -- --watchAll=false
+# 前端測試/建構驗證
+cd frontend && npm run build  # 目前使用建構驗證代替測試
 
-# 後端測試
-cd backend && go test -v ./...
+# 後端測試/建構驗證
+cd backend && go build ./...  # 目前使用建構驗證代替測試
 
 # 檢查測試環境配置
 ./scripts/verify-cicd.sh
