@@ -2,9 +2,9 @@ name: 🚀 Continuous Integration
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ main, dev, feature/* ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, dev ]
   workflow_dispatch:  # 手動觸發
 
 env:

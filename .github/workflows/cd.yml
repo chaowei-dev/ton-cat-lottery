@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]  # Production部署
   pull_request:
-    branches: [ main ]  # Staging部署
+    branches: [ main, dev ]  # PR to main = Production, PR to dev = Staging
   workflow_dispatch:   # 手動觸發
     inputs:
       environment:
@@ -58,7 +58,10 @@ jobs:
           # main分支推送 -> Production
           TARGET_ENV="production"
         elif [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
-          # PR到main -> Staging  
+          # PR到main -> Production  
+          TARGET_ENV="production"
+        elif [ "${{ github.base_ref }}" = "dev" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+          # PR到dev -> Staging
           TARGET_ENV="staging"
         else
           # 其他情況不部署
