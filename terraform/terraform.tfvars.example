@@ -1,40 +1,76 @@
-# GCP Project Configuration
-project_id = "your-gcp-project-id"
-region     = "asia-east1"
-zone       = "asia-east1-a"
+# TON Cat Lottery - Terraform Configuration Example
+# Copy this file to terraform.tfvars and fill in your actual values
+
+# GCP Configuration
+project_id = "YOUR-GCP-PROJECT-ID"          # Example: ton-cat-lottery-dev-3
+region     = "asia-east1"                   # (optional) GCP Region
+zone       = "asia-east1-a"                 # (optional) GCP Zone
 
 # Network Configuration
-network_name = "ton-cat-lottery-vpc"
-subnet_name  = "ton-cat-lottery-subnet"
-subnet_cidr  = "10.0.0.0/24"
+vpc_name      = "ton-cat-lottery-vpc"       # (optional) VPC Network name
+subnet_name   = "ton-cat-lottery-subnet"    # (optional) Subnet name
+subnet_cidr   = "10.0.0.0/16"               # (optional) Subnet CIDR range
 
 # GKE Configuration
-cluster_name = "ton-cat-lottery-cluster"
-namespace    = "ton-cat-lottery"
+cluster_name        = "ton-cat-lottery-cluster"  # (optional) GKE cluster name
+gke_release_channel = "REGULAR"                  # (optional) GKE release channel (RAPID, REGULAR, STABLE)
 
-# Container Registry
-registry_location = "asia-east1"
-repository_name   = "ton-cat-lottery"
+# DNS & Domain Configuration
+domain_name           = "YOUR-DOMAIN.COM"               # Your primary domain
+staging_subdomain     = "dev"                           # (optional) Staging subdomain (dev.yourdomain.com)
+monitoring_subdomain  = "monitoring"                    # (optional) Monitoring subdomain
 
-# DNS & SSL Configuration
-domain_name          = "lottery.yourdomain.com"
-cloudflare_email     = "your-email@example.com"
-cloudflare_api_token = "your-cloudflare-api-token"
-cloudflare_zone_id   = "your-cloudflare-zone-id"
-letsencrypt_email    = "your-email@example.com"
+# Cloudflare Configuration
+cloudflare_email     = "YOUR-EMAIL@EXAMPLE.COM"         # Your Cloudflare account email
+cloudflare_api_token = "YOUR-CLOUDFLARE-API-TOKEN"      # Cloudflare API Token (not API Key)
+cloudflare_zone_id   = "YOUR-CLOUDFLARE-ZONE-ID"        # Cloudflare Zone ID
 
-# Service Account
-gke_service_account_name = "gke-service-account"
+# SSL Configuration
+letsencrypt_email = "YOUR-EMAIL@EXAMPLE.COM"            # Email for Let's Encrypt notifications
+ssl_issuer        = "letsencrypt-prod"                  # (optional) letsencrypt-staging or letsencrypt-prod
 
-# Static IP
-static_ip_name = "ton-cat-lottery-ip"
+# Environment Configuration
+environments = ["production", "staging"]                # (optional) List of environments
 
-# Environment
-environment = "dev"
+# Monitoring Configuration
+enable_monitoring       = true                          # (optional) Enable monitoring infrastructure
+prometheus_storage_size = "10Gi"                        # (optional) Prometheus storage size
+grafana_storage_size    = "5Gi"                         # (optional) Grafana storage size
 
-# Labels
-labels = {
+# Deployment Stage Control
+enable_k8s_resources = false                            # (optional) Enable K8s SSL resources - set false for initial deploy
+
+# Resource Labels (optional)
+resource_labels = {
   project     = "ton-cat-lottery"
+  environment = "multi"
   managed-by  = "terraform"
-  environment = "dev"
+  owner       = "YOUR-NAME"
 }
+
+# ============================================================================
+# SETUP INSTRUCTIONS:
+# ============================================================================
+#
+# 1. Copy this file:
+#    cp terraform.tfvars.example terraform.tfvars
+#
+# 2. Edit terraform.tfvars with your actual values:
+#    vim terraform.tfvars
+#
+# 3. Get required Cloudflare values:
+#    - Login to Cloudflare Dashboard
+#    - Go to your domain -> Overview -> API section (right sidebar)
+#    - Zone ID: Copy from right sidebar
+#    - API Token: Create new token with Zone:Read, DNS:Edit permissions
+#
+# 4. Verify GCP setup:
+#    gcloud config get-value project
+#    gcloud auth list
+#
+# 5. Initialize Terraform:
+#    terraform init
+#    terraform validate
+#    terraform plan
+#
+# ============================================================================

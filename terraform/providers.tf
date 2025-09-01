@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/google-beta"
       version = "~> 5.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 4.0"
+    }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
@@ -17,10 +21,6 @@ terraform {
     helm = {
       source  = "hashicorp/helm"
       version = "~> 2.11"
-    }
-    cloudflare = {
-      source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
     }
   }
 }
@@ -35,22 +35,23 @@ provider "google-beta" {
   region  = var.region
 }
 
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+# Configure kubernetes provider after GKE cluster creation
 provider "kubernetes" {
-  host                   = "https://${google_container_cluster.primary.endpoint}"
+  host                   = "https://${module.gke.cluster_endpoint}"
   token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth.0.cluster_ca_certificate)
+  cluster_ca_certificate = base64decode(module.gke.cluster_ca_certificate)
 }
 
 provider "helm" {
   kubernetes {
-    host                   = "https://${google_container_cluster.primary.endpoint}"
+    host                   = "https://${module.gke.cluster_endpoint}"
     token                  = data.google_client_config.default.access_token
-    cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth.0.cluster_ca_certificate)
+    cluster_ca_certificate = base64decode(module.gke.cluster_ca_certificate)
   }
-}
-
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
 }
 
 data "google_client_config" "default" {}

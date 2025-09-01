@@ -1,0 +1,484 @@
+name: 🚀 Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]  # Production部署
+  pull_request:
+    branches: [ main ]  # Staging部署
+  workflow_dispatch:   # 手動觸發
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      force_deploy:
+        description: 'Force deployment (skip safety checks)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PROJECT_ID: ton-cat-lottery-dev-3
+  CLUSTER_NAME: ton-cat-lottery-cluster
+  CLUSTER_REGION: asia-east1
+  REGISTRY_REGION: asia-east1
+  REGISTRY_REPO: tcl-repo
+
+jobs:
+  # =============================================================================
+  # 🔍 前置檢查與環境確定
+  # =============================================================================
+  pre-deployment:
+    name: 🔍 Pre-deployment Checks
+    runs-on: ubuntu-latest
+    
+    outputs:
+      target_env: ${{ steps.determine_env.outputs.target_env }}
+      namespace: ${{ steps.determine_env.outputs.namespace }}
+      domain: ${{ steps.determine_env.outputs.domain }}
+      should_deploy: ${{ steps.safety_check.outputs.should_deploy }}
+      
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2  # 需要獲取前一個commit進行比較
+        
+    - name: 🎯 Determine Target Environment
+      id: determine_env
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # 手動觸發
+          TARGET_ENV="${{ github.event.inputs.environment }}"
+        elif [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
+          # main分支推送 -> Production
+          TARGET_ENV="production"
+        elif [ "${{ github.base_ref }}" = "main" ] && [ "${{ github.event_name }}" = "pull_request" ]; then
+          # PR到main -> Staging  
+          TARGET_ENV="staging"
+        else
+          # 其他情況不部署
+          TARGET_ENV="none"
+        fi
+        
+        echo "target_env=$TARGET_ENV" >> $GITHUB_OUTPUT
+        
+        if [ "$TARGET_ENV" = "production" ]; then
+          echo "namespace=tcl-production" >> $GITHUB_OUTPUT
+          echo "domain=cat-lottery.chaowei-liu.com" >> $GITHUB_OUTPUT
+        elif [ "$TARGET_ENV" = "staging" ]; then
+          echo "namespace=tcl-staging" >> $GITHUB_OUTPUT  
+          echo "domain=dev.cat-lottery.chaowei-liu.com" >> $GITHUB_OUTPUT
+        else
+          echo "namespace=none" >> $GITHUB_OUTPUT
+          echo "domain=none" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "🎯 Target Environment: $TARGET_ENV"
+        
+    - name: 🔒 Safety Check
+      id: safety_check
+      run: |
+        SHOULD_DEPLOY="true"
+        
+        # 跳過部署的情況
+        if [ "${{ steps.determine_env.outputs.target_env }}" = "none" ]; then
+          echo "⏭️ Skipping deployment - not a deployable branch/PR"
+          SHOULD_DEPLOY="false"
+        fi
+        
+        # 強制部署檢查
+        if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+          echo "⚠️ Force deployment enabled - skipping safety checks"
+        elif [ "${{ steps.determine_env.outputs.target_env }}" = "production" ]; then
+          # Production部署額外安全檢查
+          echo "🔒 Production deployment - performing safety checks..."
+          
+          # 檢查是否是週末或非工作時間（可選）
+          current_hour=$(date -u +%H)
+          if [ $current_hour -lt 8 ] || [ $current_hour -gt 18 ]; then
+            echo "⚠️ Deploying outside business hours (UTC 8-18)"
+          fi
+        fi
+        
+        echo "should_deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+        echo "📋 Safety check result: $SHOULD_DEPLOY"
+
+  # =============================================================================
+  # 🏗️ 建構與推送 Docker 映像
+  # =============================================================================
+  build-and-push:
+    name: 🏗️ Build & Push Images
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    if: needs.pre-deployment.outputs.should_deploy == 'true'
+    
+    permissions:
+      contents: read
+      id-token: write  # 用於OIDC認證
+      
+    strategy:
+      matrix:
+        service: [frontend, backend]
+        
+    outputs:
+      image_tag: ${{ steps.image_tag.outputs.tag }}
+      
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        
+    - name: 🔧 Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: 🐳 Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGISTRY_REGION }}-docker.pkg.dev
+        
+    - name: 🏷️ Generate Image Tag
+      id: image_tag
+      run: |
+        COMMIT_SHA="${{ github.sha }}"
+        IMAGE_TAG="${COMMIT_SHA:0:7}-${{ github.run_number }}"
+        echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+        echo "🏷️ Image tag: $IMAGE_TAG"
+        
+    - name: 🐳 Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 🏗️ Build and Push Docker Image
+      env:
+        SERVICE: ${{ matrix.service }}
+        IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+      run: |
+        FULL_IMAGE_PATH="${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPO }}/${SERVICE}:${IMAGE_TAG}"
+        
+        echo "🏗️ Building $SERVICE image..."
+        echo "📍 Target: $FULL_IMAGE_PATH"
+        
+        # 建構並推送映像
+        docker buildx build \
+          --platform linux/amd64 \
+          -f docker/Dockerfile.${SERVICE} \
+          -t $FULL_IMAGE_PATH \
+          --push \
+          .
+          
+        echo "✅ $SERVICE image built and pushed successfully"
+        
+        # 驗證映像存在
+        gcloud artifacts docker images describe $FULL_IMAGE_PATH
+        
+    - name: 🔍 Image Security Scan
+      env:
+        SERVICE: ${{ matrix.service }}
+        IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+      run: |
+        FULL_IMAGE_PATH="${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPO }}/${SERVICE}:${IMAGE_TAG}"
+        
+        echo "🔍 Scanning $SERVICE image for vulnerabilities..."
+        
+        # 使用 gcloud 進行容器分析（如果啟用）
+        gcloud artifacts docker images scan $FULL_IMAGE_PATH \
+          --format="table(
+            name,
+            vulnerabilities.total,
+            vulnerabilities.critical,
+            vulnerabilities.high,
+            vulnerabilities.medium
+          )" || echo "⚠️ Container analysis not fully configured"
+          
+        echo "✅ Security scan completed for $SERVICE"
+
+  # =============================================================================
+  # 🚀 GKE 部署
+  # =============================================================================  
+  deploy-to-gke:
+    name: 🚀 Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-push]
+    if: needs.pre-deployment.outputs.should_deploy == 'true'
+    
+    permissions:
+      contents: read
+      id-token: write
+      
+    environment:
+      name: ${{ needs.pre-deployment.outputs.target_env }}
+      url: https://${{ needs.pre-deployment.outputs.domain }}
+      
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        
+    - name: 🔧 Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: ⚙️ Configure kubectl
+      run: |
+        gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
+          --region ${{ env.CLUSTER_REGION }} \
+          --project ${{ env.PROJECT_ID }}
+        kubectl cluster-info
+        
+    - name: 📋 Pre-deployment Status
+      env:
+        NAMESPACE: ${{ needs.pre-deployment.outputs.namespace }}
+      run: |
+        echo "📋 Current deployment status in $NAMESPACE:"
+        kubectl get pods -n $NAMESPACE -o wide || echo "Namespace may not exist yet"
+        kubectl get deployments -n $NAMESPACE || echo "No existing deployments"
+        
+    - name: 🚀 Deploy to Kubernetes
+      env:
+        NAMESPACE: ${{ needs.pre-deployment.outputs.namespace }}
+        IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+      run: |
+        echo "🚀 Starting deployment to $NAMESPACE with image tag: $IMAGE_TAG"
+        
+        # 更新 Kustomization 檔案中的映像標籤
+        cd k8s/overlays/${{ needs.pre-deployment.outputs.target_env }}
+        
+        # 更新 kustomization.yaml 中的映像標籤
+        sed -i "s/newTag: .*/newTag: $IMAGE_TAG/" kustomization.yaml
+        
+        echo "📝 Updated kustomization.yaml with new image tag:"
+        cat kustomization.yaml | grep -A 5 -B 5 "newTag"
+        
+        # 應用部署
+        kubectl apply -k .
+        
+        echo "✅ Deployment applied successfully"
+        
+    - name: 🎯 Wait for Rollout
+      env:
+        NAMESPACE: ${{ needs.pre-deployment.outputs.namespace }}
+      timeout-minutes: 10
+      run: |
+        echo "⏳ Waiting for deployments to complete..."
+        
+        # 等待 frontend 部署完成
+        kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+        
+        # 等待 backend 部署完成  
+        kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+        
+        echo "✅ All deployments completed successfully"
+        
+    - name: 🔍 Post-deployment Verification
+      env:
+        NAMESPACE: ${{ needs.pre-deployment.outputs.namespace }}
+        DOMAIN: ${{ needs.pre-deployment.outputs.domain }}
+      run: |
+        echo "🔍 Verifying deployment health..."
+        
+        # 檢查 Pod 狀態
+        echo "📋 Pod Status:"
+        kubectl get pods -n $NAMESPACE -o wide
+        
+        # 檢查 Service 狀態
+        echo "📋 Service Status:"
+        kubectl get services -n $NAMESPACE
+        
+        # 檢查 Ingress 狀態
+        echo "📋 Ingress Status:"
+        kubectl get ingress -A
+        
+        # 健康檢查
+        echo "🏥 Health Checks:"
+        sleep 10  # 給應用一些啟動時間
+        
+        # Frontend 健康檢查
+        if kubectl get deployment frontend -n $NAMESPACE > /dev/null 2>&1; then
+          READY_REPLICAS=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
+          DESIRED_REPLICAS=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.spec.replicas}')
+          
+          if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ]; then
+            echo "✅ Frontend: $READY_REPLICAS/$DESIRED_REPLICAS pods ready"
+          else
+            echo "⚠️ Frontend: $READY_REPLICAS/$DESIRED_REPLICAS pods ready"
+          fi
+        fi
+        
+        # Backend 健康檢查
+        if kubectl get deployment backend -n $NAMESPACE > /dev/null 2>&1; then
+          READY_REPLICAS=$(kubectl get deployment backend -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
+          DESIRED_REPLICAS=$(kubectl get deployment backend -n $NAMESPACE -o jsonpath='{.spec.replicas}')
+          
+          if [ "$READY_REPLICAS" = "$DESIRED_REPLICAS" ]; then
+            echo "✅ Backend: $READY_REPLICAS/$DESIRED_REPLICAS pods ready"
+          else
+            echo "⚠️ Backend: $READY_REPLICAS/$DESIRED_REPLICAS pods ready"
+          fi
+        fi
+        
+    - name: 🌐 External Accessibility Test
+      env:
+        DOMAIN: ${{ needs.pre-deployment.outputs.domain }}
+      run: |
+        echo "🌐 Testing external accessibility..."
+        
+        # DNS 解析測試
+        echo "🔍 DNS Resolution:"
+        nslookup $DOMAIN || echo "⚠️ DNS resolution issues"
+        
+        # HTTP 可達性測試（最多重試3次）
+        echo "🔍 HTTP Accessibility:"
+        for i in {1..3}; do
+          if curl -I -k https://$DOMAIN --connect-timeout 10; then
+            echo "✅ HTTPS accessible on attempt $i"
+            break
+          else
+            echo "⚠️ HTTPS test failed on attempt $i"
+            if [ $i -eq 3 ]; then
+              echo "🚨 External accessibility test failed after 3 attempts"
+              echo "⚠️ This might be due to SSL certificate provisioning or DNS propagation"
+              echo "🔧 Manual verification recommended: https://$DOMAIN"
+            fi
+            sleep 10
+          fi
+        done
+
+  # =============================================================================
+  # 🔄 智能環境清理
+  # =============================================================================
+  cleanup:
+    name: 🔄 Environment Cleanup
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'pull_request' && github.event.action == 'closed')
+    
+    permissions:
+      contents: read
+      id-token: write
+      
+    steps:
+    - name: 📥 Checkout Code
+      uses: actions/checkout@v4
+      
+    - name: 🔐 Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        
+    - name: ⚙️ Configure kubectl
+      run: |
+        gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
+          --region ${{ env.CLUSTER_REGION }} \
+          --project ${{ env.PROJECT_ID }}
+          
+    - name: 🧹 Clean Staging Environment
+      run: |
+        echo "🧹 Cleaning up staging environment after PR closure..."
+        
+        # 清理staging namespace中的資源（但保留namespace本身）
+        if kubectl get namespace tcl-staging > /dev/null 2>&1; then
+          echo "📋 Current staging resources:"
+          kubectl get all -n tcl-staging
+          
+          # 清理deployment（讓它們停止運行但保留配置）
+          kubectl scale deployment --all --replicas=0 -n tcl-staging || echo "⚠️ No deployments to scale down"
+          
+          echo "✅ Staging environment scaled down"
+          echo "💡 Namespace and configurations preserved for future use"
+        else
+          echo "ℹ️ Staging namespace not found, nothing to clean"
+        fi
+        
+    - name: 🗑️ Clean Old Container Images
+      run: |
+        echo "🗑️ Cleaning up old container images..."
+        
+        # 保留最新的5個映像版本，刪除其餘的
+        for service in frontend backend; do
+          echo "🔍 Cleaning old $service images..."
+          
+          # 列出所有映像（按時間排序）
+          IMAGES=$(gcloud artifacts docker images list \
+            ${{ env.REGISTRY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPO }}/$service \
+            --sort-by=~createTime \
+            --format="value(name)" \
+            --limit=999)
+            
+          # 轉換為數組並跳過前5個（保留最新的5個）
+          echo "$IMAGES" | tail -n +6 | while read image; do
+            if [ -n "$image" ]; then
+              echo "🗑️ Deleting old image: $image"
+              gcloud artifacts docker images delete "$image" --quiet || echo "⚠️ Failed to delete $image"
+            fi
+          done
+          
+          echo "✅ $service image cleanup completed"
+        done
+
+  # =============================================================================
+  # 📊 部署報告
+  # =============================================================================
+  deployment-report:
+    name: 📊 Deployment Report
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, build-and-push, deploy-to-gke]
+    if: always() && needs.pre-deployment.outputs.should_deploy == 'true'
+    
+    steps:
+    - name: 📊 Generate Deployment Report
+      run: |
+        echo "# 🚀 TON Cat Lottery Deployment Report"
+        echo ""
+        echo "## 📋 Deployment Summary:"
+        echo "- **Environment**: \`${{ needs.pre-deployment.outputs.target_env }}\`"
+        echo "- **Namespace**: \`${{ needs.pre-deployment.outputs.namespace }}\`"
+        echo "- **Domain**: https://${{ needs.pre-deployment.outputs.domain }}"
+        echo "- **Image Tag**: \`${{ needs.build-and-push.outputs.image_tag }}\`"
+        echo "- **Commit**: \`${{ github.sha }}\`"
+        echo "- **Trigger**: \`${{ github.event_name }}\`"
+        echo "- **Actor**: @${{ github.actor }}"
+        
+        echo ""
+        echo "## 🔍 Job Status:"
+        
+        if [ "${{ needs.build-and-push.result }}" = "success" ]; then
+          echo "✅ **Build & Push**: SUCCESS"
+        else
+          echo "❌ **Build & Push**: FAILED"
+        fi
+        
+        if [ "${{ needs.deploy-to-gke.result }}" = "success" ]; then
+          echo "✅ **GKE Deployment**: SUCCESS"
+        else
+          echo "❌ **GKE Deployment**: FAILED"  
+        fi
+        
+        echo ""
+        echo "## 🔗 Quick Links:"
+        echo "- 🌐 **Application**: https://${{ needs.pre-deployment.outputs.domain }}"
+        echo "- 📊 **GCP Console**: https://console.cloud.google.com/kubernetes/workload?project=${{ env.PROJECT_ID }}"
+        echo "- 🐳 **Container Registry**: https://console.cloud.google.com/artifacts?project=${{ env.PROJECT_ID }}"
+        
+        echo ""
+        if [ "${{ needs.deploy-to-gke.result }}" = "success" ]; then
+          echo "🎉 **Deployment Status**: ✅ SUCCESS"
+          echo ""
+          echo "Your application is now live! 🚀"
+          echo "Visit: https://${{ needs.pre-deployment.outputs.domain }}"
+        else
+          echo "⚠️ **Deployment Status**: ❌ FAILED"
+          echo ""
+          echo "Please check the logs and retry deployment."
+        fi

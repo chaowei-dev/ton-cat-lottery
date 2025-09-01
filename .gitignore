@@ -94,6 +94,15 @@ Thumbs.db
 # Vite cache directory
 .vite/
 
+# Docker related files
+.docker/
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+*.pid
+containers/
+volumes/
+
 # Go specific files
 *.exe
 *.exe~
@@ -123,6 +132,13 @@ go.work.sum
 # Claude code
 CLAUDE.md
 *.drawio.bkp
+
+# GCP service account keys and credentials
+*.json
+service-account-*.json
+terraform-service-account.json
+gcp-keys/
+.gcp/
 
 # Terraform files
 terraform*key.json

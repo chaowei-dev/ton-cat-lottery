@@ -1,24 +1,24 @@
-# GCP Project Configuration
+# Core GCP Configuration
 variable "project_id" {
-  description = "GCP project ID"
+  description = "GCP Project ID"
   type        = string
 }
 
 variable "region" {
-  description = "GCP region"
+  description = "GCP Region"
   type        = string
   default     = "asia-east1"
 }
 
 variable "zone" {
-  description = "GCP zone"
+  description = "GCP Zone"
   type        = string
   default     = "asia-east1-a"
 }
 
-# Network Configuration
-variable "network_name" {
-  description = "VPC network name"
+# Networking Configuration
+variable "vpc_name" {
+  description = "VPC Network name"
   type        = string
   default     = "ton-cat-lottery-vpc"
 }
@@ -30,9 +30,9 @@ variable "subnet_name" {
 }
 
 variable "subnet_cidr" {
-  description = "Subnet CIDR block"
+  description = "Subnet CIDR range"
   type        = string
-  default     = "10.0.0.0/24"
+  default     = "10.0.0.0/16"
 }
 
 # GKE Configuration
@@ -42,31 +42,31 @@ variable "cluster_name" {
   default     = "ton-cat-lottery-cluster"
 }
 
-variable "namespace" {
-  description = "Kubernetes namespace"
+variable "gke_release_channel" {
+  description = "GKE release channel"
   type        = string
-  default     = "ton-cat-lottery"
-}
-
-# Container Registry
-variable "registry_location" {
-  description = "Artifact Registry location"
-  type        = string
-  default     = "asia-east1"
-}
-
-variable "repository_name" {
-  description = "Artifact Registry repository name"
-  type        = string
-  default     = "ton-cat-lottery"
+  default     = "REGULAR"
 }
 
 # DNS & SSL Configuration
 variable "domain_name" {
-  description = "Domain name for the application"
+  description = "Primary domain name"
   type        = string
 }
 
+variable "staging_subdomain" {
+  description = "Staging subdomain"
+  type        = string
+  default     = "dev"
+}
+
+variable "monitoring_subdomain" {
+  description = "Monitoring subdomain (optional)"
+  type        = string
+  default     = "monitoring"
+}
+
+# Cloudflare Configuration
 variable "cloudflare_email" {
   description = "Cloudflare account email"
   type        = string
@@ -79,42 +79,62 @@ variable "cloudflare_api_token" {
 }
 
 variable "cloudflare_zone_id" {
-  description = "Cloudflare zone ID"
+  description = "Cloudflare Zone ID"
   type        = string
 }
 
+# SSL Configuration
 variable "letsencrypt_email" {
-  description = "Email for Let's Encrypt certificate registration"
+  description = "Let's Encrypt email for SSL certificates"
   type        = string
 }
 
-# Service Account
-variable "gke_service_account_name" {
-  description = "GKE service account name"
+variable "ssl_issuer" {
+  description = "SSL certificate issuer (letsencrypt-staging or letsencrypt-prod)"
   type        = string
-  default     = "gke-service-account"
+  default     = "letsencrypt-prod"
 }
 
-# Static IP
-variable "static_ip_name" {
-  description = "Static external IP name"
-  type        = string
-  default     = "ton-cat-lottery-ip"
+# Environment Configuration
+variable "environments" {
+  description = "List of environments"
+  type        = list(string)
+  default     = ["production", "staging"]
 }
 
-# Environment
-variable "environment" {
-  description = "Environment name (dev, staging, prod)"
-  type        = string
-  default     = "dev"
+# Monitoring Configuration
+variable "enable_monitoring" {
+  description = "Enable monitoring infrastructure"
+  type        = bool
+  default     = true
 }
 
-# Labels
-variable "labels" {
-  description = "Common labels to apply to all resources"
+# Deployment Stage Control
+variable "enable_k8s_resources" {
+  description = "Enable Kubernetes resources deployment (SSL, certificates)"
+  type        = bool
+  default     = false
+}
+
+variable "prometheus_storage_size" {
+  description = "Prometheus storage size"
+  type        = string
+  default     = "10Gi"
+}
+
+variable "grafana_storage_size" {
+  description = "Grafana storage size"
+  type        = string
+  default     = "5Gi"
+}
+
+# Resource Configuration
+variable "resource_labels" {
+  description = "Common resource labels"
   type        = map(string)
   default = {
     project     = "ton-cat-lottery"
+    environment = "multi"
     managed-by  = "terraform"
   }
 }

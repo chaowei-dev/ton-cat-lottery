@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - backend/deployment.yaml
+  - backend/configmap.yaml
+
+commonLabels:
+  app.kubernetes.io/name: ton-cat-lottery
+  app.kubernetes.io/part-of: ton-blockchain-dapp
+
+images:
+  - name: frontend-placeholder
+    newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/frontend
+  - name: backend-placeholder
+    newName: asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/backend

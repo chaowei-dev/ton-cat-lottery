@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: backend
+    component: daemon
+data:
+  # TON Network Configuration
+  TON_NETWORK: "mainnet"
+  TON_ENDPOINT: "https://toncenter.com/api/v2/jsonRPC"
+  
+  # Contract Configuration  
+  TON_CONTRACT_ADDRESS: ""  # To be overridden by environment
+  LOTTERY_CHECK_INTERVAL: "30s"
+  BLOCK_CONFIRMATION_COUNT: "3"
+  
+  # Service Configuration
+  SERVICE_NAME: "ton-cat-lottery-daemon"
+  HEALTH_CHECK_INTERVAL: "10s"
+  GRACEFUL_SHUTDOWN_TIMEOUT: "30s"
+  
+  # Logging Configuration
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  LOG_OUTPUT: "stdout"

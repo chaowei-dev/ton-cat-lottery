@@ -1,84 +1,128 @@
-# Cluster information
+# Project Information
+output "project_id" {
+  description = "GCP Project ID"
+  value       = var.project_id
+}
+
+output "region" {
+  description = "GCP Region"
+  value       = var.region
+}
+
+# Networking Outputs
+output "vpc_name" {
+  description = "VPC Network name"
+  value       = module.networking.vpc_name
+}
+
+output "subnet_name" {
+  description = "Subnet name"
+  value       = module.networking.subnet_name
+}
+
+output "static_ip" {
+  description = "Static external IP address"
+  value       = module.networking.static_ip
+}
+
+output "static_ip_name" {
+  description = "Static external IP address name"
+  value       = module.networking.static_ip_name
+}
+
+# GKE Cluster Outputs
 output "cluster_name" {
   description = "GKE cluster name"
-  value       = google_container_cluster.primary.name
+  value       = module.gke.cluster_name
 }
 
 output "cluster_endpoint" {
   description = "GKE cluster endpoint"
-  value       = google_container_cluster.primary.endpoint
+  value       = module.gke.cluster_endpoint
+  sensitive   = true
+}
+
+output "cluster_ca_certificate" {
+  description = "GKE cluster CA certificate"
+  value       = module.gke.cluster_ca_certificate
   sensitive   = true
 }
 
 output "cluster_location" {
   description = "GKE cluster location"
-  value       = google_container_cluster.primary.location
+  value       = module.gke.cluster_location
 }
 
-output "cluster_ca_certificate" {
-  description = "GKE cluster CA certificate"
-  value       = google_container_cluster.primary.master_auth.0.cluster_ca_certificate
-  sensitive   = true
+# DNS & Domain Outputs
+output "domain_name" {
+  description = "Primary domain name"
+  value       = var.domain_name
 }
 
-# Network information
-output "vpc_name" {
-  description = "VPC network name"
-  value       = google_compute_network.vpc.name
+output "staging_domain" {
+  description = "Staging domain"
+  value       = "${var.staging_subdomain}.${var.domain_name}"
 }
 
-output "subnet_name" {
-  description = "Subnet name"
-  value       = google_compute_subnetwork.subnet.name
+output "production_domain" {
+  description = "Production domain"
+  value       = var.domain_name
 }
 
-output "subnet_cidr" {
-  description = "Subnet CIDR block"
-  value       = google_compute_subnetwork.subnet.ip_cidr_range
+output "monitoring_domain" {
+  description = "Monitoring domain (if enabled)"
+  value       = var.enable_monitoring ? "${var.monitoring_subdomain}.${var.domain_name}" : null
 }
 
-# Static IP
-output "static_ip_address" {
-  description = "Static external IP address"
-  value       = google_compute_address.static_ip.address
+# SSL Certificate Outputs
+output "ssl_issuer" {
+  description = "SSL certificate issuer"
+  value       = var.ssl_issuer
 }
 
-output "static_ip_name" {
-  description = "Static external IP name"
-  value       = google_compute_address.static_ip.name
+# Namespace Outputs
+output "namespaces" {
+  description = "Created Kubernetes namespaces"
+  value       = module.namespaces.namespace_names
 }
 
-# Service Account
+# Service Account Outputs
 output "gke_service_account_email" {
   description = "GKE service account email"
-  value       = google_service_account.gke_service_account.email
+  value       = module.iam.gke_service_account_email
 }
 
-# Artifact Registry
-output "artifact_registry_repository" {
-  description = "Artifact Registry repository URL"
-  value       = "${var.registry_location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.repository_id}"
+# Secret Manager Outputs
+output "secret_names" {
+  description = "Created Secret Manager secrets"
+  value       = module.secrets.secret_names
 }
 
-# Project information
-output "project_id" {
-  description = "GCP project ID"
-  value       = var.project_id
+# Monitoring Outputs
+output "monitoring_enabled" {
+  description = "Whether monitoring is enabled"
+  value       = var.enable_monitoring
 }
 
-output "region" {
-  description = "GCP region"
-  value       = var.region
+output "monitoring_namespace" {
+  description = "Monitoring namespace"
+  value       = var.enable_monitoring ? module.monitoring[0].monitoring_namespace : null
 }
 
-# kubectl command
+# kubectl Configuration Command
 output "kubectl_config_command" {
   description = "Command to configure kubectl"
-  value       = "gcloud container clusters get-credentials ${google_container_cluster.primary.name} --region ${google_container_cluster.primary.location} --project ${var.project_id}"
+  value       = "gcloud container clusters get-credentials ${module.gke.cluster_name} --region ${var.region} --project ${var.project_id}"
 }
 
-# Docker authentication command
-output "docker_auth_command" {
-  description = "Command to configure Docker authentication"
-  value       = "gcloud auth configure-docker ${var.registry_location}-docker.pkg.dev"
+# Verification Commands
+output "verification_commands" {
+  description = "Commands to verify deployment"
+  value = {
+    cluster_health = "kubectl get nodes"
+    ssl_certificates = "kubectl get certificates -A"
+    dns_resolution = "dig ${var.domain_name}"
+    https_test = "curl -I https://${var.domain_name}"
+    namespaces = "kubectl get namespaces | grep -E '(tcl-production|tcl-staging|monitoring)'"
+  }
 }
