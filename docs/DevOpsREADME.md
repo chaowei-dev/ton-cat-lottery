@@ -994,43 +994,141 @@ kubectl scale deployment backend --replicas=3 -n tcl-production
 TON Cat Lottery 使用 GitHub Actions 實現完全自動化的 CI/CD 流程，採用 Workload Identity Federation (OIDC) 進行安全的 GCP 認證。系統支援程式碼品質檢查、自動化測試、Docker 映像建構與推送，以及 GKE 應用程式部署。
 
 **主要特色：**
-- 安全的 OIDC 認證：無需儲存 Service Account Key
-- 多環境支援：智能合約、前端、後端全端測試
-- 自動化部署：Docker 映像建構 + GKE 滾動更新
-- 工作流程依賴：CI 成功後自動觸發 CD
-- 完整的部署驗證與健康檢查
+- **三層品質關卡**：代碼品質檢查、全端測試驗證、安全掃描
+- **安全的 OIDC 認證**：無需儲存 Service Account Key，使用短期 token
+- **智能環境管理**：Staging/Production 雙環境，PR 自動部署，智能清理
+- **自動化部署流程**：Docker 映像建構 + GKE 滾動更新 + 健康檢查
+- **完整的回滾機制**：自動回滾策略 + 手動回滾支援
+- **監控和報告**：部署狀態追蹤 + 詳細的執行報告
 
 ### 架構
 ```
-Code Push → CI Workflow (測試+建構) → CD Workflow (部署+驗證)
-           ├── 智能合約測試                 ├── 推送到 Artifact Registry
-           ├── 前端建構測試                 ├── GKE 部署更新
-           ├── 後端整合測試                 └── 部署狀態驗證
-           └── Docker 映像建構
+GitHub Repository → CI Pipeline (品質關卡) → CD Pipeline (部署驗證)
+                    ├── 🔍 代碼品質檢查        ├── 🔐 OIDC 認證  
+                    ├── 🧪 三層測試驗證        ├── 🏗️ 映像建構推送
+                    │   ├── Contract Tests    ├── 🚀 GKE 滾動部署
+                    │   ├── Frontend Tests    ├── 🔍 健康檢查驗證
+                    │   └── Backend Tests     └── 🌐 外部可達性測試
+                    ├── 🔒 安全掃描
+                    └── 🐳 Docker 建構驗證
 ```
 
-**環境管理：**
+**環境管理策略：**
 ```
-├── Staging (dev.cat-lottery.chaowei-liu.com)
-│   ├── PR 建立時自動部署最新代碼
-│   └── 用於功能測試和驗證
-└── Production (cat-lottery.chaowei-liu.com)
-    ├── main 分支合併時自動部署
-    └── 滾動更新 + 自動回滾
+雙環境架構：
+├── Production (cat-lottery.chaowei-liu.com)
+│   ├── Trigger: main 分支推送
+│   ├── 前置檢查：安全檢查 + 業務時間驗證
+│   ├── 部署策略：滾動更新 + 多副本 (3 frontend + 2 backend)
+│   └── 驗證：完整健康檢查 + 外部可達性測試
+├── Staging (dev.cat-lottery.chaowei-liu.com)  
+│   ├── Trigger: PR 到 main 分支
+│   ├── 部署策略：快速部署 + 單副本測試
+│   ├── 智能清理：PR 關閉時自動縮放為 0
+│   └── 驗證：基本健康檢查
+└── 智能清理機制：
+    ├── PR 關閉觸發環境清理
+    ├── 定期清理舊容器映像（保留最新 5 個）
+    └── 資源優化和成本控制
 ```
 
 ### 檔案結構
 ```
 .github/workflows/
-├── ci.yml                           # CI 工作流程：測試與建構
+├── ci.yml                           # CI 工作流程：品質關卡與測試
 └── cd.yml                           # CD 工作流程：部署與驗證
 
 項目根目錄/
 ├── setup-gcp-oidc.sh               # OIDC 設定自動化腳本
+├── scripts/
+│   └── verify-cicd.sh               # CI/CD 配置驗證腳本
 └── .github/
     └── secrets/                     # GitHub Secrets 配置
         ├── GCP_WIF_PROVIDER          # Workload Identity Provider
-        └── GCP_SERVICE_ACCOUNT       # Service Account Email
+        ├── GCP_SERVICE_ACCOUNT       # Service Account Email  
+        └── PROJECT_ID                # GCP 專案 ID
+```
+
+### 快速啟動
+
+#### 前置條件檢查
+```bash
+# 1. 驗證 CI/CD 基礎設施配置
+./scripts/verify-cicd.sh
+
+# 2. 確認 Terraform 基礎設施已部署
+cd terraform && terraform output cluster_name
+cd terraform && terraform output static_ip
+
+# 3. 確認 GKE 集群和命名空間就緒
+kubectl get namespaces | grep -E "(tcl-production|tcl-staging)"
+```
+
+#### 階段式配置流程
+
+##### 階段 1：OIDC 認證配置
+```bash
+# 1a. 執行自動化 OIDC 設定腳本
+./setup-gcp-oidc.sh
+
+# 1b. 記錄腳本輸出的 GitHub Secrets 資訊
+# 將在下個步驟中用到：
+# - GCP_WIF_PROVIDER
+# - GCP_SERVICE_ACCOUNT  
+# - PROJECT_ID
+
+# 1c. 驗證 OIDC 設定成功
+gcloud iam workload-identity-pools list --location=global | grep github-pool
+gcloud iam service-accounts list | grep gha-deploy
+```
+
+##### 階段 2：GitHub Secrets 配置
+```bash
+# 2a. 使用 GitHub CLI 設定 Secrets (推薦)
+gh secret set GCP_WIF_PROVIDER --body "your-wif-provider-from-script-output"
+gh secret set GCP_SERVICE_ACCOUNT --body "gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com"
+gh secret set PROJECT_ID --body "ton-cat-lottery-dev-3"
+
+# 2b. 或通過 GitHub 網頁界面設定
+# 前往: Repository Settings → Secrets and variables → Actions
+# 添加上述三個 secrets
+
+# 2c. 驗證 Secrets 設定
+gh secret list
+```
+
+##### 階段 3：GitHub 環境配置 (可選，增強安全性)
+```bash
+# 3a. 建立 Production 環境保護
+# 前往 GitHub Repository Settings → Environments
+# 建立 "production" 環境，設定：
+# - Required reviewers: 1+ 審核者
+# - Deployment branches: main 分支限制
+# - Environment secrets: 可選的環境特定配置
+
+# 3b. 建立 Staging 環境  
+# 建立 "staging" 環境，無特殊限制
+```
+
+##### 階段 4：測試 CI/CD 流程
+```bash
+# 4a. 測試 CI 流程
+# 推送代碼到 feature 分支觸發 CI
+git checkout -b feature/test-cicd
+echo "# Test CI/CD" >> test-file.md
+git add . && git commit -m "test: trigger CI pipeline"
+git push origin feature/test-cicd
+
+# 4b. 監控 CI 執行
+gh run list --limit 5
+gh run watch  # 實時監控最新執行
+
+# 4c. 測試 CD 流程（建立 PR 觸發 Staging 部署）
+gh pr create --title "Test CI/CD Pipeline" --body "Testing automated deployment"
+
+# 4d. 測試 Production 部署
+# 合併 PR 到 main 分支將觸發 Production 部署
+gh pr merge --merge
 ```
 
 ### 配置
@@ -1038,14 +1136,73 @@ Code Push → CI Workflow (測試+建構) → CD Workflow (部署+驗證)
 #### 核心組件設定
 - **OIDC 身份驗證**：執行 `setup-gcp-oidc.sh` 建立 GitHub 與 GCP 信任關係，配置 Workload Identity Pool
 - **GitHub Secrets**：設定 `GCP_WIF_PROVIDER`、`GCP_SERVICE_ACCOUNT`、`PROJECT_ID`
-- **環境保護**：使用 GitHub Environment 保護生產部署
+- **環境保護**：使用 GitHub Environment 保護生產部署（可選但建議）
+- **分支策略**：main 分支保護，PR 審核機制
 
 
 #### 管理指令
-- **工作流程監控**：`gh workflow list` 查看狀態、`gh run list` 查看執行記錄
-- **手動部署**：`gh workflow run cd.yml` 觸發部署
-- **日誌查看**：`gh run view RUN_ID --log` 檢視執行日誌
-- **流程控制**：`gh run cancel RUN_ID` 取消執行中工作流程
+
+##### 工作流程監控
+```bash
+# 查看工作流程狀態
+gh workflow list
+
+# 查看執行記錄
+gh run list --limit 10
+
+# 實時監控最新執行
+gh run watch
+
+# 查看特定執行的詳細日誌
+gh run view <RUN_ID> --log
+
+# 下載執行日誌
+gh run download <RUN_ID>
+```
+
+##### 手動觸發部署
+```bash
+# 手動觸發 CD 工作流程（部署到 staging）
+gh workflow run cd.yml -f environment=staging
+
+# 手動觸發 CD 工作流程（部署到 production）
+gh workflow run cd.yml -f environment=production
+
+# 強制部署（跳過安全檢查）
+gh workflow run cd.yml -f environment=production -f force_deploy=true
+
+# 重新執行失敗的工作流程
+gh run rerun <RUN_ID>
+```
+
+##### 流程控制
+```bash
+# 取消執行中的工作流程
+gh run cancel <RUN_ID>
+
+# 檢查工作流程執行狀態
+gh run list --status=in_progress
+
+# 查看失敗的工作流程
+gh run list --status=failure --limit 5
+```
+
+##### CI/CD 狀態檢查
+```bash
+# 驗證 CI/CD 配置
+./scripts/verify-cicd.sh
+
+# 檢查 GitHub Secrets
+gh secret list
+
+# 檢查部署狀態
+kubectl get pods -n tcl-production -o wide
+kubectl get pods -n tcl-staging -o wide
+
+# 檢查映像版本
+kubectl describe deployment frontend -n tcl-production | grep Image
+kubectl describe deployment backend -n tcl-production | grep Image
+```
 
 #### OIDC 配置管理
 ```bash
@@ -1075,50 +1232,283 @@ kubectl rollout undo deployment/backend -n tcl-production
 ```
 
 ### 故障排除
-#### 工作流程失敗
+
+#### CI 流程問題
+
+##### 問題：CI 品質檢查失敗
 ```bash
-# 問題：OIDC 認證失敗
-# 檢查 Workload Identity 設定
-gcloud iam workload-identity-pools describe github-pool --location=global
+# 檢查代碼品質問題
+# 1. 智能合約編譯失敗
+cd contracts && npm ci && npm run build
 
-# 檢查服務帳戶設定
-gcloud iam service-accounts describe gha-deploy@PROJECT_ID.iam.gserviceaccount.com
+# 2. 前端 linting 或 type-check 失敗
+cd frontend && npm ci && npm run lint && npm run type-check
 
-# 重新執行 OIDC 設定
-./setup-gcp-oidc.sh
+# 3. 後端代碼格式問題
+go fmt ./... && go vet ./...
+
+# 4. Docker 建構失敗
+docker build -f docker/Dockerfile.frontend .
+docker build -f docker/Dockerfile.backend .
 ```
 
-#### 部署失敗問題
+##### 問題：測試套件失敗
 ```bash
-# 問題：映像推送失敗
-# 檢查 Artifact Registry 認證
+# 分別測試各組件
+# 智能合約測試
+cd contracts && npm test
+
+# 前端測試
+cd frontend && npm test -- --watchAll=false
+
+# 後端測試
+go test -v ./...
+
+# 檢查測試環境配置
+./scripts/verify-cicd.sh
+```
+
+##### 問題：安全掃描警告
+```bash
+# 檢查 npm 安全漏洞
+cd contracts && npm audit --audit-level=moderate
+cd frontend && npm audit --audit-level=moderate
+
+# 更新有漏洞的依賴
+cd contracts && npm audit fix
+cd frontend && npm audit fix
+
+# Go 安全檢查（如果可用）
+go list -json -deps ./... | grep "Module"
+```
+
+#### CD 流程問題
+
+##### 問題：OIDC 認證失敗
+```bash
+# 1. 檢查 Workload Identity 設定
+gcloud iam workload-identity-pools describe github-pool --location=global
+
+# 2. 檢查服務帳戶設定
+gcloud iam service-accounts describe gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com
+
+# 3. 檢查 GitHub Secrets
+gh secret list
+# 確認包含：GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT, PROJECT_ID
+
+# 4. 重新執行 OIDC 設定
+./setup-gcp-oidc.sh
+
+# 5. 檢查服務帳戶權限
+gcloud projects get-iam-policy ton-cat-lottery-dev-3 \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com"
+```
+
+##### 問題：映像建構與推送失敗
+```bash
+# 1. 檢查 Artifact Registry 認證
 gcloud auth configure-docker asia-east1-docker.pkg.dev
 
-# 檢查映像存在
-gcloud artifacts docker images list asia-east1-docker.pkg.dev/PROJECT_ID/tcl-repo
+# 2. 驗證 Artifact Registry 存在
+gcloud artifacts repositories list --location=asia-east1
 
-# 問題：GKE 部署失敗
-# 檢查 kubectl 連接
-gcloud container clusters get-credentials CLUSTER_NAME --region REGION
-kubectl get nodes
+# 3. 檢查現有映像
+gcloud artifacts docker images list asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo
 
-# 檢查部署狀態
-kubectl get pods -n tcl-production
-kubectl describe deployment backend -n tcl-production
+# 4. 手動測試映像建構
+COMMIT_SHA=$(git rev-parse --short HEAD)
+docker buildx build \
+  --platform linux/amd64 \
+  -f docker/Dockerfile.frontend \
+  -t asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/frontend:$COMMIT_SHA \
+  .
+
+# 5. 檢查網路連接和權限
+curl -I https://asia-east1-docker.pkg.dev
+```
+
+##### 問題：GKE 部署失敗
+```bash
+# 1. 檢查集群連接
+gcloud container clusters get-credentials ton-cat-lottery-cluster --region asia-east1
+kubectl cluster-info
+
+# 2. 檢查命名空間
+kubectl get namespaces | grep -E "(tcl-production|tcl-staging)"
+
+# 3. 檢查當前部署狀態
+kubectl get deployments -n tcl-production
+kubectl get pods -n tcl-production -o wide
+
+# 4. 檢查 Kustomize 配置
+kubectl apply -k k8s/overlays/production --dry-run=client
+kubectl apply -k k8s/overlays/staging --dry-run=client
+
+# 5. 檢查資源配額和限制
+kubectl describe namespace tcl-production
+kubectl get resourcequota -n tcl-production
+
+# 6. 檢查 Ingress 和服務
+kubectl get ingress -A
+kubectl get services -n tcl-production
+```
+
+##### 問題：健康檢查失敗
+```bash
+# 1. 檢查 Pod 狀態
+kubectl get pods -n tcl-production -o wide
+kubectl describe pod <POD_NAME> -n tcl-production
+
+# 2. 檢查應用日誌
+kubectl logs -f deployment/frontend -n tcl-production
+kubectl logs -f deployment/backend -n tcl-production
+
+# 3. 測試容器內健康檢查
+kubectl exec deployment/frontend -n tcl-production -- curl -f http://localhost/health
+kubectl exec deployment/backend -n tcl-production -- ps aux
+
+# 4. 檢查服務端點
+kubectl get endpoints -n tcl-production
+kubectl describe service frontend-service -n tcl-production
+```
+
+##### 問題：外部可達性測試失敗
+```bash
+# 1. 檢查 DNS 解析
+nslookup cat-lottery.chaowei-liu.com
+nslookup dev.cat-lottery.chaowei-liu.com
+
+# 2. 檢查 SSL 證書狀態
+kubectl get certificates -A
+kubectl describe certificate production-tls -n tcl-production
+
+# 3. 檢查 LoadBalancer 狀態
+kubectl get services -n ingress-nginx
+kubectl describe service nginx-ingress-ingress-nginx-controller -n ingress-nginx
+
+# 4. 手動測試連通性
+curl -I -k https://cat-lottery.chaowei-liu.com --connect-timeout 10
+curl -I -k https://dev.cat-lottery.chaowei-liu.com --connect-timeout 10
+
+# 5. 檢查靜態 IP 配置
+cd terraform && terraform output static_ip
+```
+
+#### 環境清理問題
+```bash
+# 問題：智能清理機制未執行
+# 1. 手動縮放 staging 環境
+kubectl scale deployment --all --replicas=0 -n tcl-staging
+
+# 2. 手動清理舊映像
+for service in frontend backend; do
+  gcloud artifacts docker images list \
+    asia-east1-docker.pkg.dev/ton-cat-lottery-dev-3/tcl-repo/$service \
+    --sort-by=~createTime \
+    --format="value(name)" \
+    --limit=999 | tail -n +6 | while read image; do
+    if [ -n "$image" ]; then
+      gcloud artifacts docker images delete "$image" --quiet
+    fi
+  done
+done
+
+# 3. 檢查資源使用
+kubectl top pods -n tcl-staging
+kubectl get resourcequota -A
 ```
 
 #### GitHub Secrets 問題
-```bash
-# 檢查必要的 GitHub Secrets
-# GCP_WIF_PROVIDER
-# GCP_SERVICE_ACCOUNT  
-# PROJECT_ID
 
-# 透過 GitHub CLI 設定 secrets
-gh secret set GCP_WIF_PROVIDER --body "projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
-gh secret set GCP_SERVICE_ACCOUNT --body "gha-deploy@PROJECT_ID.iam.gserviceaccount.com"
-gh secret set PROJECT_ID --body "your-project-id"
+##### 問題：Secrets 缺失或配置錯誤
+```bash
+# 1. 檢查必要的 GitHub Secrets
+gh secret list
+# 應包含：GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT, PROJECT_ID
+
+# 2. 獲取正確的 Secrets 值
+# 從 OIDC 設定腳本輸出中獲取，或手動查詢：
+PROJECT_NUMBER=$(gcloud projects describe ton-cat-lottery-dev-3 --format="value(projectNumber)")
+echo "GCP_WIF_PROVIDER: projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+echo "GCP_SERVICE_ACCOUNT: gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com"
+echo "PROJECT_ID: ton-cat-lottery-dev-3"
+
+# 3. 使用 GitHub CLI 設定 secrets（推薦）
+gh secret set GCP_WIF_PROVIDER --body "projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+gh secret set GCP_SERVICE_ACCOUNT --body "gha-deploy@ton-cat-lottery-dev-3.iam.gserviceaccount.com"
+gh secret set PROJECT_ID --body "ton-cat-lottery-dev-3"
+
+# 4. 或通過 GitHub 網頁界面設定
+# Repository Settings → Secrets and variables → Actions → New repository secret
 ```
+
+##### 問題：Secrets 權限問題
+```bash
+# 檢查當前用戶是否有 repository admin 權限
+gh api repos/:owner/:repo/collaborators/$(gh api user | jq -r .login)/permission
+
+# 檢查 organization secrets 設定（如果適用）
+gh secret list --org YOUR_ORG
+```
+
+#### 常見 CI/CD 工作流程錯誤總結
+```bash
+# 快速診斷腳本
+echo "🔍 執行完整 CI/CD 診斷..."
+./scripts/verify-cicd.sh
+
+echo "📋 檢查最近的工作流程執行..."
+gh run list --status=failure --limit 3
+
+echo "🔐 驗證 GitHub Secrets..."
+gh secret list
+
+echo "☁️ 檢查 GCP 連接..."
+gcloud auth list
+gcloud config get-value project
+
+echo "🎯 檢查部署狀態..."
+kubectl get pods -n tcl-production --no-headers | awk '{print $1, $3}'
+kubectl get pods -n tcl-staging --no-headers | awk '{print $1, $3}'
+
+echo "✅ 診斷完成！查看上述輸出以識別問題"
+```
+
+---
+
+## CI/CD 階段完成總結 ✅
+
+### 🎉 已實作功能
+- **✅ 三層品質關卡**：代碼品質、全端測試、安全掃描  
+- **✅ OIDC 安全認證**：無金鑰認證，自動化腳本配置
+- **✅ 雙環境部署**：Production/Staging 智能路由
+- **✅ 智能清理機制**：PR 關閉自動清理，舊映像清理
+- **✅ 完整監控驗證**：健康檢查、外部可達性測試
+- **✅ 詳細故障排除**：涵蓋所有常見問題和解決方案
+
+### 🛠️ 關鍵檔案
+```
+TON Cat Lottery CI/CD 基礎設施：
+├── .github/workflows/ci.yml         # CI 品質關卡流程
+├── .github/workflows/cd.yml         # CD 部署驗證流程  
+├── setup-gcp-oidc.sh               # OIDC 自動配置腳本
+├── scripts/verify-cicd.sh           # CI/CD 配置驗證工具
+└── docs/DevOpsREADME.md             # 完整操作文檔
+```
+
+### 🚀 下一步操作
+1. **執行 OIDC 設定**：`./setup-gcp-oidc.sh`
+2. **配置 GitHub Secrets**：依照腳本輸出設定
+3. **測試 CI/CD 流程**：推送代碼觸發工作流程
+4. **監控部署狀態**：`gh run watch` 實時監控
+
+### 🔗 相關連結  
+- 📊 **GitHub Actions**: [Repository Actions](https://github.com/用戶名/ton-cat-lottery/actions)
+- ☁️ **GCP Console**: [Kubernetes Workloads](https://console.cloud.google.com/kubernetes/workload)
+- 🐳 **Container Registry**: [Artifact Registry](https://console.cloud.google.com/artifacts)
+- 🌐 **Production**: https://cat-lottery.chaowei-liu.com
+- 🧪 **Staging**: https://dev.cat-lottery.chaowei-liu.com
 
 ---
 ## Monitoring (Prometheus + Grafana)

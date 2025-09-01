@@ -674,6 +674,7 @@ ton-cat-lottery/
   - [ ] 更新主目錄 `.gitignore` for CI/CD
   - [ ] 整理內容到 `DevOpsREADME.md`
 
+---
 #### 階段 6：Monitoring (Prometheus + Grafana)
 
 > 技術：Prometheus + Grafana + AlertManager
