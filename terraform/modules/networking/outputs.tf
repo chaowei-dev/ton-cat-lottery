@@ -20,12 +20,12 @@ output "subnet_self_link" {
 
 output "static_ip" {
   description = "Static external IP address"
-  value       = google_compute_global_address.static_ip.address
+  value       = google_compute_address.static_ip.address
 }
 
 output "static_ip_name" {
   description = "Static external IP address name"
-  value       = google_compute_global_address.static_ip.name
+  value       = google_compute_address.static_ip.name
 }
 
 output "pods_secondary_range_name" {

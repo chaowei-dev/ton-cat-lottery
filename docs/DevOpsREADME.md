@@ -600,20 +600,40 @@ curl -I https://$(terraform output -raw domain_name)
 
 ### 故障排除
 #### 常見部署問題
+##### 問題：cert-manager CRDs 不存在
 ```bash
-# 問題：cert-manager CRDs 不存在
 # 原因：kubernetes_manifest 在 cert-manager 完成安裝前執行
 # 解決方案：分步驟部署
 terraform apply -target="module.ssl[0].helm_release.cert_manager" -var="enable_k8s_resources=true"
 terraform apply -var="enable_k8s_resources=true"
-
-# 問題：Secret Manager API 未啟用
+```
+##### 問題：Secret Manager API 未啟用
+```bash
 # 解決方案：
 gcloud services enable secretmanager.googleapis.com --project=PROJECT_ID
+```
 
-# 問題：kubernetes provider 連接錯誤
+##### 問題：kubernetes provider 連接錯誤
+```bash
 # 解決方案：確保 kubectl 已配置
 gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region $(terraform output -raw region)
+```
+##### 問題：LoadBalancer External-IP 一直顯示 <pending>
+```bash
+# 原因：靜態IP類型錯誤 (Global vs Regional)
+# 檢查當前IP類型：
+gcloud compute addresses list --global
+gcloud compute addresses list --regions=REGION
+
+# 解決方案：將 Global 靜態IP 改為 Regional 靜態IP
+# 在 modules/networking/main.tf 中修改：
+# google_compute_global_address -> google_compute_address
+# 並加入 region = var.region 參數
+terraform apply -target=module.networking.google_compute_address.static_ip -auto-approve
+
+# 重新配置 LoadBalancer Service 使用新IP
+kubectl delete svc nginx-ingress-ingress-nginx-controller -n ingress-nginx
+kubectl apply -f updated-loadbalancer-service.yaml
 ```
 
 #### 一般故障排除

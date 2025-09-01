@@ -32,9 +32,10 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 # Static external IP for ingress
-resource "google_compute_global_address" "static_ip" {
+resource "google_compute_address" "static_ip" {
   name         = "tcl-ingress-ip"
   address_type = "EXTERNAL"
+  region       = var.region
   
   project = var.project_id
 }
