@@ -1245,7 +1245,7 @@ cd contracts && npm ci && npm run build
 cd frontend && npm ci && npm run lint && npm run type-check
 
 # 3. 後端代碼格式問題
-go fmt ./... && go vet ./...
+cd backend && go fmt ./... && go vet ./...
 
 # 4. Docker 建構失敗
 docker build -f docker/Dockerfile.frontend .
@@ -1262,7 +1262,7 @@ cd contracts && npm test
 cd frontend && npm test -- --watchAll=false
 
 # 後端測試
-go test -v ./...
+cd backend && go test -v ./...
 
 # 檢查測試環境配置
 ./scripts/verify-cicd.sh

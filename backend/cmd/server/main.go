@@ -57,7 +57,7 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 		"version": "0.1.0",
 		"message": "Backend service is ready for DevOps deployment"
 	}`
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))

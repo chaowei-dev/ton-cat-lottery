@@ -59,6 +59,7 @@ jobs:
     # 後端代碼品質
     - name: 📋 Backend Code Quality
       run: |
+        cd backend
         go fmt ./...
         go vet ./...
         if command -v golint &> /dev/null; then
@@ -131,6 +132,7 @@ jobs:
     - name: 🧪 Backend Tests
       if: matrix.component == 'backend'
       run: |
+        cd backend
         go test -v ./... || {
           echo "❌ Backend tests failed"
           echo "::warning::Backend tests need attention"
@@ -175,6 +177,7 @@ jobs:
         
     - name: 🔒 Go Security Check
       run: |
+        cd backend
         # 檢查 Go 模組的已知漏洞
         go list -json -deps ./... | grep "Module" || echo "⚠️ No Go modules security check available"
         echo "✅ Go security scan completed"
